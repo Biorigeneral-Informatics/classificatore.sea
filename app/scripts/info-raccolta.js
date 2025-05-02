@@ -36,58 +36,77 @@ class InfoRaccoltaManager {
         }
     }
 
+    // Nuovo metodo per gestire i dropdown con campo di testo editabile
     initializeEditableDropdowns() {
         ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
             const select = document.getElementById(fieldId);
             
+            // Crea un campo di testo editabile
+            const customInputContainer = document.createElement('div');
+            customInputContainer.className = 'custom-input-container';
+            customInputContainer.style.display = 'none'; // Nascosto inizialmente
+            customInputContainer.style.marginTop = '0.5rem';
+            
+            const customInput = document.createElement('input');
+            customInput.type = 'text';
+            customInput.id = `${fieldId}Custom`;
+            customInput.className = 'form-control custom-field-input';
+            customInput.placeholder = `Inserisci ${fieldId} personalizzato`;
+            
+            customInputContainer.appendChild(customInput);
+            
+            // Inserisci il container dopo il select
             if (select) {
-                // Aggiungi stile per assicurare che le opzioni siano tutte visibili
-                select.style.maxHeight = '300px';
-                select.style.overflow = 'auto';
+                select.parentNode.appendChild(customInputContainer);
                 
+                // Aggiungi event listener per il select
                 select.addEventListener('change', function() {
                     if (this.value === 'EDITABILE') {
-                        // Quando si seleziona "EDITABILE", chiedi il valore all'utente
-                        const customValue = prompt(`Inserisci il valore personalizzato per ${fieldId}:`);
-                        
-                        if (customValue && customValue.trim() !== '') {
-                            // Verifica se l'opzione esiste già per evitare duplicati
-                            let optionExists = false;
-                            for (let i = 0; i < this.options.length; i++) {
-                                if (this.options[i].value === customValue.trim()) {
-                                    optionExists = true;
-                                    this.value = customValue.trim(); // Seleziona l'opzione esistente
-                                    break;
-                                }
-                            }
-                            
-                            // Se l'opzione non esiste, creala
-                            if (!optionExists) {
-                                // Crea una nuova opzione per questo valore
-                                const newOption = document.createElement('option');
-                                newOption.value = customValue.trim();
-                                newOption.textContent = customValue.trim();
-                                
-                                // Inserisci prima dell'opzione EDITABILE
-                                const editableOption = this.querySelector('option[value="EDITABILE"]');
-                                this.insertBefore(newOption, editableOption);
-                                
-                                // Seleziona la nuova opzione
-                                this.value = customValue.trim();
-                            }
-                        } else {
-                            // Se l'utente annulla o inserisce un valore vuoto, torna a "Seleziona..."
-                            this.value = '';
-                        }
-                        
-                        // Triggera un evento change per notificare eventuali listener
-                        const event = new Event('change', { bubbles: true });
-                        this.dispatchEvent(event);
+                        // Mostra il campo personalizzato
+                        customInputContainer.style.display = 'block';
+                        customInput.focus();
+                    } else {
+                        // Nascondi il campo personalizzato
+                        customInputContainer.style.display = 'none';
                     }
+                });
+                
+                // Aggiungi event listener per il tasto Enter e per la perdita di focus
+                customInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        applyCustomValue(select, customInput, customInputContainer);
+                    }
+                });
+                
+                customInput.addEventListener('blur', function() {
+                    applyCustomValue(select, customInput, customInputContainer);
                 });
             }
         });
-    }
+        
+        // Funzione per applicare il valore personalizzato
+        function applyCustomValue(select, input, container) {
+            const customValue = input.value.trim();
+            if (customValue !== '') {
+                // Crea una nuova opzione per questo valore
+                const newOption = document.createElement('option');
+                newOption.value = customValue;
+                newOption.textContent = customValue;
+                
+                // Inserisci prima dell'opzione EDITABILE
+                const editableOption = select.querySelector('option[value="EDITABILE"]');
+                select.insertBefore(newOption, editableOption);
+                
+                // Seleziona la nuova opzione
+                select.value = customValue;
+                
+                // Nascondi il campo personalizzato
+                container.style.display = 'none';
+            }
+        }
+    } //Fine initializeEditableDropdowns
+
 
     getFormData() {
         // Raccoglie i dati dal Form 1: Caratteristiche Fisiche (versione aggiornata)
@@ -162,7 +181,7 @@ class InfoRaccoltaManager {
     }
 
    // Migliora anche questa funzione in info-raccolta.js per una gestione migliore dei valori personalizzati
-populateFormsWithData(data) {
+   populateFormsWithData(data) {
     // Popola Form 1: Caratteristiche Fisiche (versione aggiornata)
     const cf = data.caratteristicheFisiche;
     if (cf) {
@@ -198,6 +217,12 @@ populateFormsWithData(data) {
                 
                 // Imposta il valore selezionato (dopo aver eventualmente aggiunto l'opzione)
                 select.value = value;
+                
+                // Nascondi eventuali campi personalizzati aperti
+                const customInputContainer = select.parentNode.querySelector('.custom-input-container');
+                if (customInputContainer) {
+                    customInputContainer.style.display = 'none';
+                }
             }
         });
         
@@ -210,18 +235,17 @@ populateFormsWithData(data) {
         });
     }
 
-    // Il resto della funzione rimane invariato...
-    // Popola Form 2: Informazioni Certificato (invariato)
-    const ic = data.infoCertificato;
-    if (ic) {
-        Object.keys(ic).forEach(key => {
-            const element = document.getElementById(key);
-            if (element) {
-                element.value = ic[key];
-            }
-        });
+        // Popola Form 2: Informazioni Certificato (invariato)
+        const ic = data.infoCertificato;
+        if (ic) {
+            Object.keys(ic).forEach(key => {
+                const element = document.getElementById(key);
+                if (element) {
+                    element.value = ic[key];
+                }
+            });
+        }
     }
-}
 
     resetForms() {
         document.getElementById('caratteristicheFisicheForm').reset();

@@ -1397,6 +1397,19 @@
     border-top: 1px solid #444;
 }
 
+.custom-input-container {
+    display: flex;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.custom-field-input {
+    flex: 1;
+}
+
+.custom-field-apply {
+    margin-left: 0.5rem;
+}
 
 
 
