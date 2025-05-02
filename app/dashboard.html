@@ -541,71 +541,55 @@
                     <h3>Caratteristiche Fisiche del Campione</h3>
                     <form id="caratteristicheFisicheForm" class="raccolta-form">
                         <div class="form-group-grid">
-                            <!-- Prima colonna -->
+                           <!-- Prima colonna -->
                             <div class="form-column">
                                 <div class="form-group">
                                     <label for="colore">Colore</label>
-                                    <div class="input-group">
-                                        <select id="colore" class="form-control" required>
-                                            <option value="">Seleziona colore...</option>
-                                            <option value="Incolore">Incolore</option>
-                                            <option value="Vario">Vario</option>
-                                            <!-- Rimosso EDITABILE -->
-                                        </select>
-                                        <div class="custom-control custom-checkbox ml-2">
-                                            <input type="checkbox" class="custom-control-input" id="coloreCustomCheck">
-                                            <label class="custom-control-label" for="coloreCustomCheck">Personalizza</label>
-                                        </div>
-                                    </div>
-                                    <input type="text" id="coloreCustom" class="form-control mt-2" placeholder="Inserisci colore personalizzato" disabled>
+                                    <select id="colore" class="form-control" required>
+                                        <option value="">Seleziona colore...</option>
+                                        <option value="Incolore">Incolore</option>
+                                        <option value="Vario">Vario</option>
+                                        <option value="Altro">Altro (specificare)</option>
+                                    </select>
+                                    <input type="text" id="coloreCustom" class="form-control mt-2" 
+                                        placeholder="Specificare se 'Altro'" style="display: none;">
                                 </div>
                                 
-                                <!-- Modifica per il campo odore -->
                                 <div class="form-group">
                                     <label for="odore">Odore</label>
-                                    <div class="input-group">
-                                        <select id="odore" class="form-control" required>
-                                            <option value="">Seleziona odore...</option>
-                                            <option value="Chimico non definibile">Chimico non definibile</option>
-                                            <option value="Di carta">Di carta</option>
-                                            <option value="Di idrocarburi">Di idrocarburi</option>
-                                            <option value="Di legno">Di legno</option>
-                                            <option value="Di solvente">Di solvente</option>
-                                            <option value="Di terra">Di terra</option>
-                                            <option value="Inodore">Inodore</option>
-                                            <option value="Metallico">Metallico</option>
-                                            <option value="Non determinabile">Non determinabile</option>
-                                            <option value="Sgradevole">Sgradevole</option>
-                                            <!-- Rimosso EDITABILE -->
-                                        </select>
-                                        <div class="custom-control custom-checkbox ml-2">
-                                            <input type="checkbox" class="custom-control-input" id="odoreCustomCheck">
-                                            <label class="custom-control-label" for="odoreCustomCheck">Personalizza</label>
-                                        </div>
-                                    </div>
-                                    <input type="text" id="odoreCustom" class="form-control mt-2" placeholder="Inserisci odore personalizzato" disabled>
+                                    <select id="odore" class="form-control" required>
+                                        <option value="">Seleziona odore...</option>
+                                        <option value="Chimico non definibile">Chimico non definibile</option>
+                                        <option value="Di carta">Di carta</option>
+                                        <option value="Di idrocarburi">Di idrocarburi</option>
+                                        <option value="Di legno">Di legno</option>
+                                        <option value="Di solvente">Di solvente</option>
+                                        <option value="Di terra">Di terra</option>
+                                        <option value="Inodore">Inodore</option>
+                                        <option value="Metallico">Metallico</option>
+                                        <option value="Non determinabile">Non determinabile</option>
+                                        <option value="Sgradevole">Sgradevole</option>
+                                        <option value="Altro">Altro (specificare)</option>
+                                    </select>
+                                    <input type="text" id="odoreCustom" class="form-control mt-2" 
+                                        placeholder="Specificare se 'Altro'" style="display: none;">
                                 </div>
                                 
-                                <!-- Modifica per il campo stato fisico -->
                                 <div class="form-group">
                                     <label for="statoFisico">Stato Fisico</label>
-                                    <div class="input-group">
-                                        <select id="statoFisico" class="form-control" required>
-                                            <option value="">Seleziona stato fisico...</option>
-                                            <option value="Fangoso palabile">Fangoso palabile</option>
-                                            <option value="Fangoso pompabile">Fangoso pompabile</option>
-                                            <option value="Liquido">Liquido</option>
-                                            <option value="Solido non polverulento">Solido non polverulento</option>
-                                            <option value="Solido polverulento">Solido polverulento</option>
-                                            <!-- Rimosso EDITABILE -->
-                                        </select>
-                                        <div class="custom-control custom-checkbox ml-2">
-                                            <input type="checkbox" class="custom-control-input" id="statoFisicoCustomCheck">
-                                            <label class="custom-control-label" for="statoFisicoCustomCheck">Personalizza</label>
-                                        </div>
-                                    </div>
-                                    <input type="text" id="statoFisicoCustom" class="form-control mt-2" placeholder="Inserisci stato fisico personalizzato" disabled>
+                                    <select id="statoFisico" class="form-control" required>
+                                        <option value="">Seleziona stato fisico...</option>
+                                        <option value="Fangoso palabile">Fangoso palabile</option>
+                                        <option value="Fangoso pompabile">Fangoso pompabile</option>
+                                        <option value="Liquido">Liquido</option>
+                                        <option value="Solido non polverulento">Solido non polverulento</option>
+                                        <option value="Solido polverulento">Solido polverulento</option>
+                                        <option value="Altro">Altro (specificare)</option>
+                                    </select>
+                                    <input type="text" id="statoFisicoCustom" class="form-control mt-2" 
+                                        placeholder="Specificare se 'Altro'" style="display: none;">
                                 </div>
+                                
                                 <div class="form-group">
                                     <label for="ph">pH</label>
                                     <input type="text" id="ph" class="form-control" required>
