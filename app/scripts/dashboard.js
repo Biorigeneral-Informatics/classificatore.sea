@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     initElectronListeners();
     initTabellaRiscontro();
     
+    // Inizializza dropdown personalizzabili
+    initCustomDropdowns();
+
     // Inizializza sezione sali-metalli
     await initSaliMetalli();
 
@@ -188,6 +191,27 @@ function initThemeToggle() {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // EVENT LISTNERS
 function initEventListeners() {
     // Home page buttons
@@ -234,6 +258,8 @@ function initEventListeners() {
             window.electronAPI.openPage('./echa/echa.html');
         });
     }
+
+
     
     // File upload nella sezione Raccolta
     const dropZone = document.getElementById('dropZone');
@@ -1102,7 +1128,37 @@ async function deleteFile(filePath) {
     }
 }
 
-
+// Inizializza i dropdown personalizzati
+// per i campi colore, odore e stato fisico
+function initCustomDropdowns() {
+    ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
+        const select = document.getElementById(fieldId);
+        const customInput = document.getElementById(`${fieldId}Custom`);
+        
+        if (select && customInput) {
+            // Inizializza lo stato iniziale
+            if (select.value === 'custom') {
+                customInput.style.display = 'block';
+                customInput.required = true;
+            } else {
+                customInput.style.display = 'none';
+                customInput.required = false;
+            }
+            
+            // Aggiungi l'event listener
+            select.addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    customInput.style.display = 'block';
+                    customInput.required = true;
+                    customInput.focus();
+                } else {
+                    customInput.style.display = 'none';
+                    customInput.required = false;
+                }
+            });
+        }
+    });
+}
 
 
 

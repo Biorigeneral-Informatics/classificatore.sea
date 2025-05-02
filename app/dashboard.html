@@ -545,22 +545,48 @@
                             <div class="form-column">
                                 <div class="form-group">
                                     <label for="colore">Colore</label>
-                                    <input type="text" id="colore" class="form-control" required>
+                                    <select id="colore" class="form-control" required>
+                                        <option value="">Seleziona colore...</option>
+                                        <option value="Incolore">Incolore</option>
+                                        <option value="Vario">Vario</option>
+                                        <option value="EDITABILE">Editabile...</option>
+                                    </select>
                                 </div>
                                 <div class="form-group">
                                     <label for="odore">Odore</label>
-                                    <input type="text" id="odore" class="form-control" required>
+                                    <select id="odore" class="form-control" required>
+                                        <option value="">Seleziona odore...</option>
+                                        <option value="Chimico non definibile">Chimico non definibile</option>
+                                        <option value="Di carta">Di carta</option>
+                                        <option value="Di idrocarburi">Di idrocarburi</option>
+                                        <option value="Di legno">Di legno</option>
+                                        <option value="Di solvente">Di solvente</option>
+                                        <option value="Di terra">Di terra</option>
+                                        <option value="Inodore">Inodore</option>
+                                        <option value="Metallico">Metallico</option>
+                                        <option value="Non determinabile">Non determinabile</option>
+                                        <option value="Sgradevole">Sgradevole</option>
+                                        <option value="EDITABILE">Editabile...</option>
+                                    </select>
                                 </div>
                                 <div class="form-group">
                                     <label for="statoFisico">Stato Fisico</label>
-                                    <input type="text" id="statoFisico" class="form-control" required>
+                                    <select id="statoFisico" class="form-control" required>
+                                        <option value="">Seleziona stato fisico...</option>
+                                        <option value="Fangoso palabile">Fangoso palabile</option>
+                                        <option value="Fangoso pompabile">Fangoso pompabile</option>
+                                        <option value="Liquido">Liquido</option>
+                                        <option value="Solido non polverulento">Solido non polverulento</option>
+                                        <option value="Solido polverulento">Solido polverulento</option>
+                                        <option value="EDITABILE">Editabile...</option>
+                                    </select>
                                 </div>
                                 <div class="form-group">
                                     <label for="ph">pH</label>
                                     <input type="text" id="ph" class="form-control" required>
                                 </div>
                             </div>
-                            
+
                             <!-- Seconda colonna -->
                             <div class="form-column">
                                 <div class="form-group">
@@ -581,37 +607,6 @@
                                 </div>
                             </div>
 
-                            <!-- Terza colonna -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="grammiCOver10">Grammi C > 10</label>
-                                    <div class="input-group">
-                                        <input type="number" id="grammiCOver10" class="form-control" step="0.01" required>
-                                        <span class="input-group-text">g</span>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="grammiCUnder10">Grammi C < 10</label>
-                                    <div class="input-group">
-                                        <input type="number" id="grammiCUnder10" class="form-control" step="0.01" required>
-                                        <span class="input-group-text">g</span>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="idroPolicicicli">Idrocarburi Policiclici Aromatici</label>
-                                    <div class="input-group">
-                                        <input type="number" id="idroPolicicicli" class="form-control" step="0.01" required>
-                                        <span class="input-group-text">g</span>
-                                    </div>
-                                </div>
-                                <div class="form-group">
-                                    <label for="grammiIPA">Grammi pesati IPA</label>
-                                    <div class="input-group">
-                                        <input type="number" id="grammiIPA" class="form-control" step="0.01" required>
-                                        <span class="input-group-text">g</span>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </form>
                 </div>

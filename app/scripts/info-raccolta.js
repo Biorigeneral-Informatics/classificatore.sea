@@ -19,6 +19,9 @@ class InfoRaccoltaManager {
         if (resetBtn) {
             resetBtn.addEventListener('click', () => this.resetForms());
         }
+        
+        // Aggiungi gestione per opzioni EDITABILE
+        this.initializeEditableDropdowns();
     }
 
     async loadSavedData() {
@@ -33,8 +36,40 @@ class InfoRaccoltaManager {
         }
     }
 
+ // Nuovo metodo per gestire i dropdown con opzione EDITABILE
+ initializeEditableDropdowns() {
+    ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
+        const select = document.getElementById(fieldId);
+        
+        if (select) {
+            select.addEventListener('change', function() {
+                if (this.value === 'EDITABILE') {
+                    // Quando si seleziona "EDITABILE", chiedi il valore all'utente
+                    const customValue = prompt(`Inserisci il valore personalizzato per ${fieldId}:`);
+                    if (customValue && customValue.trim() !== '') {
+                        // Crea una nuova opzione per questo valore
+                        const newOption = document.createElement('option');
+                        newOption.value = customValue;
+                        newOption.textContent = customValue;
+                        
+                        // Inserisci prima dell'opzione EDITABILE
+                        const editableOption = this.querySelector('option[value="EDITABILE"]');
+                        this.insertBefore(newOption, editableOption);
+                        
+                        // Seleziona la nuova opzione
+                        this.value = customValue;
+                    } else {
+                        // Se l'utente annulla o inserisce un valore vuoto, torna a "Seleziona..."
+                        this.value = '';
+                    }
+                }
+            });
+        }
+    });
+    }
+
     getFormData() {
-        // Raccoglie i dati dal Form 1: Caratteristiche Fisiche
+        // Raccoglie i dati dal Form 1: Caratteristiche Fisiche (versione aggiornata)
         const caratteristicheFisiche = {
             colore: document.getElementById('colore').value,
             odore: document.getElementById('odore').value,
@@ -43,14 +78,11 @@ class InfoRaccoltaManager {
             residuo105: document.getElementById('residuo105').value,
             residuo180: document.getElementById('residuo180').value,
             residuo600: document.getElementById('residuo600').value,
-            infiammabilita: document.getElementById('infiammabilita').value,
-            grammiCOver10: document.getElementById('grammiCOver10').value,
-            grammiCUnder10: document.getElementById('grammiCUnder10').value,
-            idroPolicicicli: document.getElementById('idroPolicicicli').value,
-            grammiIPA: document.getElementById('grammiIPA').value
+            infiammabilita: document.getElementById('infiammabilita').value
+            // Rimossi i campi non più necessari
         };
 
-        // Raccoglie i dati dal Form 2: Informazioni Certificato
+        // Raccoglie i dati dal Form 2: Informazioni Certificato (invariato)
         const infoCertificato = {
             rapportoProva: document.getElementById('rapportoProva').value,
             descrizione: document.getElementById('descrizione').value,
@@ -109,18 +141,54 @@ class InfoRaccoltaManager {
     }
 
     populateFormsWithData(data) {
-        // Popola Form 1: Caratteristiche Fisiche
+        // Popola Form 1: Caratteristiche Fisiche (versione aggiornata)
         const cf = data.caratteristicheFisiche;
         if (cf) {
-            Object.keys(cf).forEach(key => {
+            // Popola i dropdown con opzione EDITABILE
+            ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
+                const select = document.getElementById(fieldId);
+                const value = cf[fieldId];
+                
+                if (select && value) {
+                    // Verifica se il valore è presente nelle opzioni predefinite
+                    let optionExists = false;
+                    for (let i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value === value) {
+                            optionExists = true;
+                            break;
+                        }
+                    }
+                    
+                    // Se il valore non esiste, crea una nuova opzione personalizzata
+                    if (!optionExists && value !== '') {
+                        const newOption = document.createElement('option');
+                        newOption.value = value;
+                        newOption.textContent = value;
+                        
+                        // Inserisci prima dell'opzione EDITABILE
+                        const editableOption = select.querySelector('option[value="EDITABILE"]');
+                        if (editableOption) {
+                            select.insertBefore(newOption, editableOption);
+                        } else {
+                            select.add(newOption);
+                        }
+                    }
+                    
+                    // Imposta il valore selezionato
+                    select.value = value;
+                }
+            });
+            
+            // Popola gli altri campi normalmente
+            ['ph', 'residuo105', 'residuo180', 'residuo600', 'infiammabilita'].forEach(key => {
                 const element = document.getElementById(key);
-                if (element) {
+                if (element && cf[key] !== undefined) {
                     element.value = cf[key];
                 }
             });
         }
 
-        // Popola Form 2: Informazioni Certificato
+        // Popola Form 2: Informazioni Certificato (invariato)
         const ic = data.infoCertificato;
         if (ic) {
             Object.keys(ic).forEach(key => {
@@ -138,6 +206,12 @@ class InfoRaccoltaManager {
         showNotification('Form ripristinati', 'info');
     }
 }
+
+
+
+
+//********************************************************************************************* */
+
 
 // Inizializza il gestore quando il documento è pronto
 document.addEventListener('DOMContentLoaded', () => {
