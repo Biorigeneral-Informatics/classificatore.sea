@@ -1319,115 +1319,83 @@
     transition: all 0.2s ease;
 }
 
-/* Stili per i menu a tendina */
+/* RESET RADICALE per i menu a tendina */
 .form-group select.form-control {
-    appearance: auto; /* Usa l'aspetto nativo del browser */
-    background: var(--card-bg);
-    background-image: none; /* Rimuove l'immagine di sfondo di freccia aggiunta in precedenza */
-    padding: 0.75rem; /* Utilizza lo stesso padding degli altri input */
+    /* Reset completo */
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+    appearance: menulist !important;
+    
+    /* Rimuove qualsiasi immagine di sfondo o pattern */
+    background-image: none !important;
+    background-color: var(--card-bg) !important;
+    
+    /* Stile base coerente */
+    width: 100%;
+    height: fit-content;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 14px;
+    cursor: pointer;
+    
+    /* Previene qualsiasi pattern o overlay */
+    position: relative;
+    z-index: 1;
 }
 
-@-moz-document url-prefix() {
-    .form-group select.form-control {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0h8L4 6 0 0z' fill='%23666'/%3E%3C/svg%3E");
-        background-position: right 0.75rem center;
-        background-repeat: no-repeat;
-        padding-right: 2rem;
-    }
+/* Stile hover */
+.form-group select.form-control:hover {
+    border-color: var(--primary);
 }
 
-/* For Chrome e Safari */
-@media screen and (-webkit-min-device-pixel-ratio:0) {
-    .form-group select.form-control {
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6'%3E%3Cpath d='M0 0h8L4 6 0 0z' fill='%23666'/%3E%3C/svg%3E");
-        background-position: right 0.75rem center;
-        background-repeat: no-repeat;
-        padding-right: 2rem;
-    }
-}
-
-/* Stili per gli input personalizzati che appaiono quando si seleziona 'custom' */
-.form-group .custom-input {
-    margin-top: 0.5rem;
-    display: none;
-    animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-5px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.form-group .form-control:focus {
+/* Stile focus */
+.form-group select.form-control:focus {
+    outline: none;
     border-color: var(--primary);
     box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.1);
-    outline: none;
 }
 
-.input-group {
-    display: flex;
-    align-items: center;
+/* Assicurati che non ci siano pattern o overlay */
+.form-group select.form-control::before,
+.form-group select.form-control::after {
+    display: none !important;
+    content: none !important;
 }
 
-.input-group .form-control {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-}
-
-.input-group-text {
-    padding: 0.75rem;
-    background: var(--light);
-    border: 1px solid var(--border-color);
-    border-left: none;
-    border-top-right-radius: 8px;
-    border-bottom-right-radius: 8px;
+/* Stile per le opzioni */
+.form-group select.form-control option {
+    background-color: var(--card-bg);
     color: var(--text-color);
+    padding: 8px;
+    border: none;
 }
 
-textarea.form-control {
-    min-height: 100px;
-    resize: vertical;
+/* Evidenzia l'opzione "EDITABILE" */
+.form-group select.form-control option[value="EDITABILE"] {
+    font-style: italic;
+    color: #666;
+    border-top: 1px solid #ddd;
+    padding-top: 8px;
 }
 
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 2rem;
-    padding: 1rem;
-    background: var(--card-bg);
-    border-radius: 8px;
-    box-shadow: var(--card-shadow);
-}
-
-/* Stili per il campo custom attivo */
-.custom-input-active {
-    display: block !important;
-    border-top: 1px solid var(--border-color);
-    padding-top: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-/* Dark mode styles */
+/* Dark mode specifico per i select */
 [data-theme="dark"] .form-group select.form-control {
-    background-color: rgba(30, 30, 30, 0.7);
+    background-color: #1e1e1e !important;
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-[data-theme="dark"] .form-group select.form-control {
-    background-color: rgba(30, 30, 30, 0.7);
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23adb5bd' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+[data-theme="dark"] .form-group select.form-control option {
+    background-color: #1e1e1e;
+    color: #fff;
 }
 
-[data-theme="dark"] .input-group-text {
-    background: rgba(30, 30, 30, 0.7);
-    border-color: var(--border-color);
+[data-theme="dark"] .form-group select.form-control option[value="EDITABILE"] {
+    color: #aaa;
+    border-top: 1px solid #444;
 }
-
-[data-theme="dark"] .form-control:focus {
-    background: rgba(30, 30, 30, 0.9);
-}
-
-
 
 
 

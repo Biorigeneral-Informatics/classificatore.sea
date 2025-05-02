@@ -36,36 +36,57 @@ class InfoRaccoltaManager {
         }
     }
 
- // Nuovo metodo per gestire i dropdown con opzione EDITABILE
- initializeEditableDropdowns() {
-    ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
-        const select = document.getElementById(fieldId);
-        
-        if (select) {
-            select.addEventListener('change', function() {
-                if (this.value === 'EDITABILE') {
-                    // Quando si seleziona "EDITABILE", chiedi il valore all'utente
-                    const customValue = prompt(`Inserisci il valore personalizzato per ${fieldId}:`);
-                    if (customValue && customValue.trim() !== '') {
-                        // Crea una nuova opzione per questo valore
-                        const newOption = document.createElement('option');
-                        newOption.value = customValue;
-                        newOption.textContent = customValue;
+    initializeEditableDropdowns() {
+        ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
+            const select = document.getElementById(fieldId);
+            
+            if (select) {
+                // Aggiungi stile per assicurare che le opzioni siano tutte visibili
+                select.style.maxHeight = '300px';
+                select.style.overflow = 'auto';
+                
+                select.addEventListener('change', function() {
+                    if (this.value === 'EDITABILE') {
+                        // Quando si seleziona "EDITABILE", chiedi il valore all'utente
+                        const customValue = prompt(`Inserisci il valore personalizzato per ${fieldId}:`);
                         
-                        // Inserisci prima dell'opzione EDITABILE
-                        const editableOption = this.querySelector('option[value="EDITABILE"]');
-                        this.insertBefore(newOption, editableOption);
+                        if (customValue && customValue.trim() !== '') {
+                            // Verifica se l'opzione esiste già per evitare duplicati
+                            let optionExists = false;
+                            for (let i = 0; i < this.options.length; i++) {
+                                if (this.options[i].value === customValue.trim()) {
+                                    optionExists = true;
+                                    this.value = customValue.trim(); // Seleziona l'opzione esistente
+                                    break;
+                                }
+                            }
+                            
+                            // Se l'opzione non esiste, creala
+                            if (!optionExists) {
+                                // Crea una nuova opzione per questo valore
+                                const newOption = document.createElement('option');
+                                newOption.value = customValue.trim();
+                                newOption.textContent = customValue.trim();
+                                
+                                // Inserisci prima dell'opzione EDITABILE
+                                const editableOption = this.querySelector('option[value="EDITABILE"]');
+                                this.insertBefore(newOption, editableOption);
+                                
+                                // Seleziona la nuova opzione
+                                this.value = customValue.trim();
+                            }
+                        } else {
+                            // Se l'utente annulla o inserisce un valore vuoto, torna a "Seleziona..."
+                            this.value = '';
+                        }
                         
-                        // Seleziona la nuova opzione
-                        this.value = customValue;
-                    } else {
-                        // Se l'utente annulla o inserisce un valore vuoto, torna a "Seleziona..."
-                        this.value = '';
+                        // Triggera un evento change per notificare eventuali listener
+                        const event = new Event('change', { bubbles: true });
+                        this.dispatchEvent(event);
                     }
-                }
-            });
-        }
-    });
+                });
+            }
+        });
     }
 
     getFormData() {
@@ -140,65 +161,67 @@ class InfoRaccoltaManager {
         }
     }
 
-    populateFormsWithData(data) {
-        // Popola Form 1: Caratteristiche Fisiche (versione aggiornata)
-        const cf = data.caratteristicheFisiche;
-        if (cf) {
-            // Popola i dropdown con opzione EDITABILE
-            ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
-                const select = document.getElementById(fieldId);
-                const value = cf[fieldId];
-                
-                if (select && value) {
-                    // Verifica se il valore è presente nelle opzioni predefinite
-                    let optionExists = false;
-                    for (let i = 0; i < select.options.length; i++) {
-                        if (select.options[i].value === value) {
-                            optionExists = true;
-                            break;
-                        }
-                    }
-                    
-                    // Se il valore non esiste, crea una nuova opzione personalizzata
-                    if (!optionExists && value !== '') {
-                        const newOption = document.createElement('option');
-                        newOption.value = value;
-                        newOption.textContent = value;
-                        
-                        // Inserisci prima dell'opzione EDITABILE
-                        const editableOption = select.querySelector('option[value="EDITABILE"]');
-                        if (editableOption) {
-                            select.insertBefore(newOption, editableOption);
-                        } else {
-                            select.add(newOption);
-                        }
-                    }
-                    
-                    // Imposta il valore selezionato
-                    select.value = value;
-                }
-            });
+   // Migliora anche questa funzione in info-raccolta.js per una gestione migliore dei valori personalizzati
+populateFormsWithData(data) {
+    // Popola Form 1: Caratteristiche Fisiche (versione aggiornata)
+    const cf = data.caratteristicheFisiche;
+    if (cf) {
+        // Popola i dropdown con opzione EDITABILE
+        ['colore', 'odore', 'statoFisico'].forEach(fieldId => {
+            const select = document.getElementById(fieldId);
+            const value = cf[fieldId];
             
-            // Popola gli altri campi normalmente
-            ['ph', 'residuo105', 'residuo180', 'residuo600', 'infiammabilita'].forEach(key => {
-                const element = document.getElementById(key);
-                if (element && cf[key] !== undefined) {
-                    element.value = cf[key];
+            if (select && value && value.trim() !== '') {
+                // Verifica se il valore è presente nelle opzioni predefinite
+                let optionExists = false;
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].value === value) {
+                        optionExists = true;
+                        break;
+                    }
                 }
-            });
-        }
-
-        // Popola Form 2: Informazioni Certificato (invariato)
-        const ic = data.infoCertificato;
-        if (ic) {
-            Object.keys(ic).forEach(key => {
-                const element = document.getElementById(key);
-                if (element) {
-                    element.value = ic[key];
+                
+                // Se il valore non esiste, crea una nuova opzione personalizzata
+                if (!optionExists) {
+                    const newOption = document.createElement('option');
+                    newOption.value = value;
+                    newOption.textContent = value;
+                    
+                    // Inserisci prima dell'opzione EDITABILE
+                    const editableOption = select.querySelector('option[value="EDITABILE"]');
+                    if (editableOption) {
+                        select.insertBefore(newOption, editableOption);
+                    } else {
+                        select.add(newOption);
+                    }
                 }
-            });
-        }
+                
+                // Imposta il valore selezionato (dopo aver eventualmente aggiunto l'opzione)
+                select.value = value;
+            }
+        });
+        
+        // Popola gli altri campi normalmente
+        ['ph', 'residuo105', 'residuo180', 'residuo600', 'infiammabilita'].forEach(key => {
+            const element = document.getElementById(key);
+            if (element && cf[key] !== undefined) {
+                element.value = cf[key];
+            }
+        });
     }
+
+    // Il resto della funzione rimane invariato...
+    // Popola Form 2: Informazioni Certificato (invariato)
+    const ic = data.infoCertificato;
+    if (ic) {
+        Object.keys(ic).forEach(key => {
+            const element = document.getElementById(key);
+            if (element) {
+                element.value = ic[key];
+            }
+        });
+    }
+}
 
     resetForms() {
         document.getElementById('caratteristicheFisicheForm').reset();
