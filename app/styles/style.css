@@ -1253,7 +1253,7 @@
 
 
 
-/*SEZIONE RACCOLTA (Messo da Fede)*/
+/*SEZIONE RACCOLTA*/
 .btn-danger {
     background-color: var(--danger);
     color: white;
@@ -1277,7 +1277,7 @@
     align-items: flex-start;
 }
 
-/* Stili per i form della sezione Raccolta FEDE */
+/* Stili per i form della sezione Raccolta */
 .raccolta-forms {
     margin-top: 2rem;
 }
@@ -1288,7 +1288,7 @@
 
 .form-group-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr); /* Modificato: da 3 a 2 colonne */
+    grid-template-columns: repeat(2, 1fr);
     gap: 2rem;
 }
 
@@ -1372,14 +1372,6 @@
     border: none;
 }
 
-/* Evidenzia l'opzione "EDITABILE" */
-.form-group select.form-control option[value="EDITABILE"] {
-    font-style: italic;
-    color: #666;
-    border-top: 1px solid #ddd;
-    padding-top: 8px;
-}
-
 /* Dark mode specifico per i select */
 [data-theme="dark"] .form-group select.form-control {
     background-color: #1e1e1e !important;
@@ -1392,23 +1384,102 @@
     color: #fff;
 }
 
-[data-theme="dark"] .form-group select.form-control option[value="EDITABILE"] {
-    color: #aaa;
-    border-top: 1px solid #444;
-}
+/* NUOVI STILI PER IL SISTEMA CON CHECKBOX */
 
-.custom-input-container {
+/* Stili per il gruppo di input con checkbox */
+.input-group {
     display: flex;
     align-items: center;
-    margin-top: 0.5rem;
+    gap: 10px;
 }
 
-.custom-field-input {
-    flex: 1;
+.custom-control {
+    display: flex;
+    align-items: center;
+    margin-left: 10px;
 }
 
-.custom-field-apply {
-    margin-left: 0.5rem;
+.custom-control-input {
+    margin-right: 5px;
+}
+
+.custom-control-label {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+/* Campi disabilitati ma con stile chiaro */
+input[disabled] {
+    background-color: rgba(0, 0, 0, 0.03);
+    cursor: not-allowed;
+}
+
+[data-theme="dark"] input[disabled] {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Checkbox personalizzata */
+.custom-checkbox {
+    display: flex;
+    align-items: center;
+    margin-top: 0.3rem;
+    margin-bottom: 0.7rem;
+}
+
+.custom-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    margin-right: 8px;
+    accent-color: var(--primary);
+}
+
+.custom-checkbox label {
+    margin-bottom: 0;
+    font-size: 0.9rem;
+    color: var(--text-color);
+    cursor: pointer;
+}
+
+/* Campo personalizzato quando attivo */
+input.custom-field-active {
+    border-color: var(--primary);
+    background-color: rgba(46, 125, 50, 0.05);
+}
+
+[data-theme="dark"] input.custom-field-active {
+    background-color: rgba(0, 214, 91, 0.1);
+    border-color: var(--primary);
+}
+
+/* Animazione per l'attivazione del campo personalizzato */
+@keyframes fieldActivation {
+    0% { opacity: 0.7; transform: translateY(-3px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+.custom-field-active {
+    animation: fieldActivation 0.3s ease forwards;
+}
+
+/* Miglioramenti per la leggibilità in tema scuro */
+[data-theme="dark"] .custom-control-label {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="dark"] .custom-checkbox label {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Stile per select disabilitato */
+select[disabled] {
+    opacity: 0.6;
+    background-color: rgba(0, 0, 0, 0.03) !important;
+}
+
+[data-theme="dark"] select[disabled] {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 
