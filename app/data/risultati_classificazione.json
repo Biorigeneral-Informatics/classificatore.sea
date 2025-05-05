@@ -31,12 +31,8 @@
     "H335": 0,
     "H319": 0
   },
-  "caratteristiche_pericolo": [
-    "HP3"
-  ],
-  "motivazioni_hp": {
-    "HP3": "Punto di infiammabilità (50.0 °C) <= 60 °C [Eseguire metodo di prova]"
-  },
+  "caratteristiche_pericolo": [],
+  "motivazioni_hp": {},
   "valori_limite": {
     "H224": 0.1,
     "H225": 0.1,
@@ -53,6 +49,6 @@
     "HP3": 0
   },
   "stato_fisico": "Liquido",
-  "punto_infiammabilita": 50.0,
+  "punto_infiammabilita": 70.0,
   "contiene_gasolio": false
 }

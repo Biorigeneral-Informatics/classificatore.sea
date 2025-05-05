@@ -4,11 +4,6 @@
 //                  in fondo al file avviene l'esportazione in tal senso. Questo va fatto in modo
 //                  che le funzioni siano accessibili anche da altri file JS, come dashboard.js. 
 
-
-
-
-// ==== Funzioni semplificate per la sezione Classificazione ====
-
 // Inizializza sezione "Classificazione"
 function initClassificazione() {
     // Aggiungi listener per il bottone "Avvia Classificazione"
@@ -30,13 +25,15 @@ function initClassificazione() {
 // Verifica se ci sono dati campione disponibili e aggiorna l'interfaccia di conseguenza
 async function updateClassificationUI() {
     try {
-        // Controlla se esiste il file dati_campione.json
+        // Percorso assoluto per il file dati_campione.json
+        const appPath = await window.electronAPI.getAppPath();
         const fileExists = await window.electronAPI.fileExists('app/data/dati_campione.json');
         
         // Ottieni il container della sezione classificazione
         const sectionContainer = document.getElementById('classificazione');
         const fileInfo = document.getElementById('classificationFileInfo');
         const startBtn = document.getElementById('startClassificationBtn');
+        const goToReportsBtn = document.getElementById('goToReportsBtn');
         const infoMessage = document.getElementById('classificationInfoMessage');
         
         if (fileExists) {
@@ -55,6 +52,7 @@ async function updateClassificationUI() {
             // Se non esiste, mostra un messaggio che invita l'utente a caricare un file
             if (fileInfo) fileInfo.style.display = 'none';
             if (startBtn) startBtn.style.display = 'none';
+            if (goToReportsBtn) goToReportsBtn.style.display = 'none';
             
             // Aggiungi un messaggio informativo se non esiste già
             if (!infoMessage) {
@@ -142,14 +140,18 @@ async function avviaClassificazione() {
             goToReportsBtn.style.display = 'inline-block';
         }
         
-        // Genera automaticamente i report
-        await generateClassificationReport(result.data);
+        // Genera report usando la versione corretta dalla dashboard.js
+        const reportName = await generateReportFromClassificationData(result.data);
         
-        // Aggiungi attività
-        addActivity('Classificazione completata', 'Report generato e pronto nella sezione Reports', 'fas fa-check');
-        
-        // Mostra notifica di completamento
-        showNotification('Classificazione completata con successo! Vai alla sezione Reports per visualizzare i risultati.');
+        if (reportName) {
+            // Aggiungi attività
+            addActivity('Classificazione completata', `Report "${reportName}" generato e pronto nella sezione Reports`, 'fas fa-check');
+            
+            // Mostra notifica di completamento
+            showNotification('Classificazione completata con successo! Vai alla sezione Reports per visualizzare i risultati.');
+        } else {
+            throw new Error('Errore nella generazione del report');
+        }
         
         return true;
     } catch (error) {
@@ -167,22 +169,11 @@ async function avviaClassificazione() {
     }
 }
 
-// Funzione per generare i report Excel e Word
-async function generateClassificationReport(classificationData = null) {
+// Versione corretta per generare report dal risultato della classificazione
+async function generateReportFromClassificationData(classificationData) {
     try {
-        // Se non vengono forniti dati, usa quelli in sessione
         if (!classificationData) {
-            const dataStr = sessionStorage.getItem('classificationResults');
-            if (!dataStr) {
-                console.warn('Nessun dato di classificazione disponibile');
-                return null;
-            }
-            try {
-                classificationData = JSON.parse(dataStr);
-            } catch (e) {
-                console.error('Errore nel parsing dei dati di classificazione:', e);
-                return null;
-            }
+            throw new Error('Nessun dato di classificazione disponibile');
         }
         
         // Genera nome univoco per il report
@@ -191,56 +182,18 @@ async function generateClassificationReport(classificationData = null) {
         const reportName = `Classificazione_${timestamp}`;
         
         // Prepara i dati per il report
-        const reportData = prepareReportData(classificationData);
-        
-        // Ottieni il percorso della cartella reports
-        const reportsPath = await window.electronAPI.getReportsPath();
-        
-        // Genera il report Excel
-        const excelFilePath = `${reportsPath}/${reportName}.xlsx`;
-        await generateExcelReport(reportData, excelFilePath);
-        
-        // Genera il report Word (HTML)
-        const wordFilePath = `${reportsPath}/${reportName}.html`;
-        await generateWordReport(reportData, wordFilePath);
-        
-        // Salva il report JSON tramite l'API dedicata
-        const saveResult = await window.electronAPI.saveReport(`${reportName}.json`, reportData);
-        
-        if (!saveResult) {
-            console.warn('Errore nel salvataggio del report JSON');
-        }
-        
-        console.log('Report generati:', reportName);
-        return reportName;
-    } catch (error) {
-        console.error('Errore nella generazione dei report:', error);
-        showNotification('Errore nella generazione dei report: ' + error.message, 'error');
-        return null;
-    }
-}
-
-// Funzione per preparare i dati del report in un formato adatto per Excel e Word
-function prepareReportData(classificationData) {
-    const reportData = [];
-    
-    try {
-        // Ottieni le caratteristiche di pericolo
-        const caratteristichePericolo = classificationData.caratteristiche_pericolo || [];
-        
-        // Ottieni le motivazioni per le HP
-        const motivazioniHP = classificationData.motivazioni_hp || {};
+        const reportData = [];
         
         // Se i dati provengono dal classificatore, estraili correttamente
         if (classificationData.campione) {
             const campione = classificationData.campione;
+            const hp = classificationData.caratteristiche_pericolo || [];
             
             // Crea un oggetto riassuntivo per ogni sostanza
             for (const [sostanza, info] of Object.entries(campione)) {
                 reportData.push({
                     'Sostanza': sostanza,
                     'Concentrazione (ppm)': info.concentrazione_ppm || 0,
-                    'Concentrazione (%)': info.concentrazione_percentuale || 0,
                     'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
                     'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
                     'CAS': info.cas || 'N/A'
@@ -251,184 +204,37 @@ function prepareReportData(classificationData) {
             reportData.push({
                 'Sostanza': '** RISULTATO TOTALE **',
                 'Concentrazione (ppm)': '',
-                'Concentrazione (%)': '',
                 'Frasi H': '',
-                'Caratteristiche HP': caratteristichePericolo.join(', ') || 'Nessuna caratteristica di pericolo',
-                'CAS': '',
-                'Note HP3': (caratteristichePericolo.includes('HP3') && motivazioniHP['HP3']) ? motivazioniHP['HP3'] : ''
+                'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
+                'CAS': ''
             });
         } else if (Array.isArray(classificationData)) {
             // Se i dati sono già in formato tabellare, usali direttamente
             reportData.push(...classificationData);
         }
         
-        // Aggiungi informazioni fisiche se disponibili
-        if (classificationData.stato_fisico || classificationData.punto_infiammabilita) {
-            reportData[reportData.length - 1]['Stato Fisico'] = classificationData.stato_fisico || 'N/A';
-            reportData[reportData.length - 1]['Punto Infiammabilità'] = classificationData.punto_infiammabilita || 'N/A';
-            reportData[reportData.length - 1]['Contiene Gasolio'] = classificationData.contiene_gasolio ? 'Sì' : 'No';
+        // Usa l'API dedicata per salvare il report
+        const saveResult = await window.electronAPI.saveReport(`${reportName}.json`, reportData);
+        
+        if (!saveResult) {
+            throw new Error('Errore nel salvataggio del report');
         }
         
-    } catch (error) {
-        console.error('Errore nella preparazione dei dati per il report:', error);
-    }
-    
-    return reportData;
-}
-
-// Funzione per generare il report Excel
-async function generateExcelReport(data, filePath) {
-    try {
-        // Usa l'API per esportare in Excel
-        const result = await window.electronAPI.exportReportExcel(data, filePath);
+        showNotification(`Report "${reportName}" generato con successo!`);
         
-        if (!result || !result.success) {
-            throw new Error(result ? result.message : 'Errore nell\'esportazione Excel');
+        // Aggiorna la visualizzazione dei report
+        if (typeof loadReports === 'function') {
+            setTimeout(() => {
+                loadReports();
+            }, 500);
         }
         
-        console.log('Report Excel generato:', filePath);
-        
-        // Aggiungi attività
-        addActivity('Report Excel', 'Report Excel generato', 'fas fa-file-excel');
-        
-        return true;
+        return reportName;
     } catch (error) {
-        console.error('Errore nella generazione del report Excel:', error);
-        showNotification('Errore nella generazione del report Excel: ' + error.message, 'error');
-        return false;
+        console.error('Errore nella generazione del report:', error);
+        showNotification('Errore nella generazione del report: ' + error.message, 'error');
+        return null;
     }
-}
-
-// Funzione per generare il report Word
-async function generateWordReport(data, filePath) {
-    try {
-        // Genera HTML strutturato per il report
-        const now = new Date();
-        const html = `
-            <!DOCTYPE html>
-            <html lang="it">
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Report Classificazione Rifiuti</title>
-                <style>
-                    body { font-family: Arial, sans-serif; margin: 20px; }
-                    h1, h2, h3 { color: #2c3e50; }
-                    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                    th { background-color: #4CAF50; color: white; }
-                    tr:nth-child(even) { background-color: #f2f2f2; }
-                    .footer { margin-top: 40px; text-align: center; font-style: italic; color: #7f8c8d; }
-                    .result-row { font-weight: bold; background-color: #e8f5e9 !important; }
-                    .note { color: #e74c3c; font-weight: bold; }
-                </style>
-            </head>
-            <body>
-                <h1>Report di Classificazione Rifiuti</h1>
-                <p><strong>Data:</strong> ${now.toLocaleString('it-IT')}</p>
-                
-                <h2>Caratteristiche Fisiche</h2>
-                <table>
-                    <tr>
-                        <th>Stato Fisico</th>
-                        <th>Punto di Infiammabilità</th>
-                        <th>Contiene Gasolio/Carburanti/Oli</th>
-                    </tr>
-                    <tr>
-                        <td>${data[data.length-1]['Stato Fisico'] || 'N/A'}</td>
-                        <td>${data[data.length-1]['Punto Infiammabilità'] || 'N/A'} °C</td>
-                        <td>${data[data.length-1]['Contiene Gasolio'] || 'No'}</td>
-                    </tr>
-                </table>
-                
-                <h2>Caratteristiche di Pericolo Assegnate</h2>
-                <table>
-                    <tr>
-                        <th>Caratteristica</th>
-                        <th>Descrizione</th>
-                        <th>Note</th>
-                    </tr>
-                    ${data[data.length-1]['Caratteristiche HP'] ? 
-                        data[data.length-1]['Caratteristiche HP'].split(', ').map(hp => `
-                            <tr>
-                                <td>${hp}</td>
-                                <td>${getHPDescription(hp)}</td>
-                                <td>${hp === 'HP3' && data[data.length-1]['Note HP3'] ? 
-                                    `<span class="note">${data[data.length-1]['Note HP3']}</span>` : 
-                                    ''}
-                                </td>
-                            </tr>
-                        `).join('') :
-                        '<tr><td colspan="3">Nessuna caratteristica di pericolo assegnata</td></tr>'
-                    }
-                </table>
-                
-                <h2>Dettaglio delle Sostanze</h2>
-                <table>
-                    <tr>
-                        <th>Sostanza</th>
-                        <th>CAS</th>
-                        <th>Concentrazione (ppm)</th>
-                        <th>Concentrazione (%)</th>
-                        <th>Frasi H</th>
-                        <th>Caratteristiche HP</th>
-                    </tr>
-                    ${data.map((row, index) => `
-                        <tr class="${row['Sostanza'] === '** RISULTATO TOTALE **' ? 'result-row' : ''}">
-                            <td>${row['Sostanza']}</td>
-                            <td>${row['CAS'] || ''}</td>
-                            <td>${row['Concentrazione (ppm)'] !== undefined ? row['Concentrazione (ppm)'] : ''}</td>
-                            <td>${row['Concentrazione (%)'] !== undefined ? row['Concentrazione (%)'] : ''}</td>
-                            <td>${row['Frasi H'] || ''}</td>
-                            <td>${row['Caratteristiche HP'] || ''}</td>
-                        </tr>
-                    `).join('')}
-                </table>
-                
-                <div class="footer">
-                    <p>Report generato automaticamente da WasteGuard</p>
-                </div>
-            </body>
-            </html>
-        `;
-        
-        // Salva l'HTML come file
-        await window.electronAPI.writeFile(filePath, html);
-        
-        console.log('Report HTML generato:', filePath);
-        
-        // Aggiungi attività
-        addActivity('Report HTML', 'Report HTML generato', 'fas fa-file-alt');
-        
-        return true;
-    } catch (error) {
-        console.error('Errore nella generazione del report HTML:', error);
-        showNotification('Errore nella generazione del report HTML: ' + error.message, 'error');
-        return false;
-    }
-}
-
-// Funzione helper per ottenere la descrizione delle caratteristiche di pericolo
-function getHPDescription(hp) {
-    const descriptions = {
-        "HP1": "Esplosivo",
-        "HP2": "Comburente",
-        "HP3": "Infiammabile",
-        "HP4": "Irritante - Irritazione cutanea e lesioni oculari",
-        "HP5": "Tossicità specifica per organi bersaglio (STOT)/Tossicità in caso di aspirazione",
-        "HP6": "Tossicità acuta",
-        "HP7": "Cancerogeno",
-        "HP8": "Corrosivo",
-        "HP9": "Infettivo",
-        "HP10": "Tossico per la riproduzione",
-        "HP11": "Mutageno",
-        "HP12": "Liberazione di gas a tossicità acuta",
-        "HP13": "Sensibilizzante",
-        "HP14": "Ecotossico",
-        "HP15": "Rifiuto che non possiede direttamente una delle caratteristiche di pericolo summenzionate ma può manifestarla successivamente"
-    };
-    
-    return descriptions[hp] || "Descrizione non disponibile";
 }
 
 // Funzione per aprire la cartella dei report
@@ -447,6 +253,9 @@ async function openReportsFolder() {
         // Apri la cartella
         await window.electronAPI.openFolder(reportsPath);
         
+        // Vai alla sezione report
+        showSection('report');
+        
     } catch (error) {
         console.error('Errore nell\'apertura della cartella dei report:', error);
         showNotification('Errore nell\'apertura della cartella dei report', 'error');
@@ -463,7 +272,5 @@ window.initClassificazione = initClassificazione;
 window.updateClassificationUI = updateClassificationUI;
 window.updateClassificationFileInfo = updateClassificationFileInfo;
 window.avviaClassificazione = avviaClassificazione;
-window.generateClassificationReport = generateClassificationReport;
-window.generateExcelReport = generateExcelReport;
-window.generateWordReport = generateWordReport;
+window.generateReportFromClassificationData = generateReportFromClassificationData;
 window.openReportsFolder = openReportsFolder;
