@@ -2,30 +2,17 @@
 # -*- coding: utf-8 -*-
 
 """
-Programma per la classificazione dei rifiuti in base alle caratteristiche di pericolo
-
-NOTA IMPORTANTE:
----------------
-Questo script attualmente usa dei dati temporanei! Vedere appunti fed eper dettagli.
-
+Implementazione dell'HP3 nel classificatore rifiuti
 """
 
-# Importazioni necessarie
-import pandas as pd
-import numpy as np
-import re
-import sqlite3  # Per la connessione al database
-
-
-# E sostituiscila con questa funzione per caricare i dati reali:
-import json
 import os
+import json
+import re
+import sqlite3
+import pandas as pd
+from datetime import datetime
 
-
-
-
-
-#---------CARICAMENTO DATI REALI-----------#
+#---------CARICAMENTO DATI CAMPIONE-----------#
 def carica_dati_campione():
     """
     Carica i dati reali del campione dal file JSON creato nella sezione sali-metalli
@@ -62,169 +49,99 @@ def carica_dati_campione():
         return None
 
 
+# Funzione per caricare le informazioni della raccolta
+def carica_info_raccolta():
+    """
+    Carica le informazioni di raccolta, inclusi stato fisico e punto di infiammabilità
+    
+    Returns:
+        dict: Dizionario con le informazioni di raccolta
+        None: Se si verifica un errore nel caricamento
+    """
+    try:
+        # Percorso delle informazioni di raccolta
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Percorsi possibili per info_raccolta.json
+        # 1. Nella cartella dati dell'applicazione (classico)
+        data_dir = os.path.join(script_dir, "data")
+        classic_path = os.path.join(data_dir, "info_raccolta.json")
+        
+        # 2. Nella cartella utente (Electron)
+        from pathlib import Path
+        home_dir = str(Path.home())
+        electron_dir = os.path.join(home_dir, '.config', 'WasteGuard') if os.name != 'nt' else os.path.join(os.getenv('APPDATA'), 'WasteGuard')
+        electron_path = os.path.join(electron_dir, "info_raccolta.json")
+        
+        # Prova a caricare da uno dei percorsi possibili
+        if os.path.exists(classic_path):
+            file_path = classic_path
+        elif os.path.exists(electron_path):
+            file_path = electron_path
+        else:
+            print("File info_raccolta.json non trovato. Percorsi cercati:")
+            print(f"- {classic_path}")
+            print(f"- {electron_path}")
+            return None
+        
+        # Carica il file JSON
+        with open(file_path, 'r', encoding='utf-8') as f:
+            info_raccolta = json.load(f)
+        
+        print(f"Informazioni raccolta caricate con successo da {file_path}")
+        return info_raccolta
+        
+    except Exception as e:
+        print(f"Errore nel caricamento delle informazioni raccolta: {str(e)}")
+        return None
 
 
-
-# ===============================================================================================================
-# Definizione del mini database: sostanze - frasi H associate (TUTTE LE FRASI H VALIDE SONO QUI PER IL SOFTWARE)
-# ===============================================================================================================
 class DatabaseSostanze:
     def __init__(self):
         """Inizializza il database delle sostanze"""
+        # Connessione al database
+        self.conn = None
+        
         # Mappatura delle sostanze alle frasi H
         self.sostanze_frasi_h = {}
         
-      # Mappatura delle frasi H alle caratteristiche di pericolo (HP)
-# Questa associazione è fissa e non viene caricata dal database
+        # Mappatura delle frasi H alle caratteristiche di pericolo (HP)
+        # Questa associazione è fissa e verrà usata per determinare quali frasi H sono rilevanti per ogni HP
         self.hp_mapping = {
-            # HP1 - Esplosivo
-            "HP1": ["H200", "H201", "H202", "H203", "H204", "H240", "H241"],
-            
-            # HP2 - Comburente
-            "HP2": ["H270", "H271", "H272"],
-            
             # HP3 - Infiammabile
             "HP3": ["H224", "H225", "H226", "H228", "H242", "H250", "H251", "H252", "H260", "H261"],
             
-            # HP4 - Irritante
-            "HP4": ["H314", "H315", "H318", "H319"],
-            
-            # HP5 - Tossicità organi bersaglio/aspirazione
-            "HP5": ["H304", "H335", "H370", "H371", "H372", "H373"],
-            
-            # HP6 - Tossicità acuta
-            "HP6": ["H300", "H301", "H302", "H310", "H311", "H312", "H330", "H331", "H332"],
-            
-            # HP7 - Cancerogeno
-            "HP7": ["H350", "H350i", "H351"],
-            
-            # HP8 - Corrosivo
-            "HP8": ["H314"],
-            
-            # HP9 - Infettivo
-            # L'HP9 non è basato su frasi H ma su presenza di microrganismi vitali o tossine
-            "HP9": [],
-            
-            # HP10 - Tossico per la riproduzione
-            "HP10": ["H360", "H360D", "H360Df", "H360F", "H360FD", "H360Fd", "H361", "H361d", "H361f", "H361fd", "H362"],
-            
-            # HP11 - Mutageno
-            "HP11": ["H340", "H341"],
-            
-            # HP12 - Liberazione di gas a tossicità acuta
-            "HP12": ["EUH029", "EUH031", "EUH032"],
-            
-            # HP13 - Sensibilizzante
-            "HP13": ["H317", "H334"],
-            
-            # HP14 - Ecotossico
-            "HP14": ["H400", "H410", "H411", "H412", "H413"],
-            
-            # HP15 - Proprietà che rendono pericolosi i rifiuti dopo lo smaltimento
-            "HP15": ["H205", "H240", "H241", "EUH001", "EUH019", "EUH044"]
+            # Altre HP verranno aggiunte in seguito
         }
 
-        # Valori soglia per ogni caratteristica di pericolo (in percentuale)
-        self.valori_soglia = {
-            "HP1": 0,  # Qualsiasi presenza
-            "HP2": 0,  # Qualsiasi presenza
-            "HP3": 0,  # Qualsiasi presenza
-            "HP4": 1,  # 1% per H314 (Skin Corr. 1), H318 (Eye Dam. 1) e 10% per H315 (Skin Irrit. 2), H319 (Eye Irrit. 2)
-            "HP5": 1,  # 1% per STOT SE 1, STOT RE 1, 10% per STOT SE 2, STOT RE 2
-            "HP6": 0.1,  # Varia in base alla categoria
-            "HP7": 0.1,  # 0.1% per Carc. 1A, 1B; 1% per Carc. 2
-            "HP8": 1,  # 1% per H314
-            "HP9": 0,  # Valutazione qualitativa, non basata su concentrazioni
-            "HP10": 0.3,  # 0.3% per Repr. 1A, 1B; 3% per Repr. 2
-            "HP11": 0.1,  # 0.1% per Muta. 1A, 1B; 1% per Muta. 2
-            "HP12": 0,  # Qualsiasi presenza che possa liberare gas tossici
-            "HP13": 1,  # 1% per Skin Sens. 1, Resp. Sens. 1
-            "HP14": 0.1,  # Vari valori in base alla categoria
-            "HP15": 0   # Qualsiasi presenza di sostanze con queste frasi
+        # Valori CUT-OFF (soglia) per ogni caratteristica di pericolo (in percentuale)
+        # Questi valori fungono da filtro: se la concentrazione è < cut-off, 
+        # la sostanza NON viene considerata nella classificazione
+        self.valori_cut_off = {
+            "HP3": 0,  # HP3 non ha valori soglia cut-off
+            
+            # Altri valori soglia verranno aggiunti in seguito
         }
 
-        # Soglie per la sommatoria delle concentrazioni di ogni frase H
-        self.soglie_sommatoria = {
-            # HP4
-            "H314": 1,    # Skin Corr. 1
-            "H318": 1,    # Eye Dam. 1
-            "H315": 10,   # Skin Irrit. 2
-            "H319": 10,   # Eye Irrit. 2
+        # Valori LIMITE per attribuzione effettiva delle caratteristiche di pericolo
+        # Questi valori determinano se una HP deve essere assegnata in base a sommatorie specifiche
+        self.valori_limite = {
+            # HP3 - Infiammabile
+            # Per le frasi H di HP3, ogni frase ha un limite minimo dello 0.1%
+            "H224": 0.1,   # Liquido e vapori altamente infiammabili
+            "H225": 0.1,   # Liquido e vapori facilmente infiammabili
+            "H226": 0.1,   # Liquido e vapori infiammabili
+            "H228": 0.1,   # Solido infiammabile
+            "H242": 0.1,   # Rischio d'incendio per riscaldamento
+            "H250": 0.1,   # Spontaneamente infiammabile all'aria
+            "H251": 0.1,   # Autoriscaldante; può infiammarsi
+            "H252": 0.1,   # Autoriscaldante in grandi quantità; può infiammarsi
+            "H260": 0.1,   # A contatto con l'acqua libera gas infiammabili che possono infiammarsi spontaneamente
+            "H261": 0.1,   # A contatto con l'acqua libera gas infiammabili
             
-            # HP6
-            "H300": 0.1,  # Acute Tox. 1, 2 (oral)
-            "H301": 0.25, # Acute Tox. 3 (oral)
-            "H302": 2.5,  # Acute Tox. 4 (oral)
-            "H310": 0.1,  # Acute Tox. 1, 2 (dermal)
-            "H311": 0.25, # Acute Tox. 3 (dermal)
-            "H312": 2.5,  # Acute Tox. 4 (dermal)
-            "H330": 0.1,  # Acute Tox. 1, 2 (inhal)
-            "H331": 0.25, # Acute Tox. 3 (inhal)
-            "H332": 2.5,  # Acute Tox. 4 (inhal)
-            
-            # HP5
-            "H370": 0.1,  # STOT SE 1
-            "H371": 1,    # STOT SE 2
-            "H372": 0.1,  # STOT RE 1
-            "H373": 1,    # STOT RE 2
-            "H304": 1,    # Asp. Tox. 1
-            "H335": 10,   # STOT SE 3
-            
-            # HP7
-            "H350": 0.1,  # Carc. 1A, 1B
-            "H350i": 0.1, # Carc. 1A, 1B
-            "H351": 1,    # Carc. 2
-            
-            # HP10
-            "H360": 0.3,  # Repr. 1A, 1B
-            "H360D": 0.3, # Repr. 1A, 1B
-            "H360F": 0.3, # Repr. 1A, 1B
-            "H360FD": 0.3, # Repr. 1A, 1B
-            "H360Fd": 0.3, # Repr. 1A, 1B
-            "H360Df": 0.3, # Repr. 1A, 1B
-            "H361": 3,    # Repr. 2
-            "H361d": 3,   # Repr. 2
-            "H361f": 3,   # Repr. 2
-            "H361fd": 3,  # Repr. 2
-            "H362": 3,    # Lact.
-            
-            # HP11
-            "H340": 0.1,  # Muta. 1A, 1B
-            "H341": 1,    # Muta. 2
-            
-            # HP12
-            "EUH029": 0,  # Qualsiasi concentrazione
-            "EUH031": 0,  # Qualsiasi concentrazione
-            "EUH032": 0,  # Qualsiasi concentrazione
-            
-            # HP13
-            "H317": 1,    # Skin Sens. 1
-            "H334": 1,    # Resp. Sens. 1
-            
-            # HP14
-            "H400": 0.1,  # Aquatic Acute 1
-            "H410": 0.1,  # Aquatic Chronic 1
-            "H411": 0.25, # Aquatic Chronic 2
-            "H412": 2.5,  # Aquatic Chronic 3
-            "H413": 2.5,  # Aquatic Chronic 4
-            
-            # HP15
-            "H205": 0,    # Qualsiasi concentrazione
-            "H240": 0,    # Qualsiasi concentrazione
-            "H241": 0,    # Qualsiasi concentrazione
-            "EUH001": 0,  # Qualsiasi concentrazione
-            "EUH019": 0,  # Qualsiasi concentrazione
-            "EUH044": 0   # Qualsiasi concentrazione
+            # Altri valori limite verranno aggiunti in seguito
         }
 
-
-
-
-
-
-
-
-    #---------CONNESSIONE DB------------#
     def connetti_database(self, db_path=None):
         """
         Connette al database SQLite per ottenere le frasi H associate alle sostanze
@@ -239,7 +156,6 @@ class DatabaseSostanze:
         try:
             # Se non viene fornito un percorso, usa il percorso predefinito
             if db_path is None:
-                import os
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 db_path = os.path.join(script_dir, "DB", "database_app.db")
             
@@ -253,9 +169,6 @@ class DatabaseSostanze:
     def carica_frasi_h(self):
         """
         Carica i dati delle sostanze e frasi H dal database SQLite
-        
-        Questa funzione è essenziale per ottenere le associazioni tra sostanze e frasi H
-        necessarie per la classificazione.
         
         Returns:
             bool: True se il caricamento ha avuto successo, False altrimenti
@@ -353,21 +266,43 @@ class DatabaseSostanze:
         return self.sostanze_frasi_h.get(nome_sostanza, [])
 
 
-
-
-
-
-
-
-
-# =============================================================================
-# Classe per la classificazione dei rifiuti
-# =============================================================================
 class ClassificatoreRifiuti:
-
     def __init__(self, database):
         """Inizializza il classificatore con un database"""
         self.database = database
+        
+        # Carica informazioni dalla raccolta
+        self.info_raccolta = carica_info_raccolta()
+        
+        # Imposta valori predefiniti
+        self.stato_fisico = None
+        self.punto_infiammabilita = None
+        self.contiene_gasolio = False
+        
+        # Estrai le informazioni rilevanti se disponibili
+        if self.info_raccolta and 'caratteristicheFisiche' in self.info_raccolta:
+            self.stato_fisico = self.info_raccolta['caratteristicheFisiche'].get('statoFisico', None)
+            self.contiene_gasolio = self.info_raccolta['caratteristicheFisiche'].get('gasolio', False)
+            
+            # Estrai e converti il punto di infiammabilità
+            infiammabilita_str = self.info_raccolta['caratteristicheFisiche'].get('infiammabilita', '')
+            try:
+                # Estrai solo il valore numerico dal campo infiammabilità
+                # Ad esempio, da "55 °C" estrae "55"
+                numeric_match = re.search(r'(\d+(?:\.\d+)?)', infiammabilita_str)
+                if numeric_match:
+                    self.punto_infiammabilita = float(numeric_match.group(1))
+                    print(f"Punto di infiammabilità estratto: {self.punto_infiammabilita} °C")
+                else:
+                    print(f"Impossibile estrarre punto di infiammabilità da: '{infiammabilita_str}'")
+            except (ValueError, TypeError) as e:
+                print(f"Errore nella conversione del punto di infiammabilità: {e}")
+                self.punto_infiammabilita = None
+        
+        # Log delle informazioni estratte
+        print(f"Stato fisico: {self.stato_fisico}")
+        print(f"Punto di infiammabilità: {self.punto_infiammabilita} °C")
+        print(f"Contiene gasolio/carburanti/oli: {self.contiene_gasolio}")
 
     def normalize_name(self, nome):
         """
@@ -376,7 +311,7 @@ class ClassificatoreRifiuti:
         """
         # Rimuove spazi multipli e converte in minuscolo
         return re.sub(r'\s+', ' ', nome).lower().strip()
-    
+
     def classifica_dati(self, campione_dati):
         """
         Classifica un rifiuto in base ai dati del campione già preprocessati
@@ -388,338 +323,263 @@ class ClassificatoreRifiuti:
         Returns:
             dict: Risultati della classificazione o None se ci sono errori
         """
-       # Verifica preliminare: controlla se tutte le sostanze sono presenti nel database
-        sostanze_mancanti = []
-        # Prima ottieni tutte le sostanze dal database con i loro nomi normalizzati
-        cursor = self.database.conn.cursor()
-        cursor.execute('SELECT Nome FROM "sostanze"')
-        sostanze_db = [row[0] for row in cursor.fetchall()]
-        cursor.close()
-
-        # Crea un dizionario di nomi normalizzati per il confronto
-        sostanze_db_normalize = {self.normalize_name(nome): nome for nome in sostanze_db}
-
-        for nome_sostanza in campione_dati.keys():
-            # Normalizza il nome della sostanza dall'input
-            nome_normalizzato = self.normalize_name(nome_sostanza)
+        try:
+            # Verifica preliminare: controlla se tutte le sostanze sono presenti nel database
+            sostanze_mancanti = []
             
-            # Controlla se il nome normalizzato esiste nel database
-            if nome_normalizzato not in sostanze_db_normalize:
-                sostanze_mancanti.append(nome_sostanza)
+            # Prima ottieni tutte le sostanze dal database con i loro nomi normalizzati
+            cursor = self.database.conn.cursor()
+            cursor.execute('SELECT Nome FROM "sostanze"')
+            sostanze_db = [row[0] for row in cursor.fetchall()]
+            cursor.close()
 
-        # Se ci sono sostanze mancanti, interrompi la classificazione
-        if sostanze_mancanti:
-            print("\nERRORE: Impossibile avviare la classificazione.")
-            print("Le seguenti sostanze non sono presenti nella Tabella di Riscontro:")
-            for sostanza in sostanze_mancanti:
-                print(f"  - {sostanza}")
-            print("\nPotrebbe trattarsi di errori di battitura nei file di input.")
-            print("Verificare i nomi delle sostanze e assicurarsi che corrispondano esattamente a quelli nella Tabella di Riscontro.")
-            return None
-        
-        # Se tutte le sostanze sono nel database, procedi con la classificazione
-        # Resto del codice esistente...
+            # Crea un dizionario di nomi normalizzati per il confronto
+            sostanze_db_normalize = {self.normalize_name(nome): nome for nome in sostanze_db}
 
-        # Dizionario per memorizzare le informazioni complete del campione
-        campione = {}
-        
-        # Dizionario per la sommatoria delle concentrazioni per ogni frase H
-        sommatoria = {frase: 0 for frase in self.database.soglie_sommatoria.keys()}
-        
-        # Processa ogni sostanza nel campione
-        for nome_sostanza, dati in campione_dati.items():
-            # Estrai i dati della sostanza
-            concentrazione_ppm = dati["concentrazione_ppm"]
-            concentrazione_percentuale = dati["concentrazione_percentuale"]
+            for nome_sostanza in campione_dati.keys():
+                # Normalizza il nome della sostanza dall'input
+                nome_normalizzato = self.normalize_name(nome_sostanza)
+                
+                # Controlla se il nome normalizzato esiste nel database
+                if nome_normalizzato not in sostanze_db_normalize:
+                    sostanze_mancanti.append(nome_sostanza)
+
+            # Se ci sono sostanze mancanti, interrompi la classificazione
+            if sostanze_mancanti:
+                print("\nERRORE: Impossibile avviare la classificazione.")
+                print("Le seguenti sostanze non sono presenti nella Tabella di Riscontro:")
+                for sostanza in sostanze_mancanti:
+                    print(f"  - {sostanza}")
+                print("\nPotrebbe trattarsi di errori di battitura nei file di input.")
+                print("Verificare i nomi delle sostanze e assicurarsi che corrispondano esattamente a quelli nella Tabella di Riscontro.")
+                return None
             
-            # Cerca la sostanza nel database per ottenere le frasi H associate
-            frasi_h_associate = self.database.get_frasi_h(nome_sostanza)
+            # Dizionario per memorizzare le informazioni complete del campione
+            campione = {}
             
-            # Se la sostanza non è trovata, avvisa ma continua
-            if not frasi_h_associate:
-                print(f"Avviso: Sostanza '{nome_sostanza}' non trovata nel database.")
+            # Dizionari per tenere traccia delle sommatorie
+            # Sommatoria per ciascuna frase H specifica
+            sommatoria_per_frase = {}
             
-            # Aggiungi la sostanza al dizionario del campione
-            campione[nome_sostanza] = {
-                "concentrazione_ppm": concentrazione_ppm,
-                "concentrazione_percentuale": concentrazione_percentuale,
-                "frasi_h": frasi_h_associate
+            # Insieme per tenere traccia delle caratteristiche di pericolo assegnate
+            hp_assegnate = set()
+            
+            # Dizionario per memorizzare le motivazioni delle assegnazioni HP
+            motivazioni_hp = {}
+            
+            # STEP 1: Verifica preliminare per HP3 - Controllo punto di infiammabilità
+            # Questa verifica viene fatta prima di processare le sostanze
+            hp3_infiammabilita = self._verifica_hp3_infiammabilita()
+            if hp3_infiammabilita["assegnata"]:
+                hp_assegnate.add("HP3")
+                motivazioni_hp["HP3"] = hp3_infiammabilita["motivo"]
+            
+            # STEP 2: Processa ogni sostanza nel campione
+            for nome_sostanza, dati in campione_dati.items():
+                # Estrai i dati della sostanza
+                concentrazione_ppm = dati["concentrazione_ppm"]
+                concentrazione_percentuale = dati["concentrazione_percentuale"]
+                
+                # Cerca la sostanza nel database per ottenere le frasi H associate
+                frasi_h_associate = self.database.get_frasi_h(nome_sostanza)
+                
+                # Se la sostanza non è trovata, avvisa ma continua
+                if not frasi_h_associate:
+                    print(f"Avviso: Sostanza '{nome_sostanza}' non trovata nel database.")
+                
+                # Aggiungi la sostanza al dizionario del campione
+                campione[nome_sostanza] = {
+                    "concentrazione_ppm": concentrazione_ppm,
+                    "concentrazione_percentuale": concentrazione_percentuale,
+                    "frasi_h": frasi_h_associate
+                }
+                
+                # Inizializza un insieme per tenere traccia delle caratteristiche di pericolo della sostanza
+                hp_sostanza = set()
+                
+                # Per ogni frase H associata alla sostanza, aggiorna le sommatorie
+                for frase_h in frasi_h_associate:
+                    # Assicurati che la frase H sia pulita e normalizzata rispetto agli spazi
+                    frase_h_clean = re.sub(r'\s+', '', re.sub(r'\s*\*+\s*', '', str(frase_h)))
+                    
+                    # Inizializza la sommatoria per questa frase se non esiste già
+                    if frase_h_clean not in sommatoria_per_frase:
+                        sommatoria_per_frase[frase_h_clean] = 0
+                    
+                    # Per HP3, le frasi H corrispondenti hanno tutte limite 0.1%
+                    if frase_h_clean in self.database.hp_mapping["HP3"]:
+                        # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
+                        sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
+                        
+                        # Verifica se la frase supera il limite per HP3
+                        if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0):
+                            hp_sostanza.add("HP3")
+                        
+                # Salva le caratteristiche di pericolo associate alla sostanza
+                if hp_sostanza:
+                    campione[nome_sostanza]["caratteristiche_pericolo"] = list(hp_sostanza)
+                    # Aggiorna l'insieme globale delle HP assegnate
+                    hp_assegnate.update(hp_sostanza)
+            
+            # STEP 3: Verifica le sommatorie per HP3
+            hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
+            if hp3_sommatoria["assegnata"]:
+                hp_assegnate.add("HP3")
+                # Aggiungi o aggiorna la motivazione
+                if "HP3" in motivazioni_hp:
+                    motivazioni_hp["HP3"] = f"{motivazioni_hp['HP3']}; {hp3_sommatoria['motivo']}"
+                else:
+                    motivazioni_hp["HP3"] = hp3_sommatoria["motivo"]
+            
+            # Prepara i risultati finali della classificazione
+            risultati = {
+                "campione": campione,
+                "sommatoria_per_frase": sommatoria_per_frase,
+                "caratteristiche_pericolo": sorted(list(hp_assegnate)),
+                "motivazioni_hp": motivazioni_hp,
+                "valori_limite": self.database.valori_limite,
+                "valori_cut_off": self.database.valori_cut_off,
+                "stato_fisico": self.stato_fisico,
+                "punto_infiammabilita": self.punto_infiammabilita,
+                "contiene_gasolio": self.contiene_gasolio
             }
             
-            # Per ogni frase H associata alla sostanza, verifica le caratteristiche di pericolo
-            for frase_h in frasi_h_associate:
-                # Assicurati che la frase H sia pulita e normalizzata rispetto agli spazi
-                frase_h_clean = re.sub(r'\s+', '', re.sub(r'\s*\*+\s*', '', str(frase_h)))
-                
-                # Aggiungi la concentrazione alla sommatoria per questa frase H
-                if frase_h_clean in sommatoria:
-                    sommatoria[frase_h_clean] += concentrazione_percentuale
-                
-                # Controlla tutte le caratteristiche di pericolo
-                for hp, frasi in self.database.hp_mapping.items():
-                    # Normalizza anche le frasi H nel hp_mapping se necessario 
-                    frasi_normalizzate = [re.sub(r'\s+', '', f) for f in frasi]
-                    
-                    # Se la frase H è associata a questa caratteristica di pericolo
-                    if frase_h_clean in frasi_normalizzate:
-                        valore_soglia = self.database.valori_soglia[hp]
-                        
-                        # Se la concentrazione supera la soglia
-                        if concentrazione_percentuale >= valore_soglia:
-                            # Assegna la caratteristica di pericolo alla sostanza
-                            if "caratteristiche_pericolo" not in campione[nome_sostanza]:
-                                campione[nome_sostanza]["caratteristiche_pericolo"] = []
-                            
-                            if hp not in campione[nome_sostanza]["caratteristiche_pericolo"]:
-                                campione[nome_sostanza]["caratteristiche_pericolo"].append(hp)
-        
-        # Verifica finale in base alla sommatoria delle concentrazioni
-        caratteristiche_pericolo_assegnate = set()
-        
-        # Aggiungi le caratteristiche di pericolo di ogni sostanza al set finale
-        for nome_sostanza, dati in campione.items():
-            if "caratteristiche_pericolo" in dati:
-                for hp in dati["caratteristiche_pericolo"]:
-                    caratteristiche_pericolo_assegnate.add(hp)
-        
-        # Per tenere traccia delle caratteristiche di pericolo assegnate per sommatoria
-        hp_per_sommatoria = {}
-        
-        for frase_h, concentrazione_totale in sommatoria.items():
-            # Verifica se la frase H è effettivamente presente nelle sostanze
-            frase_presente = False
-            for nome_sostanza, dati in campione.items():
-                if "frasi_h" in dati and frase_h in dati["frasi_h"]:
-                    frase_presente = True
-                    break
+            return risultati
             
-            # Procedi solo se la frase è presente o se la concentrazione è > 0
-            if frase_presente or concentrazione_totale > 0:
-                if frase_h in self.database.soglie_sommatoria:
-                    soglia_sommatoria = self.database.soglie_sommatoria[frase_h]
-                    
-                    if concentrazione_totale >= soglia_sommatoria:
-                        # Trova le caratteristiche di pericolo associate a questa frase H
-                        for hp, frasi in self.database.hp_mapping.items():
-                            if frase_h in frasi:
-                                caratteristiche_pericolo_assegnate.add(hp)
-                                
-                                # Aggiungi alla traccia delle HP assegnate per sommatoria
-                                # (solo per le HP effettivamente associate a questa frase H)
-                                if hp not in hp_per_sommatoria:
-                                    hp_per_sommatoria[hp] = []
-                                hp_per_sommatoria[hp].append(frase_h)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Errore nella classificazione: {str(e)}")
+            return None
+    
+    def _verifica_hp3_infiammabilita(self):
+        """
+        Verifica i criteri di HP3 basati sul punto di infiammabilità
         
-        # Prepara i risultati
-        risultati = {
-            "campione": campione,
-            "sommatoria": sommatoria,
-            "soglie_sommatoria": self.database.soglie_sommatoria,
-            "caratteristiche_pericolo": sorted(list(caratteristiche_pericolo_assegnate)),
-            "hp_per_sommatoria": hp_per_sommatoria
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
         }
         
-        return risultati
+        # Verifica se abbiamo le informazioni necessarie
+        if not self.stato_fisico or self.punto_infiammabilita is None:
+            print("Informazioni mancanti per verificare HP3 (stato fisico o punto di infiammabilità)")
+            return risultato
+        
+        # Verifica lo stato fisico
+        stati_fisici_liquidi = ["Liquido", "Fangoso palabile", "Fangoso pompabile"]
+        
+        if self.stato_fisico not in stati_fisici_liquidi:
+            print(f"Stato fisico '{self.stato_fisico}' non richiede verifica del punto di infiammabilità")
+            return risultato
+        
+        # Verifica il punto di infiammabilità in base allo stato fisico e alla presenza di gasolio
+        if self.stato_fisico == "Liquido":
+            if self.contiene_gasolio:
+                # Per gasoli, carburanti e oli: punto tra 55 e 75 °C
+                if 55 <= self.punto_infiammabilita <= 75:
+                    risultato["assegnata"] = True
+                    risultato["motivo"] = f"Punto di infiammabilità ({self.punto_infiammabilita} °C) tra 55 e 75 °C per gasolio/carburante/olio [Eseguire metodo di prova]"
+                    print(f"HP3 assegnata: {risultato['motivo']}")
+            else:
+                # Per altri liquidi: punto <= 60 °C
+                if self.punto_infiammabilita <= 60:
+                    risultato["assegnata"] = True
+                    risultato["motivo"] = f"Punto di infiammabilità ({self.punto_infiammabilita} °C) <= 60 °C [Eseguire metodo di prova]"
+                    print(f"HP3 assegnata: {risultato['motivo']}")
+        elif self.stato_fisico in ["Fangoso palabile", "Fangoso pompabile"]:
+            # Per fangosi, verificare punto di infiammabilità ma con logica da definire
+            # Per ora utilizziamo la stessa logica del liquido
+            if self.contiene_gasolio:
+                if 55 <= self.punto_infiammabilita <= 75:
+                    risultato["assegnata"] = True
+                    risultato["motivo"] = f"Punto di infiammabilità ({self.punto_infiammabilita} °C) tra 55 e 75 °C per gasolio/carburante/olio in stato {self.stato_fisico} [Eseguire metodo di prova]"
+                    print(f"HP3 assegnata: {risultato['motivo']}")
+            else:
+                if self.punto_infiammabilita <= 60:
+                    risultato["assegnata"] = True
+                    risultato["motivo"] = f"Punto di infiammabilità ({self.punto_infiammabilita} °C) <= 60 °C in stato {self.stato_fisico} [Eseguire metodo di prova]"
+                    print(f"HP3 assegnata: {risultato['motivo']}")
+        
+        return risultato
     
-    def salva_risultati(self, risultati, file_output):
+    def _verifica_hp3_sommatoria(self, sommatoria_per_frase):
         """
-        Salva i risultati della classificazione in un file Excel
+        Verifica i criteri di HP3 basati sulle sommatorie delle frasi H
         
         Args:
-            risultati (dict): Risultati della classificazione
-            file_output (str): Percorso del file Excel di output
+            sommatoria_per_frase (dict): Sommatoria delle concentrazioni per ciascuna frase H
             
         Returns:
-            bool: True se il salvataggio ha avuto successo, False altrimenti
+            dict: Dizionario con il risultato della verifica
         """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Lista di frasi H rilevanti per HP3
+        frasi_hp3 = self.database.hp_mapping["HP3"]
+        
+        # Verifica se qualsiasi frase H di HP3 ha una sommatoria > 0.1%
+        frasi_sopra_limite = []
+        for frase_h in frasi_hp3:
+            if frase_h in sommatoria_per_frase:
+                sommatoria = sommatoria_per_frase[frase_h]
+                limite = self.database.valori_limite.get(frase_h, 0.1)  # Default 0.1% se non specificato
+                
+                if sommatoria >= limite:
+                    frasi_sopra_limite.append(f"{frase_h} ({sommatoria:.4f}% >= {limite}%)")
+        
+        # Se almeno una frase è sopra il limite, assegna HP3
+        if frasi_sopra_limite:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"Sommatoria frasi H sopra limite: {', '.join(frasi_sopra_limite)} [Eseguire metodo di prova]"
+            print(f"HP3 assegnata: {risultato['motivo']}")
+        
+        return risultato
+
+
+def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
+    """
+    Salva i risultati della classificazione in un file JSON
+    
+    Args:
+        risultati (dict): Risultati della classificazione
+        nome_file (str): Nome del file di output
+        
+    Returns:
+        bool: True se il salvataggio ha avuto successo, False altrimenti
+    """
+    try:
         if not risultati:
             print("Nessun risultato da salvare.")
             return False
         
-        try:
-            # Assicurati che la cartella risultati_classificazione esista
-            import os
-            risultati_dir = "risultati_classificazione"
-            if not os.path.exists(risultati_dir):
-                os.makedirs(risultati_dir)
-            
-            # Prepara il percorso completo del file
-            file_path = os.path.join(risultati_dir, file_output)
-            
-            # Crea un DataFrame per i risultati delle sostanze
-            sostanze_risultati = []
-            for nome_sostanza, dati in risultati["campione"].items():
-                riga = {
-                    "Sostanza": nome_sostanza,
-                    "Concentrazione (ppm)": dati["concentrazione_ppm"],
-                    "Concentrazione (%)": dati["concentrazione_percentuale"],
-                    "Frasi H": ", ".join(dati["frasi_h"]),
-                }
-                
-                if "caratteristiche_pericolo" in dati:
-                    riga["Caratteristiche di Pericolo"] = ", ".join(dati["caratteristiche_pericolo"])
-                else:
-                    riga["Caratteristiche di Pericolo"] = ""
-                
-                sostanze_risultati.append(riga)
-            
-            # Crea un DataFrame per i risultati della sommatoria
-            sommatoria_risultati = [
-                {"Frase H": frase_h, "Concentrazione Totale (%)": concentrazione}
-                for frase_h, concentrazione in risultati["sommatoria"].items()
-                if concentrazione > 0  # Mostra solo le frasi H con concentrazione > 0
-            ]
-            
-            # Ordina per frase H
-            sommatoria_risultati = sorted(sommatoria_risultati, key=lambda x: x["Frase H"])
-            
-            # Crea un DataFrame per il risultato finale
-            risultato_finale = [
-                {"Caratteristica di Pericolo": hp}
-                for hp in risultati["caratteristiche_pericolo"]
-            ]
-            
-            # Crea un DataFrame per le HP assegnate per sommatoria
-            hp_sommatoria = []
-            if "hp_per_sommatoria" in risultati and risultati["hp_per_sommatoria"]:
-                for hp, frasi in risultati["hp_per_sommatoria"].items():
-                    for frase in frasi:
-                        valore = risultati["sommatoria"][frase]
-                        soglia = risultati["soglie_sommatoria"][frase]
-                        hp_sommatoria.append({
-                            "Caratteristica di Pericolo": hp,
-                            "Frase H": frase,
-                            "Concentrazione Totale (%)": valore,
-                            "Soglia (%)": soglia
-                        })
-            
-            # Crea un file Excel con fogli multipli
-            with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
-                pd.DataFrame(sostanze_risultati).to_excel(writer, sheet_name="Sostanze", index=False)
-                pd.DataFrame(sommatoria_risultati).to_excel(writer, sheet_name="Sommatoria Frasi H", index=False)
-                pd.DataFrame(risultato_finale).to_excel(writer, sheet_name="Risultato Finale", index=False)
-                
-                if hp_sommatoria:
-                    pd.DataFrame(hp_sommatoria).to_excel(writer, sheet_name="HP per Sommatoria", index=False)
-            
-            print(f"Risultati salvati in {file_path}")
-            return True
-        except Exception as e:
-            print(f"Errore nel salvataggio dei risultati: {e}")
-            return False
-
-
-
-
-
-
-# =============================================================================
-# Funzioni di utilità
-# =============================================================================
-def stampa_risultati(risultati):
-    """
-    Stampa i risultati della classificazione in console in modo dettagliato
-    """
-    print("\n===== RISULTATI DELLA CLASSIFICAZIONE =====\n")
-    
-    # Stampa le caratteristiche di pericolo assegnate
-    print("Caratteristiche di pericolo assegnate:")
-    if risultati["caratteristiche_pericolo"]:
-        for hp in sorted(risultati["caratteristiche_pericolo"]):
-            print(f"  - {hp}")
-    else:
-        print("  Nessuna caratteristica di pericolo assegnata")
-    
-    print("\nDettaglio delle sostanze analizzate:")
-    for nome_sostanza, dati in risultati["campione"].items():
-        print(f"\n  • {nome_sostanza}")
-        print(f"    Concentrazione: {dati['concentrazione_ppm']:.2f} ppm ({dati['concentrazione_percentuale']:.6f}%)")
+        # Percorso del file
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = os.path.join(script_dir, "data")
         
-        if dati["frasi_h"]:
-            print(f"    Frasi H associate: {', '.join(dati['frasi_h'])}")
-        else:
-            print(f"    Frasi H associate: Nessuna")
+        # Assicurati che la cartella esista
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
         
-        if "caratteristiche_pericolo" in dati and dati["caratteristiche_pericolo"]:
-            print(f"    Caratteristiche di pericolo: {', '.join(dati['caratteristiche_pericolo'])}")
-        else:
-            print(f"    Caratteristiche di pericolo: Nessuna")
-    
-    print("\nSommatoria delle concentrazioni per frase H:")
-    frasi_h_rilevanti = {k: v for k, v in risultati["sommatoria"].items() if v > 0}
-    
-    if frasi_h_rilevanti:
-        for frase_h, concentrazione in sorted(frasi_h_rilevanti.items()):
-            # Aggiungi indicazione se supera la soglia
-            if frase_h in risultati.get("soglie_sommatoria", {}):
-                soglia = risultati["soglie_sommatoria"][frase_h]
-                if concentrazione >= soglia:
-                    print(f"  - {frase_h}: {concentrazione:.6f}% (SUPERA LA SOGLIA DI {soglia}%)")
-                else:
-                    print(f"  - {frase_h}: {concentrazione:.6f}% (soglia: {soglia}%)")
-            else:
-                print(f"  - {frase_h}: {concentrazione:.6f}%")
-    else:
-        print("  Nessuna sommatoria rilevante")
-    
-    # Sezione per le caratteristiche di pericolo assegnate per singola sostanza
-    hp_per_sostanza = {}
-    for nome_sostanza, dati in risultati["campione"].items():
-        if "caratteristiche_pericolo" in dati and dati["caratteristiche_pericolo"]:
-            for hp in dati["caratteristiche_pericolo"]:
-                if hp not in hp_per_sostanza:
-                    hp_per_sostanza[hp] = []
-                hp_per_sostanza[hp].append(f"{nome_sostanza} ({dati['concentrazione_percentuale']:.6f}%)")
-
-    if hp_per_sostanza:
-        print("\nCaratteristiche di pericolo assegnate per singola sostanza:")
-        for hp, sostanze in sorted(hp_per_sostanza.items()):
-            print(f"  - {hp}: {', '.join(sostanze)}")
-    else:
-        print("\nNessuna caratteristica di pericolo assegnata per singola sostanza")
-    
-    # Sezione per le caratteristiche di pericolo assegnate per sommatoria
-    if "hp_per_sommatoria" in risultati and risultati["hp_per_sommatoria"]:
-        print("\nCaratteristiche di pericolo assegnate per sommatoria:")
+        file_path = os.path.join(data_dir, nome_file)
         
-        # Filtra i valori con concentrazione a zero
-        hp_per_sommatoria_filtered = {}
-        for hp, frasi in risultati["hp_per_sommatoria"].items():
-            frasi_rilevanti = []
-            for frase in frasi:
-                valore = risultati["sommatoria"].get(frase, 0)
-                if valore > 0:
-                    frasi_rilevanti.append(frase)
-            
-            if frasi_rilevanti:
-                hp_per_sommatoria_filtered[hp] = frasi_rilevanti
+        # Salva i risultati come JSON
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(risultati, f, ensure_ascii=False, indent=2)
         
-        # Stampa le HP assegnate per sommatoria (solo quelle rilevanti)
-        for hp, frasi in sorted(hp_per_sommatoria_filtered.items()):
-            frasi_desc = []
-            for frase in frasi:
-                valore = risultati["sommatoria"][frase]
-                soglia = risultati["soglie_sommatoria"][frase]
-                frasi_desc.append(f"{frase} ({valore:.6f}% > {soglia}%)")
-            
-            print(f"  - {hp}: {', '.join(frasi_desc)}")
-    else:
-        print("\nNessuna caratteristica di pericolo assegnata per sommatoria")
-    
-    print("\n============================================\n")
+        print(f"Risultati salvati in {file_path}")
+        return True
+    except Exception as e:
+        print(f"Errore nel salvataggio dei risultati: {e}")
+        return False
 
 
-
-
-
-
-
-
-
-
-# =============================================================================
-# Funzione principale del programma
-# =============================================================================
 def main():
     """
     Funzione principale del programma
@@ -766,6 +626,9 @@ def main():
                 "message": "Errore durante la classificazione"
             })
         
+        # Salva i risultati per uso futuro
+        salva_risultati(risultati, "risultati_classificazione.json")
+        
         # Chiudi la connessione al database
         database.chiudi_connessione()
         
@@ -778,14 +641,125 @@ def main():
     
     except Exception as e:
         # Gestisci qualsiasi eccezione non prevista
+        import traceback
+        traceback.print_exc()
         return json.dumps({
             "success": False, 
             "message": f"Errore durante la classificazione: {str(e)}"
         })
 
-# =============================================================================
-# Punto di ingresso del programma
-# =============================================================================
+
+# Funzioni di supporto per esportazione dei risultati
+def esporta_risultati_excel(risultati, file_path):
+    """
+    Esporta i risultati in formato Excel
+    
+    Args:
+        risultati (dict): Risultati della classificazione
+        file_path (str): Percorso del file Excel da creare
+        
+    Returns:
+        bool: True se l'esportazione ha avuto successo, False altrimenti
+    """
+    try:
+        import pandas as pd
+        
+        # Crea DataFrame per le sostanze
+        sostanze_data = []
+        for nome_sostanza, info in risultati["campione"].items():
+            sostanze_data.append({
+                "Sostanza": nome_sostanza,
+                "Concentrazione (ppm)": info["concentrazione_ppm"],
+                "Concentrazione (%)": info["concentrazione_percentuale"],
+                "Frasi H": ", ".join(info.get("frasi_h", [])),
+                "Caratteristiche HP": ", ".join(info.get("caratteristiche_pericolo", []))
+            })
+        
+        sostanze_df = pd.DataFrame(sostanze_data)
+        
+        # Crea DataFrame per le sommatorie
+        sommatorie_data = []
+        for frase_h, valore in risultati["sommatoria_per_frase"].items():
+            if valore > 0:  # Mostra solo valori > 0
+                limite = risultati["valori_limite"].get(frase_h, "N/A")
+                sommatorie_data.append({
+                    "Frase H": frase_h,
+                    "Concentrazione Totale (%)": valore,
+                    "Valore Limite (%)": limite,
+                    "Superamento Limite": "Sì" if limite != "N/A" and valore >= limite else "No"
+                })
+        
+        sommatorie_df = pd.DataFrame(sommatorie_data)
+        
+        # Crea DataFrame per il risultato finale
+        hp_data = []
+        for hp in risultati["caratteristiche_pericolo"]:
+            motivazione = risultati.get("motivazioni_hp", {}).get(hp, "")
+            hp_data.append({
+                "Caratteristica di Pericolo": hp,
+                "Descrizione": _get_hp_description(hp),
+                "Motivazione": motivazione
+            })
+        
+        hp_df = pd.DataFrame(hp_data)
+        
+        # Crea DataFrame per informazioni sul punto di infiammabilità
+        info_data = []
+        info_data.append({
+            "Stato Fisico": risultati.get("stato_fisico", "N/A"),
+            "Punto Infiammabilità (°C)": risultati.get("punto_infiammabilita", "N/A"),
+            "Contiene Gasolio/Carburanti/Oli": "Sì" if risultati.get("contiene_gasolio", False) else "No"
+        })
+        
+        info_df = pd.DataFrame(info_data)
+        
+        # Scrivi i DataFrame in un file Excel con fogli separati
+        with pd.ExcelWriter(file_path) as writer:
+            hp_df.to_excel(writer, sheet_name="Caratteristiche di Pericolo", index=False)
+            info_df.to_excel(writer, sheet_name="Informazioni Fisiche", index=False)
+            sostanze_df.to_excel(writer, sheet_name="Sostanze", index=False)
+            sommatorie_df.to_excel(writer, sheet_name="Sommatorie", index=False)
+        
+        print(f"Risultati esportati in Excel: {file_path}")
+        return True
+    
+    except Exception as e:
+        print(f"Errore nell'esportazione in Excel: {e}")
+        return False
+
+
+def _get_hp_description(hp):
+    """
+    Restituisce la descrizione di una caratteristica di pericolo HP
+    
+    Args:
+        hp (str): Codice della caratteristica di pericolo (es. "HP4")
+        
+    Returns:
+        str: Descrizione della caratteristica di pericolo
+    """
+    descrizioni = {
+        "HP1": "Esplosivo",
+        "HP2": "Comburente",
+        "HP3": "Infiammabile",
+        "HP4": "Irritante - Irritazione cutanea e lesioni oculari",
+        "HP5": "Tossicità specifica per organi bersaglio (STOT)/Tossicità in caso di aspirazione",
+        "HP6": "Tossicità acuta",
+        "HP7": "Cancerogeno",
+        "HP8": "Corrosivo",
+        "HP9": "Infettivo",
+        "HP10": "Tossico per la riproduzione",
+        "HP11": "Mutageno",
+        "HP12": "Liberazione di gas a tossicità acuta",
+        "HP13": "Sensibilizzante",
+        "HP14": "Ecotossico",
+        "HP15": "Rifiuto che non possiede direttamente una delle caratteristiche di pericolo summenzionate ma può manifestarla successivamente"
+    }
+    
+    return descrizioni.get(hp, "Descrizione non disponibile")
+
+
+# Avvia il programma se eseguito direttamente
 if __name__ == "__main__":
     # Stampa il risultato JSON
     print(main())

@@ -83,7 +83,9 @@ class InfoRaccoltaManager {
             residuo105: document.getElementById('residuo105').value,
             residuo180: document.getElementById('residuo180').value,
             residuo600: document.getElementById('residuo600').value,
-            infiammabilita: document.getElementById('infiammabilita').value
+            infiammabilita: document.getElementById('infiammabilita').value,
+            // Aggiunta del valore gasolio
+            gasolio: document.getElementById('gasolioCheckbox').checked
         };
     
         // Raccoglie i dati dal Form 2: Informazioni Certificato
@@ -135,6 +137,10 @@ class InfoRaccoltaManager {
                 sessionStorage.setItem('infoRaccolta', JSON.stringify(formData));
                 // Aggiungi attività
                 addActivity('Info Raccolta', 'Informazioni raccolta salvate', 'fas fa-save');
+                
+                // Log per verificare se gasolio è stato salvato correttamente
+                console.log('Informazioni raccolta salvate:', formData);
+                console.log('Opzione gasolio:', formData.caratteristicheFisiche.gasolio);
             } else {
                 throw new Error(result.message);
             }
@@ -183,6 +189,12 @@ class InfoRaccoltaManager {
                     element.value = cf[key];
                 }
             });
+            
+            // Imposta la checkbox per gasolio
+            const gasolioCheckbox = document.getElementById('gasolioCheckbox');
+            if (gasolioCheckbox && cf.gasolio !== undefined) {
+                gasolioCheckbox.checked = cf.gasolio;
+            }
         }
 
         // Popola Form 2: Informazioni Certificato
@@ -200,6 +212,12 @@ class InfoRaccoltaManager {
     resetForms() {
         document.getElementById('caratteristicheFisicheForm').reset();
         document.getElementById('infoCertificatoForm').reset();
+        
+        // Reimposta anche la checkbox gasolio
+        const gasolioCheckbox = document.getElementById('gasolioCheckbox');
+        if (gasolioCheckbox) {
+            gasolioCheckbox.checked = false;
+        }
         
         // Nascondi tutti i campi personalizzati al reset
         ['colore', 'odore', 'statoFisico'].forEach(fieldId => {

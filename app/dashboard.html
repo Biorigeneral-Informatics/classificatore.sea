@@ -540,6 +540,17 @@
                 <div class="data-table">
                     <h3>Caratteristiche Fisiche del Campione</h3>
                     <form id="caratteristicheFisicheForm" class="raccolta-form">
+                        
+                        <!-- Gasoli, oli e carburanti: cambia la soglia del punto di infiammabilità -->
+                        <div class="form-group special-checkbox" style="margin: 1.5rem 0;">
+                            <label class="checkbox-container">
+                                <input type="checkbox" id="gasolioCheckbox">
+                                <span class="checkmark"></span>
+                                <span class="checkbox-label">Il campione contiene gasoli, carburanti o oli</span>
+                            </label>
+                            <small class="form-text text-muted">Seleziona questa opzione se il campione contiene prodotti derivati da petrolio come gasoli, carburanti o oli minerali.</small>
+                        </div>
+                        
                         <div class="form-group-grid">
                            <!-- Prima colonna -->
                             <div class="form-column">
@@ -697,7 +708,8 @@
             </div>
         </section>
 
-        <!-- Sezione Classificazione -->
+        
+        <!-- Sezione Classificazione (Semplificata) -->
         <section id="classificazione" class="section">
             <h2>Classificazione Rifiuti</h2>
             
@@ -707,7 +719,7 @@
                 <p class="text-sm text-gray-600" id="classificationFileDate">Caricato il </p>
             </div>
             
-            <!-- Pulsante per avviare classificazione -->
+            <!-- Pulsanti di azione -->
             <div class="action-buttons" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
                 <button id="startClassificationBtn" class="btn btn-primary" style="margin-right: 1rem;">
                     <i class="fas fa-play"></i> Avvia Classificazione
@@ -717,52 +729,16 @@
                 </button>
             </div>
             
-            <!-- La tabella di classificazione verrà mostrata qui dopo aver premuto Avvia Classificazione -->
-            <div id="classificationTableContainer" style="display: none;" class="mt-4">
-                <div class="data-table">
-                    <table id="classificationTable" class="w-full">
-                        <thead>
-                            <tr>
-                                <th>CAS</th>
-                                <th>Cod EER</th>
-                                <th>Cod Analisi</th>
-                                <th>Descrizione</th>
-                                <th>Concentrazione</th>
-                                <th>Fattore di conversione</th>
-                                <th>Frasi H</th>
-                                <th>HP</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-                
-            <!-- Tabella dei risultati della classificazione -->
-            <div id="classificationResultsContainer" style="display: none;" class="mt-4">
-                <div class="data-table">
-                    <h3>Risultati Classificazione</h3>
-                    <table id="classificationResultsTable" class="w-full">
-                        <thead>
-                            <tr>
-                                <th>CAS</th>
-                                <th>Cod EER</th>
-                                <th>Cod Analisi</th>
-                                <th>Descrizione</th>
-                                <th>Concentrazione</th>
-                                <th>Fattore di conversione</th>
-                                <th>Frasi H</th>
-                                <th>HP</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                    <div class="mt-4 text-right">
-                        <button class="btn btn-primary" id="saveClassificationBtn" style="display: none;">
-                            <i class="fas fa-save"></i> Salva Classificazione
-                        </button>
-                    </div>
-                </div>
+            <!-- Messaggio di informazione su come ottenere i risultati -->
+            <div class="info-box" style="background-color: #f0f7ff; border-left: 4px solid #2196f3; padding: 1rem; margin-top: 2rem;">
+                <h3 style="margin-top: 0;"><i class="fas fa-info-circle"></i> Come funziona la classificazione</h3>
+                <p>Quando avvii la classificazione, il sistema:</p>
+                <ol>
+                    <li>Analizza i dati del campione e le sostanze con le relative frasi H</li>
+                    <li>Applica i valori di cut-off e limite per ogni caratteristica di pericolo (HP)</li>
+                    <li>Genera automaticamente un report nella sezione Reports</li>
+                </ol>
+                <p>Una volta completata la classificazione, usa il pulsante "Vai a Reports" per visualizzare e gestire i risultati.</p>
             </div>
         </section>
     </main>
