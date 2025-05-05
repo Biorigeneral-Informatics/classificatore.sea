@@ -11,13 +11,16 @@
       ]
     },
     "TetraidroFurano": {
-      "concentrazione_ppm": 300,
-      "concentrazione_percentuale": 0.03,
+      "concentrazione_ppm": 1000000,
+      "concentrazione_percentuale": 100,
       "frasi_h": [
         "H225",
         "H351",
         "H335",
         "H319"
+      ],
+      "caratteristiche_pericolo": [
+        "HP3"
       ]
     }
   },
@@ -26,13 +29,17 @@
     "H301": 0,
     "H400": 0,
     "H410": 0,
-    "H225": 0.03,
+    "H225": 100,
     "H351": 0,
     "H335": 0,
     "H319": 0
   },
-  "caratteristiche_pericolo": [],
-  "motivazioni_hp": {},
+  "caratteristiche_pericolo": [
+    "HP3"
+  ],
+  "motivazioni_hp": {
+    "HP3": "Sommatoria frasi H sopra limite: H225 (100.0000% >= 0.1%) [Eseguire metodo di prova]"
+  },
   "valori_limite": {
     "H224": 0.1,
     "H225": 0.1,
