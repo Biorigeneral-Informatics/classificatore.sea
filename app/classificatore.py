@@ -110,6 +110,7 @@ class DatabaseSostanze:
         self.hp_mapping = {
             # HP3 - Infiammabile
             "HP3": ["H224", "H225", "H226", "H228", "H242", "H250", "H251", "H252", "H260", "H261"],
+            "HP8": ["H314"],
             
             # Altre HP verranno aggiunte in seguito
         }
@@ -119,6 +120,7 @@ class DatabaseSostanze:
         # la sostanza NON viene considerata nella classificazione
         self.valori_cut_off = {
             "HP3": 0,  # HP3 non ha valori soglia cut-off
+            "HP8": 1.0,  # HP8 ha valore soglia dell'1%
             
             # Altri valori soglia verranno aggiunti in seguito
         }
@@ -138,7 +140,11 @@ class DatabaseSostanze:
             "H252": 0.1,   # Autoriscaldante in grandi quantità; può infiammarsi
             "H260": 0.1,   # A contatto con l'acqua libera gas infiammabili che possono infiammarsi spontaneamente
             "H261": 0.1,   # A contatto con l'acqua libera gas infiammabili
+
+            # HP8 - Corrosivo
+            "H314": 5.0,  # Somma delle concentrazioni delle sostanze con H314 deve essere ≥ 5%
             
+
             # Altri valori limite verranno aggiunti in seguito
         }
 
@@ -318,7 +324,7 @@ class ClassificatoreRifiuti:
         
         Args:
             campione_dati (dict): Dizionario con chiave il nome della sostanza e valore
-                                 un dizionario con 'concentrazione_ppm' e 'concentrazione_percentuale'
+                                un dizionario con 'concentrazione_ppm' e 'concentrazione_percentuale'
         
         Returns:
             dict: Risultati della classificazione o None se ci sono errori
@@ -374,6 +380,12 @@ class ClassificatoreRifiuti:
                 hp_assegnate.add("HP3")
                 motivazioni_hp["HP3"] = hp3_infiammabilita["motivo"]
             
+            # STEP 1.1: Verifica preliminare per HP8 - Controllo pH
+            hp8_ph = self._verifica_hp8_ph()
+            if hp8_ph["assegnata"]:
+                hp_assegnate.add("HP8")
+                motivazioni_hp["HP8"] = hp8_ph["motivo"]
+            
             # STEP 2: Processa ogni sostanza nel campione
             for nome_sostanza, dati in campione_dati.items():
                 # Estrai i dati della sostanza
@@ -414,7 +426,16 @@ class ClassificatoreRifiuti:
                         # Verifica se la frase supera il limite per HP3
                         if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0):
                             hp_sostanza.add("HP3")
-                        
+                    
+                    # Per HP8, verifica H314 con cut-off 1%
+                    if frase_h_clean in self.database.hp_mapping["HP8"]:
+                        # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
+                        if concentrazione_percentuale >= self.database.valori_cut_off.get("HP8", 1.0):
+                            sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
+                            
+                            # Aggiungi HP8 alle HP della sostanza
+                            hp_sostanza.add("HP8")
+                
                 # Salva le caratteristiche di pericolo associate alla sostanza
                 if hp_sostanza:
                     campione[nome_sostanza]["caratteristiche_pericolo"] = list(hp_sostanza)
@@ -430,6 +451,16 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP3"] = f"{motivazioni_hp['HP3']}; {hp3_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP3"] = hp3_sommatoria["motivo"]
+            
+            # STEP 4: Verifica le sommatorie per HP8
+            hp8_sommatoria = self._verifica_hp8_sommatoria(sommatoria_per_frase)
+            if hp8_sommatoria["assegnata"]:
+                hp_assegnate.add("HP8")
+                # Aggiungi o aggiorna la motivazione
+                if "HP8" in motivazioni_hp:
+                    motivazioni_hp["HP8"] = f"{motivazioni_hp['HP8']}; {hp8_sommatoria['motivo']}"
+                else:
+                    motivazioni_hp["HP8"] = hp8_sommatoria["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -541,7 +572,75 @@ class ClassificatoreRifiuti:
             print(f"HP3 assegnata: {risultato['motivo']}")
         
         return risultato
-
+    
+    def _verifica_hp8_ph(self):
+        """
+        Verifica i criteri di HP8 basati sul pH
+        
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Verifica se abbiamo le informazioni sul pH
+        if not self.info_raccolta or 'caratteristicheFisiche' not in self.info_raccolta or 'ph' not in self.info_raccolta['caratteristicheFisiche']:
+            print("Informazioni mancanti per verificare HP8 (pH)")
+            return risultato
+        
+        # Estrai il valore del pH
+        ph_str = self.info_raccolta['caratteristicheFisiche']['ph']
+        
+        try:
+            # Tenta di convertire il pH in float
+            ph = float(ph_str.replace(',', '.'))
+            
+            # Verifica se il pH è estremamente acido o alcalino
+            if ph <= 2.0:
+                risultato["assegnata"] = True
+                risultato["motivo"] = f"pH ≤ 2.0 (valore rilevato: {ph})"
+                print(f"HP8 assegnata: {risultato['motivo']}")
+                
+            elif ph >= 11.5:
+                risultato["assegnata"] = True
+                risultato["motivo"] = f"pH ≥ 11.5 (valore rilevato: {ph})"
+                print(f"HP8 assegnata: {risultato['motivo']}")
+        
+        except (ValueError, TypeError) as e:
+            print(f"Errore nella conversione del pH: {e}")
+        
+        return risultato
+    
+    def _verifica_hp8_sommatoria(self, sommatoria_per_frase):
+        """
+        Verifica i criteri di HP8 basati sulle sommatorie delle frasi H314
+        
+        Args:
+            sommatoria_per_frase (dict): Sommatoria delle concentrazioni per ciascuna frase H
+            
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Verifica se la frase H314 ha una sommatoria >= 5%
+        if 'H314' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H314']
+            limite = self.database.valori_limite.get('H314', 5.0)  # Default 5% se non specificato
+            
+            if sommatoria >= limite:
+                risultato["assegnata"] = True
+                risultato["motivo"] = f"Sommatoria sostanze con frase H314 (SkinCorr. 1A/1B/1C) pari a {sommatoria:.4f}% ≥ {limite}%"
+                print(f"HP8 assegnata: {risultato['motivo']}")
+        
+        return risultato
+        
+    
 
 def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
     """

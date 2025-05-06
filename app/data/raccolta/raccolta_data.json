@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-05-05T19:52:32.117035",
+  "timestamp": "2025-05-06T12:07:13.159054",
   "filename": "temp_raccolta_data.json",
   "data": [
     {
@@ -48,7 +48,7 @@
     },
     {
       "Descriz": "TetraidroFurano",
-      "Valore_Txt": "1000000"
+      "Valore_Txt": "300"
     }
   ],
   "columns": [

@@ -11,16 +11,13 @@
       ]
     },
     "TetraidroFurano": {
-      "concentrazione_ppm": 1000000,
-      "concentrazione_percentuale": 100,
+      "concentrazione_ppm": 300,
+      "concentrazione_percentuale": 0.03,
       "frasi_h": [
         "H225",
         "H351",
         "H335",
         "H319"
-      ],
-      "caratteristiche_pericolo": [
-        "HP3"
       ]
     }
   },
@@ -29,16 +26,16 @@
     "H301": 0,
     "H400": 0,
     "H410": 0,
-    "H225": 100,
+    "H225": 0.03,
     "H351": 0,
     "H335": 0,
     "H319": 0
   },
   "caratteristiche_pericolo": [
-    "HP3"
+    "HP8"
   ],
   "motivazioni_hp": {
-    "HP3": "Sommatoria frasi H sopra limite: H225 (100.0000% >= 0.1%) [Eseguire metodo di prova]"
+    "HP8": "pH ≥ 11.5 (valore rilevato: 233.0)"
   },
   "valori_limite": {
     "H224": 0.1,
@@ -50,10 +47,12 @@
     "H251": 0.1,
     "H252": 0.1,
     "H260": 0.1,
-    "H261": 0.1
+    "H261": 0.1,
+    "H314": 5.0
   },
   "valori_cut_off": {
-    "HP3": 0
+    "HP3": 0,
+    "HP8": 1.0
   },
   "stato_fisico": "Liquido",
   "punto_infiammabilita": 70.0,
