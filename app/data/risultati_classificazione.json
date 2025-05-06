@@ -31,12 +31,8 @@
     "H335": 0,
     "H319": 0
   },
-  "caratteristiche_pericolo": [
-    "HP8"
-  ],
-  "motivazioni_hp": {
-    "HP8": "pH ≥ 11.5 (valore rilevato: 233.0)"
-  },
+  "caratteristiche_pericolo": [],
+  "motivazioni_hp": {},
   "valori_limite": {
     "H224": 0.1,
     "H225": 0.1,
