@@ -117,6 +117,9 @@ class DatabaseSostanze:
             # HP5 - Tossicità specifica per organi bersaglio (STOT)/Tossicità in caso di aspirazione
             "HP5": ["H370", "H371", "H335", "H372", "H373", "H304"],
 
+            # HP6 - Tossicità acuta
+            "HP6": ["H300", "H301", "H302", "H310", "H311", "H312", "H330", "H331", "H332"],
+
             # HP8 - Corrosivo
             "HP8": ["H314"],
             
@@ -130,6 +133,7 @@ class DatabaseSostanze:
             "HP3": 0,  # HP3 non ha valori soglia cut-off
             "HP4": 1.0,  # HP4 ha valore soglia dell'1%
             "HP5": 1.0,  # HP5 ha valore soglia dell'1% per H370, H372
+            "HP6": 1.0,  # HP6 ha valore soglia dell'1%
             "HP8": 1.0,  # HP8 ha valore soglia dell'1%
             
             # Altri valori soglia verranno aggiunti in seguito
@@ -163,6 +167,23 @@ class DatabaseSostanze:
             "H372": 1.0,   # STOT RE 1 limite 1%
             "H373": 10.0,  # STOT RE 2 limite 10%
             "H304": 10.0,  # Asp. Tox. 1 limite 10%
+
+            # HP6 - Tossicità acuta
+            ## Esposizione orale
+            "H300_1": 0.1,    # Acute Tox. 1 (H300)
+            "H300_2": 0.25,   # Acute Tox. 2 (H300)
+            "H301": 5.0,      # Acute Tox. 3 (H301)
+            "H302": 25.0,     # Acute Tox. 4 (H302)
+            ## Esposizione cutanea
+            "H310_1": 0.25,   # Acute Tox. 1 (H310)
+            "H310_2": 2.5,    # Acute Tox. 2 (H310)
+            "H311": 15.0,     # Acute Tox. 3 (H311)
+            "H312": 55.0,     # Acute Tox. 4 (H312)
+            ## Esposizione per inalazione
+            "H330_1": 0.1,    # Acute Tox. 1 (H330)
+            "H330_2": 0.5,    # Acute Tox. 2 (H330)
+            "H331": 3.5,      # Acute Tox. 3 (H331)
+            "H332": 22.5,     # Acute Tox. 4 (H332)            
 
             # HP8 - Corrosivo
             "H314": 5.0,  # Somma delle concentrazioni delle sostanze con H314 deve essere ≥ 5%
@@ -295,6 +316,39 @@ class DatabaseSostanze:
         return self.sostanze_frasi_h.get(nome_sostanza, [])
 
 
+
+
+
+
+
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+
+
+
+#------------- INIZO CLASSE CLASSIFICATORE RIFIUTI -------------#
+
+#Questa classe è:
+## - La responsabile della classificazione con il metodo classifica_dati
+## - La responsabile della normalizzazione dei nomi delle sostanze con il metodo normalize_name
+## - Gestisce tuti i diversi approcci di classificazione per ogni HP
+
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+
+
+
+
+
+
 class ClassificatoreRifiuti:
     def __init__(self, database):
         """Inizializza il classificatore con un database"""
@@ -333,6 +387,9 @@ class ClassificatoreRifiuti:
         print(f"Punto di infiammabilità: {self.punto_infiammabilita} °C")
         print(f"Contiene gasolio/carburanti/oli: {self.contiene_gasolio}")
 
+
+
+    #-----------METODI DI CLASSIFICAZIONE E NORMALIZZAZIONE-----------#
     def normalize_name(self, nome):
         """
         Normalizza il nome della sostanza rimuovendo spazi extra e convertendo in minuscolo
@@ -477,6 +534,27 @@ class ClassificatoreRifiuti:
                             
                             # Aggiungi HP5 alle HP della sostanza
                             hp_sostanza.add("HP5")
+                    
+                    # Per HP6, verifica frasi H con cut-off 1%
+                    if frase_h_clean in self.database.hp_mapping["HP6"]:
+                        # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
+                        if concentrazione_percentuale >= self.database.valori_cut_off.get("HP6", 1.0):
+                            # Per le frasi H300 e H310 e H330 che possono essere di categoria 1 o 2
+                            # useremo la categoria più conservativa (categoria 1)
+                            if frase_h_clean == "H300":
+                                frase_key = "H300_1"  # Categoria 1, valore più basso
+                            elif frase_h_clean == "H310":
+                                frase_key = "H310_1"  # Categoria 1, valore più basso
+                            elif frase_h_clean == "H330":
+                                frase_key = "H330_1"  # Categoria 1, valore più basso
+                            else:
+                                frase_key = frase_h_clean
+                            
+                            # Aggiungi alla sommatoria
+                            sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
+                            
+                            # Aggiungi HP6 alle HP della sostanza
+                            hp_sostanza.add("HP6")
                 
                 # Salva le caratteristiche di pericolo associate alla sostanza
                 if hp_sostanza:
@@ -523,6 +601,16 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP5"] = f"{motivazioni_hp['HP5']}; {hp5_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP5"] = hp5_sommatoria["motivo"]
+            
+            # STEP 7: Verifica le sommatorie per HP6
+            hp6_sommatoria = self._verifica_hp6_sommatoria(sommatoria_per_frase)
+            if hp6_sommatoria["assegnata"]:
+                hp_assegnate.add("HP6")
+                # Aggiungi o aggiorna la motivazione
+                if "HP6" in motivazioni_hp:
+                    motivazioni_hp["HP6"] = f"{motivazioni_hp['HP6']}; {hp6_sommatoria['motivo']}"
+                else:
+                    motivazioni_hp["HP6"] = hp6_sommatoria["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -842,7 +930,146 @@ class ClassificatoreRifiuti:
             print(f"HP5 assegnata: {risultato['motivo']}")
         
         return risultato
-    
+
+    def _verifica_hp6_sommatoria(self, sommatoria_per_frase):
+        """
+        Verifica i criteri di HP6 (Tossicità acuta) basati sulle sommatorie delle frasi H
+        
+        Args:
+            sommatoria_per_frase (dict): Sommatoria delle concentrazioni per ciascuna frase H
+                
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Per tenere traccia delle condizioni soddisfatte per HP6
+        condizioni_soddisfatte = []
+        
+        # Verifica per esposizione orale (H300, H301, H302)
+        if 'H300' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H300']
+            limite_cat1 = self.database.valori_limite.get('H300_1', 0.1)
+            limite_cat2 = self.database.valori_limite.get('H300_2', 0.25)
+            
+            # Verifichiamo prima con il limite più conservativo (categoria 1)
+            if sommatoria >= limite_cat1:
+                condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 1) = {sommatoria:.4f}% ≥ {limite_cat1}%")
+            # Altrimenti verifichiamo con il limite di categoria 2
+            elif sommatoria >= limite_cat2:
+                condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 2) = {sommatoria:.4f}% ≥ {limite_cat2}%")
+        
+        if 'H301' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H301']
+            limite = self.database.valori_limite.get('H301', 5.0)
+            
+            if sommatoria >= limite:
+                condizioni_soddisfatte.append(f"Somma H301 (Acute Tox. 3) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        if 'H302' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H302']
+            limite = self.database.valori_limite.get('H302', 25.0)
+            
+            if sommatoria >= limite:
+                condizioni_soddisfatte.append(f"Somma H302 (Acute Tox. 4) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Verifica per esposizione cutanea (H310, H311, H312)
+        if 'H310' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H310']
+            limite_cat1 = self.database.valori_limite.get('H310_1', 0.25)
+            limite_cat2 = self.database.valori_limite.get('H310_2', 2.5)
+            
+            # Verifichiamo prima con il limite più conservativo (categoria 1)
+            if sommatoria >= limite_cat1:
+                condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 1) = {sommatoria:.4f}% ≥ {limite_cat1}%")
+            # Altrimenti verifichiamo con il limite di categoria 2
+            elif sommatoria >= limite_cat2:
+                condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 2) = {sommatoria:.4f}% ≥ {limite_cat2}%")
+        
+        if 'H311' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H311']
+            limite = self.database.valori_limite.get('H311', 15.0)
+            
+            if sommatoria >= limite:
+                condizioni_soddisfatte.append(f"Somma H311 (Acute Tox. 3) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        if 'H312' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H312']
+            limite = self.database.valori_limite.get('H312', 55.0)
+            
+            if sommatoria >= limite:
+                condizioni_soddisfatte.append(f"Somma H312 (Acute Tox. 4) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Verifica per esposizione per inalazione (H330, H331, H332)
+        if 'H330' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H330']
+            limite_cat1 = self.database.valori_limite.get('H330_1', 0.1)
+            limite_cat2 = self.database.valori_limite.get('H330_2', 0.5)
+            
+            # Verifichiamo prima con il limite più conservativo (categoria 1)
+            if sommatoria >= limite_cat1:
+                condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 1) = {sommatoria:.4f}% ≥ {limite_cat1}%")
+            # Altrimenti verifichiamo con il limite di categoria 2
+            elif sommatoria >= limite_cat2:
+                condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 2) = {sommatoria:.4f}% ≥ {limite_cat2}%")
+        
+        if 'H331' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H331']
+            limite = self.database.valori_limite.get('H331', 3.5)
+            
+            if sommatoria >= limite:
+                condizioni_soddisfatte.append(f"Somma H331 (Acute Tox. 3) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        if 'H332' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H332']
+            limite = self.database.valori_limite.get('H332', 22.5)
+            
+            if sommatoria >= limite:
+                condizioni_soddisfatte.append(f"Somma H332 (Acute Tox. 4) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Se almeno una condizione è soddisfatta, assegna HP6
+        if condizioni_soddisfatte:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP6 assegnata per: {'; '.join(condizioni_soddisfatte)}"
+            print(f"HP6 assegnata: {risultato['motivo']}")
+        
+        return risultato
+
+
+
+
+
+
+
+
+
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+
+
+
+#------------- FINE CLASSE CLASSIFICATORE RIFIUTI -------------#
+
+
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
+
+
+
+
+
+
 
 def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
     """
