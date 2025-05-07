@@ -108,6 +108,9 @@ class DatabaseSostanze:
         # Mappatura delle frasi H alle caratteristiche di pericolo (HP)
         # Questa associazione è fissa e verrà usata per determinare quali frasi H sono rilevanti per ogni HP
         self.hp_mapping = {
+            # HP1 - Esplosivo
+            "HP1": ["H200", "H201", "H202", "H203", "H204", "H240", "H241"],
+
             # HP3 - Infiammabile
             "HP3": ["H224", "H225", "H226", "H228", "H242", "H250", "H251", "H252", "H260", "H261"],
 
@@ -130,6 +133,7 @@ class DatabaseSostanze:
         # Questi valori fungono da filtro: se la concentrazione è < cut-off, 
         # la sostanza NON viene considerata nella classificazione
         self.valori_cut_off = {
+            "HP1": 0,  # HP1 non ha valori soglia cut-off, come HP3
             "HP3": 0,  # HP3 non ha valori soglia cut-off
             "HP4": 1.0,  # HP4 ha valore soglia dell'1%
             "HP5": 1.0,  # HP5 ha valore soglia dell'1% per H370, H372
@@ -142,6 +146,15 @@ class DatabaseSostanze:
         # Valori LIMITE per attribuzione effettiva delle caratteristiche di pericolo
         # Questi valori determinano se una HP deve essere assegnata in base a sommatorie specifiche
         self.valori_limite = {
+            # HP1 - Esplosivo
+            "H200": 0.1,   # Esplosivo instabile
+            "H201": 0.1,   # Esplosivo; pericolo di esplosione di massa
+            "H202": 0.1,   # Esplosivo; grave pericolo di proiezione
+            "H203": 0.1,   # Esplosivo; pericolo di incendio, di spostamento d'aria o di proiezione
+            "H204": 0.1,   # Pericolo di incendio o di proiezione
+            "H240": 0.1,   # Rischio di esplosione per riscaldamento
+            "H241": 0.1,   # Rischio d'incendio o di esplosione per riscaldamento
+
             # HP3 - Infiammabile
             # Per le frasi H di HP3, ogni frase ha un limite minimo dello 0.1%
             "H224": 0.1,   # Liquido e vapori altamente infiammabili
@@ -156,9 +169,10 @@ class DatabaseSostanze:
             "H261": 0.1,   # A contatto con l'acqua libera gas infiammabili
 
             # HP4 - Irritante
-            "H314_HP4": 1.0,  # Per HP4: Somma delle sostanze con H314 deve essere ≥ 1%
-            "H318": 10.0,     # Somma delle sostanze con H318 deve essere ≥ 10%
-            "H315_H319": 20.0, # Somma delle sostanze con H315 e/o H319 deve essere ≥ 20%
+            "H314_HP4_MIN": 1.0,  # Per HP4: Limite minimo per H314
+            "H314_HP4_MAX": 5.0,  # Per HP4: Limite massimo per H314 (sotto questo valore è HP4, sopra è HP8)
+            "H318": 10.0,         # Somma delle sostanze con H318 deve essere ≥ 10%
+            "H315_H319": 20.0,    # Somma delle sostanze con H315 e/o H319 deve essere ≥ 20%
 
             # HP5 - Tossicità specifica per organi bersaglio (STOT)
             "H370": 1.0,   # STOT SE 1 limite 1%
@@ -499,6 +513,15 @@ class ClassificatoreRifiuti:
                     if frase_h_clean not in sommatoria_per_frase:
                         sommatoria_per_frase[frase_h_clean] = 0
                     
+                    # Per HP1, le frasi H corrispondenti hanno tutte limite 0.1%
+                    if frase_h_clean in self.database.hp_mapping["HP1"]:
+                        # Aggiungi alla sommatoria senza considerare il cut-off (come per HP3)
+                        sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
+                        
+                        # Verifica se la frase supera il limite per HP1
+                        if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0):
+                            hp_sostanza.add("HP1")
+                    
                     # Per HP3, le frasi H corrispondenti hanno tutte limite 0.1%
                     if frase_h_clean in self.database.hp_mapping["HP3"]:
                         # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
@@ -611,6 +634,13 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP6"] = f"{motivazioni_hp['HP6']}; {hp6_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP6"] = hp6_sommatoria["motivo"]
+            
+            # STEP 8: Verifica le sommatorie per HP1
+            hp1_sommatoria = self._verifica_hp1_sommatoria(sommatoria_per_frase)
+            if hp1_sommatoria["assegnata"]:
+                hp_assegnate.add("HP1")
+                # Aggiungi o aggiorna la motivazione
+                motivazioni_hp["HP1"] = hp1_sommatoria["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -842,10 +872,12 @@ class ClassificatoreRifiuti:
         # Per tenere traccia di tutte le condizioni che portano ad assegnare HP4
         condizioni_soddisfatte = []
         
-        # Verifica condizione 1: H314 >= 1%
-        limite_h314_hp4 = self.database.valori_limite.get('H314_HP4', 1.0)
-        if sommatoria_h314_hp4 >= limite_h314_hp4:
-            condizioni_soddisfatte.append(f"Somma H314 = {sommatoria_h314_hp4:.4f}% ≥ {limite_h314_hp4}%")
+        # Verifica condizione 1: H314 >= 1% e < 5%
+        limite_h314_hp4_min = self.database.valori_limite.get('H314_HP4_MIN', 1.0)
+        limite_h314_hp4_max = self.database.valori_limite.get('H314_HP4_MAX', 5.0)
+        
+        if sommatoria_h314_hp4 >= limite_h314_hp4_min and sommatoria_h314_hp4 < limite_h314_hp4_max:
+            condizioni_soddisfatte.append(f"Somma H314 = {sommatoria_h314_hp4:.4f}% ≥ {limite_h314_hp4_min}% e < {limite_h314_hp4_max}%")
         
         # Verifica condizione 2: H318 >= 10%
         limite_h318 = self.database.valori_limite.get('H318', 10.0)
@@ -1035,6 +1067,43 @@ class ClassificatoreRifiuti:
             risultato["assegnata"] = True
             risultato["motivo"] = f"HP6 assegnata per: {'; '.join(condizioni_soddisfatte)}"
             print(f"HP6 assegnata: {risultato['motivo']}")
+        
+        return risultato
+    
+
+    def _verifica_hp1_sommatoria(self, sommatoria_per_frase):
+        """
+        Verifica i criteri di HP1 basati sulle sommatorie delle frasi H
+        
+        Args:
+            sommatoria_per_frase (dict): Sommatoria delle concentrazioni per ciascuna frase H
+            
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Lista di frasi H rilevanti per HP1
+        frasi_hp1 = self.database.hp_mapping["HP1"]
+        
+        # Verifica se qualsiasi frase H di HP1 ha una sommatoria > 0.1%
+        frasi_sopra_limite = []
+        for frase_h in frasi_hp1:
+            if frase_h in sommatoria_per_frase:
+                sommatoria = sommatoria_per_frase[frase_h]
+                limite = self.database.valori_limite.get(frase_h, 0.1)  # Default 0.1% se non specificato
+                
+                if sommatoria >= limite:
+                    frasi_sopra_limite.append(f"{frase_h} ({sommatoria:.4f}% >= {limite}%)")
+        
+        # Se almeno una frase è sopra il limite, assegna HP1
+        if frasi_sopra_limite:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"Sommatoria frasi H sopra limite: {', '.join(frasi_sopra_limite)} [Eseguire metodo di prova]"
+            print(f"HP1 assegnata: {risultato['motivo']}")
         
         return risultato
 
