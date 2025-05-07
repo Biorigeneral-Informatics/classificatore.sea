@@ -447,6 +447,10 @@ function updateEchaFileInfo() {
 let currentEchaPage = 1;
 let echaPageSize = 50;
 let totalEchaRows = 0;
+// Variabili per la paginazione progressiva
+let loadedEchaRows = 0;
+let hasMoreEchaRows = true;
+let isLoadingMoreRows = false;
 
 // Carica e visualizza i dati ECHA dal database SQLite
 async function loadEchaFromDatabase(dbPath) {
@@ -575,147 +579,183 @@ function updateEchaTableSelector(tables, selectedTable) {
 }
 
 // Carica i dati di una specifica tabella con paginazione
-async function loadEchaTableData(dbPath, tableName, searchQuery = '', page = 1) {
+async function loadEchaTableData(dbPath, tableName, searchQuery = '', page = 1, append = false) {
     try {
-        console.log(`Caricamento tabella: ${tableName} dal database: ${dbPath} (pagina ${page})`);
+        console.log(`=== LOAD ECHA TABLE DATA ===`);
+        console.log(`dbPath ricevuto: ${dbPath}`);
+        console.log(`tableName: ${tableName}`);
+        console.log(`searchQuery: "${searchQuery}"`);
+        console.log(`page: ${page}`);
+        console.log(`append: ${append}`);
         
-        // Usa il percorso relativo se è stato memorizzato
-        const relativePath = sessionStorage.getItem('echaDbRelativePath');
+        // Verifica che il percorso esista e sia corretto
+        if (!dbPath) {
+            throw new Error('Nessun percorso database fornito');
+        }
         
-        // Se non abbiamo un percorso relativo salvato, creiamone uno
-        const pathToUse = relativePath || `echa/data/${dbPath.split(/[\\/]/).pop()}`;
-        
-        console.log(`Percorso relativo database utilizzato: ${pathToUse}`);
+        // Usa direttamente il percorso fornito
+        const pathToUse = dbPath;
+        console.log(`Percorso finale utilizzato: ${pathToUse}`);
         
         // Memorizza la pagina corrente
         currentEchaPage = page;
         
         // Calcola l'offset per la paginazione
-        const offset = (page - 1) * echaPageSize;
+        const offset = append ? loadedEchaRows : (page - 1) * echaPageSize;
         
-        // Base della query SQL
-        let query = `SELECT * FROM "${tableName}"`;
-        let params = [];
-        
-        // Se c'è una query di ricerca, aggiungi la condizione WHERE
-        if (searchQuery && searchQuery.trim() !== '') {
-            // Ottieni prima i nomi delle colonne
-            const columnsResult = await window.electronAPI.querySQLite(
-                `PRAGMA table_info("${tableName}")`,
-                [],
-                pathToUse
-            );
+        // Prima prova una query semplice senza filtri
+        if (!searchQuery || searchQuery.trim() === '') {
+            console.log('Query senza filtro di ricerca');
             
-            if (!columnsResult.success) {
-                throw new Error(`Errore nel recupero delle colonne: ${columnsResult.message}`);
+            // Ottieni il conteggio totale SOLO se non stiamo appendendo
+            if (!append) {
+                const countQuery = `SELECT COUNT(*) AS total FROM "${tableName}"`;
+                const countResult = await window.electronAPI.querySQLite(countQuery, [], pathToUse);
+                totalEchaRows = countResult.success ? countResult.data[0].total : 0;
+                console.log(`Total rows: ${totalEchaRows}`);
             }
             
-            const columns = columnsResult.data.map(col => col.name);
+            const query = `SELECT * FROM "${tableName}" LIMIT ${echaPageSize} OFFSET ${offset}`;
+            const params = [];
             
-            // Crea condizioni di ricerca per ogni colonna
-            const searchConditions = columns.map(col => `${col} LIKE ?`).join(' OR ');
-            const searchValue = `%${searchQuery}%`;
+            console.log('Query SQL:', query);
+            console.log('Parametri:', params);
             
-            // Aggiunge i parametri per ogni colonna
-            params = Array(columns.length).fill(searchValue);
+            // Esegui la query
+            const dataResult = await window.electronAPI.querySQLite(query, params, pathToUse);
             
-            // Aggiunge la condizione WHERE alla query
-            query += ` WHERE ${searchConditions}`;
+            if (!dataResult) {
+                throw new Error('Risposta query è undefined');
+            }
+            
+            console.log('Risultato query:', dataResult);
+            
+            if (!dataResult.success) {
+                throw new Error(`Errore query: ${dataResult.message || 'Errore sconosciuto'}`);
+            }
+            
+            // Dopo aver ottenuto i risultati:
+            if (!append) {
+                // Reset dei contatori quando si carica una nuova ricerca
+                loadedEchaRows = dataResult.data.length;
+                hasMoreEchaRows = loadedEchaRows < totalEchaRows;
+            } else {
+                loadedEchaRows += dataResult.data.length;
+                hasMoreEchaRows = loadedEchaRows < totalEchaRows;
+            }
+            
+            // Aggiorna l'interfaccia
+            renderEchaTable(dataResult.data, append);
+            
+            // Aggiorna il contatore dei risultati
+            document.getElementById('echaResultsCount').textContent = 
+                `${totalEchaRows} record totali (${loadedEchaRows} visualizzati)`;
+            
+            return;
         }
         
-        // Aggiungi LIMIT e OFFSET per la paginazione
-        query += ` LIMIT ${echaPageSize} OFFSET ${offset}`;
+        // Se c'è una ricerca, procedi con la logica più complessa
+        console.log('Query con filtro di ricerca');
         
-        // Esegui la query
+        // Ottieni le colonne disponibili
+        const columnsQuery = `PRAGMA table_info("${tableName}")`;
+        console.log('Columns query:', columnsQuery);
+        
+        const columnsResult = await window.electronAPI.querySQLite(columnsQuery, [], pathToUse);
+        
+        if (!columnsResult.success) {
+            throw new Error(`Errore nel recupero delle colonne: ${columnsResult.message}`);
+        }
+        
+        console.log('Colonne disponibili:', columnsResult.data);
+        
+        // Costruisci la query con i filtri
+        const columns = columnsResult.data.map(col => `"${col.name}"`);
+        const searchConditions = columns.map(col => `${col} LIKE ?`).join(' OR ');
+        const searchValue = `%${searchQuery}%`;
+        
+        // Ottieni il conteggio totale dei risultati filtrati SOLO se non stiamo appendendo
+        if (!append) {
+            const countQuery = `SELECT COUNT(*) AS total FROM "${tableName}" WHERE ${searchConditions}`;
+            const countParams = Array(columns.length).fill(searchValue);
+            const countResult = await window.electronAPI.querySQLite(countQuery, countParams, pathToUse);
+            totalEchaRows = countResult.success ? countResult.data[0].total : 0;
+            console.log(`Total filtered rows: ${totalEchaRows}`);
+        }
+        
+        const query = `SELECT * FROM "${tableName}" WHERE ${searchConditions} LIMIT ${echaPageSize} OFFSET ${offset}`;
+        const params = Array(columns.length).fill(searchValue);
+        
+        console.log('Query filtrata SQL:', query);
+        console.log('Parametri filtrata:', params);
+        
+        // Esegui la query filtrata
         const dataResult = await window.electronAPI.querySQLite(query, params, pathToUse);
         
         if (!dataResult.success) {
-            throw new Error(`Errore nel recupero dei dati: ${dataResult.message}`);
+            throw new Error(`Errore query filtrata: ${dataResult.message}`);
         }
         
-        // Ottieni il conteggio totale delle righe che corrispondono alla ricerca
-        let countQuery = `SELECT COUNT(*) AS total FROM "${tableName}"`;
-        let countParams = [];
+        console.log('Risultati trovati:', dataResult.data.length);
         
-        if (searchQuery && searchQuery.trim() !== '') {
-            // Ottieni prima i nomi delle colonne se non li abbiamo già
-            let columns;
-            if (!params.length) {
-                const columnsResult = await window.electronAPI.querySQLite(
-                    `PRAGMA table_info("${tableName}")`,
-                    [],
-                    pathToUse
-                );
-                
-                if (!columnsResult.success) {
-                    throw new Error(`Errore nel recupero delle colonne: ${columnsResult.message}`);
-                }
-                
-                columns = columnsResult.data.map(col => col.name);
-            }
-            
-            // Crea condizioni di ricerca per ogni colonna
-            const searchConditions = columns.map(col => `${col} LIKE ?`).join(' OR ');
-            const searchValue = `%${searchQuery}%`;
-            
-            // Aggiunge i parametri per ogni colonna
-            countParams = Array(columns.length).fill(searchValue);
-            
-            // Aggiunge la condizione WHERE alla query
-            countQuery += ` WHERE ${searchConditions}`;
+        // Dopo aver ottenuto i risultati:
+        if (!append) {
+            // Reset dei contatori quando si carica una nuova ricerca
+            loadedEchaRows = dataResult.data.length;
+            hasMoreEchaRows = loadedEchaRows < totalEchaRows;
+        } else {
+            loadedEchaRows += dataResult.data.length;
+            hasMoreEchaRows = loadedEchaRows < totalEchaRows;
         }
-        
-        const countResult = await window.electronAPI.querySQLite(countQuery, countParams, pathToUse);
-        totalEchaRows = countResult.success ? countResult.data[0].total : dataResult.data.length;
         
         // Aggiorna l'interfaccia
-        renderEchaTable(dataResult.data);
+        renderEchaTable(dataResult.data, append);
         
-        // Aggiorna la paginazione
-        updateEchaPagination(tableName, searchQuery);
-        
-        // Mostra il numero di record trovati
-        if (searchQuery && searchQuery.trim() !== '') {
-            document.getElementById('echaResultsCount').textContent = 
-                `${totalEchaRows} record trovati (pagina ${page}, ${Math.min(echaPageSize, dataResult.data.length)} visualizzati)`;
-        } else {
-            document.getElementById('echaResultsCount').textContent = 
-                `${totalEchaRows} record totali (pagina ${page}, ${Math.min(echaPageSize, dataResult.data.length)} visualizzati)`;
-        }
+        // Aggiorna il contatore dei risultati
+        document.getElementById('echaResultsCount').textContent = 
+            `${totalEchaRows} record totali (${loadedEchaRows} visualizzati)`;
         
     } catch (error) {
-        console.error('Errore nel caricamento della tabella:', error);
-        showNotification('Errore nel caricamento della tabella: ' + error.message, 'error');
-        
-        // Visualizza un messaggio di errore nella tabella
-        const resultsContainer = document.getElementById('echaSearchResults');
-        if (resultsContainer) {
-            resultsContainer.innerHTML = `
-                <div class="no-data-message">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <p>Errore nel caricamento della tabella: ${error.message}</p>
-                </div>
-            `;
-        }
+        console.error('=== ERRORE IN LOAD ECHA TABLE DATA ===');
+        console.error('Error object:', error);
+        console.error('Error message:', error.message);
+        console.error('Stack trace:', error.stack);
+        showNotification('Errore nel caricamento: ' + error.message, 'error');
     }
 }
 
 // Funzione di ricerca per il database ECHA
 function searchEchaData(query) {
-    const dbPath = sessionStorage.getItem('echaDbPath');
+    console.log('=== INIZIO RICERCA ===');
+    console.log('Query di ricerca:', query);
+    
+    // Verifica percorsi salvati
+    const echaDbPath = sessionStorage.getItem('echaDbPath');
+    const echaDbRelativePath = sessionStorage.getItem('echaDbRelativePath');
+    
+    console.log('echaDbPath in sessionStorage:', echaDbPath);
+    console.log('echaDbRelativePath in sessionStorage:', echaDbRelativePath);
+    
+    const dbPath = echaDbRelativePath || echaDbPath;
+    
     if (!dbPath) {
+        console.error('Nessun percorso database trovato');
         showNotification('Nessun database ECHA caricato', 'warning');
         return;
     }
     
+    console.log('Percorso database utilizzato:', dbPath);
+    
     // Ottieni la tabella attualmente selezionata
     const tableSelect = document.getElementById('echaTableSelect');
     if (!tableSelect) {
+        console.error('Selettore tabella non trovato');
         showNotification('Errore: selettore tabella non trovato', 'error');
         return;
     }
     
     const selectedTable = tableSelect.value;
+    console.log('Tabella selezionata:', selectedTable);
     
     // Reset paginazione e carica i dati
     currentEchaPage = 1;
@@ -723,16 +763,18 @@ function searchEchaData(query) {
 }
 
 // Renderizza la tabella ECHA
-function renderEchaTable(data) {
+function renderEchaTable(data, append = false) {
     const resultsContainer = document.getElementById('echaSearchResults');
     
     if (!Array.isArray(data) || data.length === 0) {
-        resultsContainer.innerHTML = `
-            <div class="no-data-message">
-                <i class="fas fa-info-circle"></i>
-                <p>Nessun risultato disponibile.</p>
-            </div>
-        `;
+        if (!append) {
+            resultsContainer.innerHTML = `
+                <div class="no-data-message">
+                    <i class="fas fa-info-circle"></i>
+                    <p>Nessun risultato disponibile.</p>
+                </div>
+            `;
+        }
         return;
     }
     
@@ -740,52 +782,72 @@ function renderEchaTable(data) {
         // Ottieni le intestazioni dalla prima riga
         const headers = Object.keys(data[0]);
         
-        // Crea la tabella
-        let tableHtml = '<table class="echa-table">';
+        let tableHtml = '';
         
-        // Aggiungi l'header della tabella
-        tableHtml += '<thead><tr>';
-        headers.forEach(header => {
-            // Formatta il nome dell'header per una migliore visualizzazione
-            const displayHeader = header.replace(/_/g, ' ');
-            tableHtml += `<th title="${header}">${displayHeader}</th>`;
-        });
-        tableHtml += '</tr></thead>';
-        
-        // Aggiungi il corpo della tabella
-        tableHtml += '<tbody>';
-        
-        // Aggiungi le righe di dati
-        data.forEach(row => {
-            tableHtml += '<tr>';
+        // Se non stiamo appendendo, crea la tabella da zero
+        if (!append) {
+            tableHtml = '<table class="echa-table">';
             
+            // Aggiungi l'header della tabella
+            tableHtml += '<thead><tr>';
             headers.forEach(header => {
-                const value = row[header] !== null && row[header] !== undefined ? row[header] : '';
-                tableHtml += `<td title="${value}">${value}</td>`;
+                const displayHeader = header.replace(/_/g, ' ');
+                tableHtml += `<th title="${header}">${displayHeader}</th>`;
+            });
+            tableHtml += '</tr></thead>';
+            tableHtml += '<tbody>';
+            
+            // Aggiungi le righe di dati
+            data.forEach(row => {
+                tableHtml += '<tr>';
+                headers.forEach(header => {
+                    const value = row[header] !== null && row[header] !== undefined ? row[header] : '';
+                    tableHtml += `<td title="${value}">${value}</td>`;
+                });
+                tableHtml += '</tr>';
             });
             
-            tableHtml += '</tr>';
-        });
-        
-        tableHtml += '</tbody></table>';
-        
-        // Aggiorna il container
-        resultsContainer.innerHTML = tableHtml;
-        
-        // Aggiungi event listeners per la visualizzazione migliorata delle celle
-        document.querySelectorAll('.echa-table td').forEach(cell => {
-            cell.addEventListener('click', function() {
-                // Evidenzia la cella quando viene cliccata
-                const selectedCells = document.querySelectorAll('.echa-table td.selected');
-                selectedCells.forEach(selected => selected.classList.remove('selected'));
-                this.classList.add('selected');
-                
-                // Se il contenuto è molto lungo, mostra un popup
-                if (this.textContent.length > 50) {
-                    showCellPopup(this, this.textContent);
-                }
+            tableHtml += '</tbody></table>';
+            
+            // Aggiungi il pulsante "Carica altri" dopo la tabella
+            tableHtml += `
+                <div class="load-more-container">
+                    <button id="loadMoreEchaBtn" class="btn btn-primary load-more-btn">
+                        <i class="fas fa-plus-circle"></i> Carica altri risultati
+                    </button>
+                </div>
+            `;
+            
+            resultsContainer.innerHTML = tableHtml;
+            
+            // Aggiungi event listener per il pulsante
+            const loadMoreBtn = document.getElementById('loadMoreEchaBtn');
+            if (loadMoreBtn) {
+                loadMoreBtn.addEventListener('click', () => loadMoreEchaResults());
+            }
+        } else {
+            // Se stiamo appendendo, aggiungi solo le nuove righe al tbody esistente
+            const tbody = resultsContainer.querySelector('tbody');
+            if (!tbody) {
+                console.error('tbody non trovato');
+                return;
+            }
+            
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(header => {
+                    const td = document.createElement('td');
+                    const value = row[header] !== null && row[header] !== undefined ? row[header] : '';
+                    td.textContent = value;
+                    td.setAttribute('title', value);
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
             });
-        });
+        }
+        
+        // Aggiorna la visibilità del pulsante
+        updateLoadMoreButtonVisibility();
         
     } catch (error) {
         console.error('Errore nella renderizzazione della tabella ECHA:', error);
@@ -795,6 +857,55 @@ function renderEchaTable(data) {
                 <p>Errore nella visualizzazione dei dati: ${error.message}</p>
             </div>
         `;
+    }
+}
+
+// Funzione per caricare più risultati
+async function loadMoreEchaResults() {
+    if (isLoadingMoreRows || !hasMoreEchaRows) return;
+    
+    isLoadingMoreRows = true;
+    
+    // Aggiorna il pulsante per mostrare lo stato di caricamento
+    const loadMoreBtn = document.getElementById('loadMoreEchaBtn');
+    if (loadMoreBtn) {
+        loadMoreBtn.disabled = true;
+        loadMoreBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Caricamento...';
+    }
+    
+    try {
+        const dbPath = sessionStorage.getItem('echaDbRelativePath') || sessionStorage.getItem('echaDbPath');
+        const tableSelect = document.getElementById('echaTableSelect');
+        const selectedTable = tableSelect ? tableSelect.value : null;
+        const searchQuery = document.getElementById('echaSearchInput')?.value || '';
+        
+        if (!dbPath || !selectedTable) {
+            throw new Error('Database o tabella non disponibili');
+        }
+        
+        // Carica i dati aggiuntivi con append = true
+        await loadEchaTableData(dbPath, selectedTable, searchQuery, 1, true);
+        
+    } catch (error) {
+        console.error('Errore nel caricamento di più risultati:', error);
+        showNotification('Errore nel caricamento: ' + error.message, 'error');
+    } finally {
+        isLoadingMoreRows = false;
+        updateLoadMoreButtonVisibility();
+    }
+}
+
+// Funzione per aggiornare la visibilità del pulsante "Carica altri"
+function updateLoadMoreButtonVisibility() {
+    const loadMoreBtn = document.getElementById('loadMoreEchaBtn');
+    if (!loadMoreBtn) return;
+    
+    if (hasMoreEchaRows && !isLoadingMoreRows) {
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.innerHTML = '<i class="fas fa-plus-circle"></i> Carica altri risultati';
+        loadMoreBtn.style.display = 'inline-flex';
+    } else if (!hasMoreEchaRows) {
+        loadMoreBtn.style.display = 'none';
     }
 }
 
