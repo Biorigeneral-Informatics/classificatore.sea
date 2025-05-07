@@ -99,6 +99,7 @@ let frasiEUHInEditMode = false;
 //-----------------------------------//
 
 // Carica i risultati del confronto ECHA nella sezione Aggiornamenti
+// Carica i risultati del confronto ECHA nella sezione Aggiornamenti
 function loadEchaComparisonResults() {
     console.log("Tentativo di caricamento risultati confronto ECHA...");
     
@@ -135,13 +136,34 @@ function loadEchaComparisonResults() {
             }
         }
         
+        // Crea il container per il riepilogo se non esiste
+        let summaryDiv = document.getElementById('echa-comparison-summary');
+        if (!summaryDiv) {
+            summaryDiv = document.createElement('div');
+            summaryDiv.id = 'echa-comparison-summary';
+            summaryDiv.className = 'echa-summary';
+            // Aggiungi il div di riepilogo prima della tabella
+            const dataTable = document.querySelector('#aggiornamenti .data-table');
+            if (dataTable) {
+                dataTable.insertBefore(summaryDiv, dataTable.firstChild);
+            }
+        }
+        
         // Ottieni il container per la tabella di confronto
-        const confrontoTable = document.getElementById('confrontoTable');
-        const confrontoTableBody = document.getElementById('confrontoTableBody');
+        let confrontoTable = document.getElementById('confrontoTable');
+        let confrontoTableBody = document.getElementById('confrontoTableBody');
         
         if (!confrontoTable || !confrontoTableBody) {
-            console.error("Tabella confronto non trovata");
-            return;
+            console.log("Elementi tabella non trovati, creo la struttura");
+            ensureConfrontoUIStructure();
+            
+            confrontoTable = document.getElementById('confrontoTable');
+            confrontoTableBody = document.getElementById('confrontoTableBody');
+            
+            if (!confrontoTable || !confrontoTableBody) {
+                console.error("Impossibile creare la struttura della tabella");
+                return;
+            }
         }
         
         // Aggiorna la descrizione
@@ -184,11 +206,8 @@ function loadEchaComparisonResults() {
         `;
         
         // Mostra il div di riepilogo
-        let summaryDiv = document.getElementById('echa-comparison-summary');
-        if (summaryDiv) {
-            summaryDiv.style.display = 'block';
-            summaryDiv.innerHTML = summaryHtml;
-        }
+        summaryDiv.style.display = 'block';
+        summaryDiv.innerHTML = summaryHtml;
         
         // Verifica se ci sono cambiamenti
         if (added.length === 0 && removed.length === 0 && modified.length === 0) {

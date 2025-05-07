@@ -14,6 +14,7 @@ import json
 from datetime import datetime
 import traceback
 import glob
+import shutil
 
 def find_most_recent_excel(directory):
     """
@@ -47,35 +48,28 @@ def compare_echa_excel_files(new_excel_path):
         dict: Risultato dell'operazione con informazioni sul confronto
     """
     try:
-        # Trova la directory dei dati ECHA
-        dir_path = os.path.dirname(new_excel_path)
-        if not dir_path.endswith('data'):
-            dir_path = os.path.join(os.path.dirname(os.path.dirname(new_excel_path)), 'echa', 'data')
-            
+        print(f"Inizio elaborazione con nuovo file: {new_excel_path}", file=sys.stderr)
+        
+        # Verifica che il nuovo file esista
+        if not os.path.exists(new_excel_path):
+            raise Exception(f"Il nuovo file Excel non esiste: {new_excel_path}")
+        
+        # Determina la directory di destinazione
+        # Cerca di determinare la directory dei dati
+        app_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        dir_path = os.path.join(app_dir, "echa", "data")
+        
+        print(f"Directory app: {app_dir}", file=sys.stderr)
         print(f"Directory dati ECHA: {dir_path}", file=sys.stderr)
         
         # Crea la directory se non esiste
         if not os.path.exists(dir_path):
             os.makedirs(dir_path)
+            print(f"Creata directory: {dir_path}", file=sys.stderr)
         
         # Trova il file Excel ECHA più recente (escludendo il nuovo file)
         old_excel_files = glob.glob(os.path.join(dir_path, "*.xlsx")) + glob.glob(os.path.join(dir_path, "*.xls"))
-        
-        # Rimuovi il nuovo file dall'elenco se è già nella directory
-        if new_excel_path in old_excel_files:
-            old_excel_files.remove(new_excel_path)
-        
-        # Ordina i file per data di modifica, dal più recente al più vecchio
-        old_excel_files.sort(key=os.path.getmtime, reverse=True)
-        
-        # Se non ci sono file Excel disponibili, restituisci un errore
-        if not old_excel_files:
-            raise Exception("Nessun file Excel ECHA esistente trovato per il confronto")
-        
-        # Prendi il file Excel più recente
-        old_excel_path = old_excel_files[0]
-        
-        print(f"Confronto tra {old_excel_path} e {new_excel_path}", file=sys.stderr)
+        print(f"Trovati {len(old_excel_files)} file Excel nella directory", file=sys.stderr)
         
         # Genera timestamp per i nomi dei file
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -84,11 +78,29 @@ def compare_echa_excel_files(new_excel_path):
         new_file_name = f"echa_new_{timestamp}.xlsx"
         new_file_path = os.path.join(dir_path, new_file_name)
         
-        # Se il nuovo file non è già nella directory di destinazione, copialo
-        if new_excel_path != new_file_path:
-            import shutil
+        print(f"Copio il nuovo file da {new_excel_path} a {new_file_path}", file=sys.stderr)
+        
+        # Copia il nuovo file nella directory dei dati
+        try:
             shutil.copy2(new_excel_path, new_file_path)
-            print(f"Nuovo file copiato in: {new_file_path}", file=sys.stderr)
+            print(f"Nuovo file copiato con successo in: {new_file_path}", file=sys.stderr)
+        except Exception as e:
+            raise Exception(f"Errore nella copia del file: {str(e)}")
+        
+        # Rimuovi il nuovo file dall'elenco se è già nella directory
+        old_excel_files = [f for f in old_excel_files if os.path.basename(f) != os.path.basename(new_file_path)]
+        
+        # Ordina i file per data di modifica, dal più recente al più vecchio
+        old_excel_files.sort(key=os.path.getmtime, reverse=True)
+        
+        # Se non ci sono file Excel disponibili, restituisci un errore
+        if not old_excel_files:
+            raise Exception("Nessun file Excel ECHA esistente trovato per il confronto. Carica prima un file base.")
+        
+        # Prendi il file Excel più recente
+        old_excel_path = old_excel_files[0]
+        
+        print(f"Confronto tra {old_excel_path} e {new_file_path}", file=sys.stderr)
         
         # Leggi i file Excel
         try:
@@ -113,7 +125,7 @@ def compare_echa_excel_files(new_excel_path):
         
         try:
             # Prima prova con header multilivello
-            new_data = pd.read_excel(new_excel_path, header=[0, 1])
+            new_data = pd.read_excel(new_file_path, header=[0, 1])
             
             # Crea nomi di colonna combinati
             new_columns = []
@@ -129,7 +141,7 @@ def compare_echa_excel_files(new_excel_path):
         except Exception as e:
             print(f"Errore con header multilivello nel nuovo file, provo con header singolo: {str(e)}", file=sys.stderr)
             # Se fallisce, prova con header singolo
-            new_data = pd.read_excel(new_excel_path)
+            new_data = pd.read_excel(new_file_path)
         
         print(f"Letti {len(old_data)} record dal vecchio file Excel", file=sys.stderr)
         print(f"Letti {len(new_data)} record dal nuovo file Excel", file=sys.stderr)
