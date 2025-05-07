@@ -16,27 +16,6 @@ import traceback
 import glob
 import shutil
 
-def find_most_recent_excel(directory):
-    """
-    Trova il file Excel più recente nella directory specificata (escluso il nuovo file)
-    
-    Args:
-        directory (str): Directory in cui cercare i file Excel
-        
-    Returns:
-        str: Percorso del file Excel più recente
-    """
-    excel_files = glob.glob(os.path.join(directory, "*.xlsx")) + glob.glob(os.path.join(directory, "*.xls"))
-    
-    # Ordina i file per data di modifica, dal più recente al più vecchio
-    excel_files.sort(key=os.path.getmtime, reverse=True)
-    
-    # Se ci sono file Excel disponibili, restituisci il più recente
-    if excel_files:
-        return excel_files[0]
-    
-    return None
-
 def compare_echa_excel_files(new_excel_path):
     """
     Confronta un file Excel ECHA esistente con un nuovo file Excel ECHA
@@ -55,20 +34,19 @@ def compare_echa_excel_files(new_excel_path):
             raise Exception(f"Il nuovo file Excel non esiste: {new_excel_path}")
         
         # Determina la directory di destinazione
-        # Cerca di determinare la directory dei dati
-        app_dir = os.path.abspath(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-        dir_path = os.path.join(app_dir, "echa", "data")
+        script_dir = os.path.dirname(os.path.abspath(__file__))  # Directory dello script attuale
+        data_dir = os.path.join(script_dir, "data")  # Directory app/echa/data
         
-        print(f"Directory app: {app_dir}", file=sys.stderr)
-        print(f"Directory dati ECHA: {dir_path}", file=sys.stderr)
+        print(f"Script directory: {script_dir}", file=sys.stderr)
+        print(f"Directory dati ECHA: {data_dir}", file=sys.stderr)
         
-        # Crea la directory se non esiste
-        if not os.path.exists(dir_path):
-            os.makedirs(dir_path)
-            print(f"Creata directory: {dir_path}", file=sys.stderr)
+        # Crea la directory data se non esiste
+        if not os.path.exists(data_dir):
+            os.makedirs(data_dir)
+            print(f"Creata directory: {data_dir}", file=sys.stderr)
         
         # Trova il file Excel ECHA più recente (escludendo il nuovo file)
-        old_excel_files = glob.glob(os.path.join(dir_path, "*.xlsx")) + glob.glob(os.path.join(dir_path, "*.xls"))
+        old_excel_files = glob.glob(os.path.join(data_dir, "*.xlsx")) + glob.glob(os.path.join(data_dir, "*.xls"))
         print(f"Trovati {len(old_excel_files)} file Excel nella directory", file=sys.stderr)
         
         # Genera timestamp per i nomi dei file
@@ -76,7 +54,7 @@ def compare_echa_excel_files(new_excel_path):
         
         # Copia il nuovo file nella directory dei dati con un nome specifico
         new_file_name = f"echa_new_{timestamp}.xlsx"
-        new_file_path = os.path.join(dir_path, new_file_name)
+        new_file_path = os.path.join(data_dir, new_file_name)
         
         print(f"Copio il nuovo file da {new_excel_path} a {new_file_path}", file=sys.stderr)
         
@@ -104,6 +82,7 @@ def compare_echa_excel_files(new_excel_path):
         
         # Leggi i file Excel
         try:
+            print("Tentativo di lettura vecchio file con header multilivello...", file=sys.stderr)
             # Prima prova con header multilivello
             old_data = pd.read_excel(old_excel_path, header=[0, 1])
             
@@ -124,6 +103,7 @@ def compare_echa_excel_files(new_excel_path):
             old_data = pd.read_excel(old_excel_path)
         
         try:
+            print("Tentativo di lettura nuovo file con header multilivello...", file=sys.stderr)
             # Prima prova con header multilivello
             new_data = pd.read_excel(new_file_path, header=[0, 1])
             
@@ -145,6 +125,10 @@ def compare_echa_excel_files(new_excel_path):
         
         print(f"Letti {len(old_data)} record dal vecchio file Excel", file=sys.stderr)
         print(f"Letti {len(new_data)} record dal nuovo file Excel", file=sys.stderr)
+        
+        # DEBUG: stampa le colonne disponibili
+        print("Colonne vecchio file:", old_data.columns.tolist(), file=sys.stderr)
+        print("Colonne nuovo file:", new_data.columns.tolist(), file=sys.stderr)
         
         # Confronta i dati vecchi e nuovi
         # Trova colonne con nomi simili tra i due dataframe
@@ -218,83 +202,111 @@ def compare_echa_excel_files(new_excel_path):
             raise Exception("Impossibile identificare le colonne necessarie per il confronto")
         
         # Converti i valori CAS in stringhe per un confronto più semplice
+        print("Conversione colonne CAS in stringhe...", file=sys.stderr)
         old_data[cas_column_old] = old_data[cas_column_old].astype(str)
         new_data[cas_column_new] = new_data[cas_column_new].astype(str)
         
+        # OTTIMIZZAZIONE: Crea un dizionario per il lookup veloce
+        print("Creazione dizionario per lookup veloce...", file=sys.stderr)
+        old_cas_dict = {str(row[cas_column_old]): idx for idx, row in old_data.iterrows()}
+        new_cas_dict = {str(row[cas_column_new]): idx for idx, row in new_data.iterrows()}
+        
         # Trova sostanze presenti solo nel vecchio file Excel (rimosse)
+        print("Ricerca sostanze rimosse...", file=sys.stderr)
         removed_substances = []
-        for idx, row in old_data.iterrows():
-            old_cas = str(row[cas_column_old])
-            
-            # Cerca nel nuovo dataframe
-            found = False
-            for idx_new, new_row in new_data.iterrows():
-                new_cas = str(new_row[cas_column_new])
-                if new_cas == old_cas:
-                    found = True
-                    break
-            
-            if not found:
-                removed_substances.append({
-                    'cas': old_cas,
-                    'name': str(row[name_column_old]),
-                    'hazard': str(row[h_column_old]) if h_column_old else "N/A"
-                })
+        removed_count = 0
+        
+        # Usa i set per un confronto più veloce
+        old_cas_set = set(old_cas_dict.keys())
+        new_cas_set = set(new_cas_dict.keys())
+        
+        # Le sostanze rimosse sono quelle presenti nel vecchio ma non nel nuovo
+        removed_cas_set = old_cas_set - new_cas_set
+        
+        for cas in removed_cas_set:
+            idx = old_cas_dict[cas]
+            row = old_data.iloc[idx]
+            removed_substances.append({
+                'cas': cas,
+                'name': str(row[name_column_old]),
+                'hazard': str(row[h_column_old]) if h_column_old else "N/A"
+            })
+            removed_count += 1
+            if removed_count % 100 == 0:
+                print(f"  Trovate {removed_count} sostanze rimosse...", file=sys.stderr)
+        
+        print(f"Trovate {len(removed_substances)} sostanze rimosse", file=sys.stderr)
         
         # Trova sostanze presenti solo nel nuovo file Excel (aggiunte)
+        print("Ricerca sostanze aggiunte...", file=sys.stderr)
         added_substances = []
-        for idx, row in new_data.iterrows():
-            new_cas = str(row[cas_column_new])
-            
-            # Cerca nel vecchio dataframe
-            found = False
-            for idx_old, old_row in old_data.iterrows():
-                old_cas = str(old_row[cas_column_old])
-                if new_cas == old_cas:
-                    found = True
-                    break
-            
-            if not found:
-                added_substances.append({
-                    'cas': new_cas,
-                    'name': str(row[name_column_new]),
-                    'hazard': str(row[h_column_new]) if h_column_new else "N/A"
-                })
+        added_count = 0
+        
+        # Le sostanze aggiunte sono quelle presenti nel nuovo ma non nel vecchio
+        added_cas_set = new_cas_set - old_cas_set
+        
+        for cas in added_cas_set:
+            idx = new_cas_dict[cas]
+            row = new_data.iloc[idx]
+            added_substances.append({
+                'cas': cas,
+                'name': str(row[name_column_new]),
+                'hazard': str(row[h_column_new]) if h_column_new else "N/A"
+            })
+            added_count += 1
+            if added_count % 100 == 0:
+                print(f"  Trovate {added_count} sostanze aggiunte...", file=sys.stderr)
+        
+        print(f"Trovate {len(added_substances)} sostanze aggiunte", file=sys.stderr)
         
         # Trova sostanze modificate
+        print("Ricerca sostanze modificate...", file=sys.stderr)
         modified_substances = []
-        for idx_new, new_row in new_data.iterrows():
-            new_cas = str(new_row[cas_column_new])
+        modified_count = 0
+        
+        # Le potenziali modifiche sono nelle sostanze presenti in entrambi i file
+        common_cas_set = old_cas_set.intersection(new_cas_set)
+        
+        for cas in common_cas_set:
+            old_idx = old_cas_dict[cas]
+            new_idx = new_cas_dict[cas]
             
-            for idx_old, old_row in old_data.iterrows():
-                old_cas = str(old_row[cas_column_old])
-                
-                if new_cas == old_cas:
-                    # Verifica se ci sono cambiamenti nelle frasi H
-                    new_hazard = str(new_row[h_column_new]) if h_column_new else "N/A"
-                    old_hazard = str(old_row[h_column_old]) if h_column_old else "N/A"
-                    
-                    if new_hazard != old_hazard and new_hazard != "N/A" and old_hazard != "N/A":
-                        modified_substances.append({
-                            'cas': new_cas,
-                            'name': str(new_row[name_column_new]),
-                            'old_hazard': old_hazard,
-                            'new_hazard': new_hazard
-                        })
-                    break
+            old_row = old_data.iloc[old_idx]
+            new_row = new_data.iloc[new_idx]
+            
+            # Verifica se ci sono cambiamenti nelle frasi H
+            new_hazard = str(new_row[h_column_new]) if h_column_new else "N/A"
+            old_hazard = str(old_row[h_column_old]) if h_column_old else "N/A"
+            
+            if new_hazard != old_hazard and new_hazard != "N/A" and old_hazard != "N/A":
+                modified_substances.append({
+                    'cas': cas,
+                    'name': str(new_row[name_column_new]),
+                    'old_hazard': old_hazard,
+                    'new_hazard': new_hazard
+                })
+                modified_count += 1
+                if modified_count % 100 == 0:
+                    print(f"  Trovate {modified_count} sostanze modificate...", file=sys.stderr)
+        
+        print(f"Trovate {len(modified_substances)} sostanze modificate", file=sys.stderr)
         
         # Limita il numero di elementi per evitare risposte troppo grandi
         max_items = 100
         if len(added_substances) > max_items:
+            print(f"Limitato le sostanze aggiunte da {len(added_substances)} a {max_items}", file=sys.stderr)
             added_substances = added_substances[:max_items]
         
         if len(removed_substances) > max_items:
+            print(f"Limitato le sostanze rimosse da {len(removed_substances)} a {max_items}", file=sys.stderr)
             removed_substances = removed_substances[:max_items]
         
         if len(modified_substances) > max_items:
+            print(f"Limitato le sostanze modificate da {len(modified_substances)} a {max_items}", file=sys.stderr)
             modified_substances = modified_substances[:max_items]
         
         # Prepara il risultato
+        print("Preparazione risultati del confronto...", file=sys.stderr)
         comparison_result = {
             'added': added_substances,
             'removed': removed_substances,
@@ -308,12 +320,46 @@ def compare_echa_excel_files(new_excel_path):
         }
         
         # Salva i risultati del confronto in un file JSON
-        comparison_file = os.path.join(dir_path, f"echa_comparison_{timestamp}.json")
-        with open(comparison_file, 'w', encoding='utf-8') as f:
-            json.dump(comparison_result, f, indent=2, ensure_ascii=False)
+        comparison_file = os.path.join(data_dir, f"echa_comparison_{timestamp}.json")
+        print(f"Salvataggio risultati in: {comparison_file}", file=sys.stderr)
         
-        print(f"Risultati del confronto salvati in: {comparison_file}", file=sys.stderr)
-        print(f"Aggiunti: {len(added_substances)}, Rimossi: {len(removed_substances)}, Modificati: {len(modified_substances)}", file=sys.stderr)
+        try:
+            with open(comparison_file, 'w', encoding='utf-8') as f:
+                json.dump(comparison_result, f, indent=2, ensure_ascii=False)
+            print(f"File JSON salvato con successo", file=sys.stderr)
+        except Exception as json_error:
+            print(f"ERRORE nel salvataggio del file JSON: {str(json_error)}", file=sys.stderr)
+            # Non interrompere l'esecuzione, continua a restituire i risultati
+        
+        # Stampa il messaggio di completamento con sintesi dei risultati
+        print("=" * 80, file=sys.stderr)
+        print("CONFRONTO COMPLETATO CON SUCCESSO", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        print(f"File originale: {os.path.basename(old_excel_path)}", file=sys.stderr)
+        print(f"Nuovo file: {os.path.basename(new_file_path)}", file=sys.stderr)
+        print(f"Risultati salvati in: {os.path.basename(comparison_file)}", file=sys.stderr)
+        print(f"Sostanze aggiunte: {len(added_substances)}", file=sys.stderr)
+        print(f"Sostanze rimosse: {len(removed_substances)}", file=sys.stderr)
+        print(f"Sostanze modificate: {len(modified_substances)}", file=sys.stderr)
+        print("=" * 80, file=sys.stderr)
+        
+        # Stampa i dettagli delle prime 5 sostanze di ogni categoria (se presenti)
+        if added_substances:
+            print("\nEsempi di sostanze aggiunte:", file=sys.stderr)
+            for i, substance in enumerate(added_substances[:5]):
+                print(f"  {i+1}. {substance['name']} (CAS: {substance['cas']})", file=sys.stderr)
+        
+        if removed_substances:
+            print("\nEsempi di sostanze rimosse:", file=sys.stderr)
+            for i, substance in enumerate(removed_substances[:5]):
+                print(f"  {i+1}. {substance['name']} (CAS: {substance['cas']})", file=sys.stderr)
+        
+        if modified_substances:
+            print("\nEsempi di sostanze modificate:", file=sys.stderr)
+            for i, substance in enumerate(modified_substances[:5]):
+                print(f"  {i+1}. {substance['name']} (CAS: {substance['cas']})", file=sys.stderr)
+                print(f"     Vecchio hazard: {substance['old_hazard']}", file=sys.stderr)
+                print(f"     Nuovo hazard: {substance['new_hazard']}", file=sys.stderr)
         
         result = {
             "success": True,
@@ -341,25 +387,37 @@ def main():
     """
     Funzione principale che può essere chiamata da Electron o dalla command line
     """
-    # Verifica che l'argomento sia stato fornito
-    if len(sys.argv) < 2:
+    try:
+        # Verifica che l'argomento sia stato fornito
+        if len(sys.argv) < 2:
+            result = {
+                "success": False,
+                "message": "Argomenti insufficienti. Fornire il percorso del nuovo file Excel ECHA."
+            }
+            print(json.dumps(result))
+            return
+        
+        # Prendi l'argomento direttamente da sys.argv
+        new_excel_path = sys.argv[1]
+        
+        print(f"Nuovo file Excel: {new_excel_path}", file=sys.stderr)
+        
+        # Esegui il confronto
+        result = compare_echa_excel_files(new_excel_path)
+        
+        # Stampa il risultato come JSON (per Electron)
+        print(json.dumps(result))
+    except Exception as e:
+        error_traceback = traceback.format_exc()
+        print(f"ERRORE in main: {str(e)}", file=sys.stderr)
+        print(error_traceback, file=sys.stderr)
+        
         result = {
             "success": False,
-            "message": "Argomenti insufficienti. Fornire il percorso del nuovo file Excel ECHA."
+            "message": f"Errore generale: {str(e)}",
+            "error_details": error_traceback
         }
         print(json.dumps(result))
-        return
-    
-    # Prendi l'argomento direttamente da sys.argv
-    new_excel_path = sys.argv[1]
-    
-    print(f"Nuovo file Excel: {new_excel_path}", file=sys.stderr)
-    
-    # Esegui il confronto
-    result = compare_echa_excel_files(new_excel_path)
-    
-    # Stampa il risultato come JSON (per Electron)
-    print(json.dumps(result))
 
 
 if __name__ == "__main__":

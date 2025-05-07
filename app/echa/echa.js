@@ -197,7 +197,7 @@ async function selectEchaFile() {
 }
 
 
-// Funzione per aggiornare il database ECHA (ora confronta direttamente i file Excel)
+// Funzione per aggiornare il database ECHA
 async function updateEchaDatabase() {
     try {
         console.log("Inizio funzione updateEchaDatabase");
@@ -258,15 +258,8 @@ async function updateEchaDatabase() {
         // Aggiungi attività
         addActivity('ECHA confrontato', `File ${newFilePath.split(/[\\/]/).pop()} confrontato. Aggiunti: ${totalAdded}, Modificati: ${totalModified}, Rimossi: ${totalRemoved}`, 'fas fa-sync');
         
-        // Chiedi se si vuole andare alla sezione di confronto
-        const confirmRedirect = confirm(`Confronto ECHA completato con successo!\n\nRisultati: ${totalAdded} sostanze aggiunte, ${totalModified} modificate, ${totalRemoved} rimosse.\n\nVuoi andare alla sezione Tabella di Riscontro per vedere i cambiamenti?`);
-        
-        if (confirmRedirect) {
-            console.log("Redirezione a dashboard.html#tabella-di-riscontro");
-            window.electronAPI.openPage('../dashboard.html#tabella-di-riscontro');
-        } else {
-            console.log("Utente ha scelto di non reindirizzare");
-        }
+        // Mostra messaggio senza reindirizzamento
+        alert(`Confronto ECHA completato con successo!\n\nRisultati: ${totalAdded} sostanze aggiunte, ${totalModified} modificate, ${totalRemoved} rimosse.\n\nPuoi visualizzare i risultati del confronto nella sezione "Tabella di Riscontro > Aggiornamenti".`);
         
     } catch (error) {
         console.error('Errore nel confronto ECHA:', error);

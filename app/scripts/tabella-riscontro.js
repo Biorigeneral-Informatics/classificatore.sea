@@ -498,168 +498,40 @@ function initFormTabs() {
 
 
 // Carica i dati per la tabella di confronto
-// Funzione migliorata per caricare e confrontare i dati ECHA con il database interno
+// Verifica se ci sono risultati di confronto ECHA da visualizzare
 async function loadConfronto() {
     try {
-        // Mostra indicatore di caricamento
-        showNotification('Caricamento dati di confronto in corso...', 'info');
+        // Controlla se esistono risultati di confronto ECHA
+        const comparisonResultsStr = localStorage.getItem('echaComparisonResults');
         
-        // Ottieni riferimento alla tabella
-        const tbody = document.getElementById('confrontoTableBody');
-        if (!tbody) {
-            console.error('Elemento confrontoTableBody non trovato');
+        if (comparisonResultsStr) {
+            // Se ci sono risultati di confronto, usa quelli
+            console.log("Trovati risultati di confronto ECHA, caricamento...");
+            loadEchaComparisonResults();
             return;
         }
         
-        // Svuota la tabella e mostra indicatore di caricamento
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="7" class="text-center">
-                    <i class="fas fa-spinner fa-spin"></i> Caricamento dati in corso...
-                </td>
-            </tr>
-        `;
-        
-        // 1. Ottieni i dati dal database ECHA
-        const echaDbPath = getEchaDbPath();
-        if (!echaDbPath) {
-            throw new Error('Database ECHA non trovato. Carica un file ECHA per procedere.');
+        // Se non ci sono risultati di confronto, mostra un messaggio informativo
+        const tbody = document.getElementById('confrontoTableBody');
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="empty-table-message">
+                        <div style="text-align: center; padding: 2rem;">
+                            <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                            <p>Nessun confronto ECHA disponibile.</p>
+                            <p>Vai alla sezione ECHA Database e utilizza il pulsante "Aggiorna ECHA" per confrontare un nuovo file.</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
         }
         
-        // Verifica che il database esista
-        const echaDbExists = await window.electronAPI.fileExists(echaDbPath);
-        if (!echaDbExists) {
-            throw new Error('Il file del database ECHA non esiste.');
+        // Nascondi il contenitore delle modifiche
+        const modificatiContainer = document.getElementById('modificatiContainer');
+        if (modificatiContainer) {
+            modificatiContainer.style.display = 'none';
         }
-        
-        // Ottieni nome della tabella ECHA
-        const tableResult = await window.electronAPI.querySQLite(
-            "SELECT name FROM sqlite_master WHERE type='table'", 
-            [],
-            echaDbPath
-        );
-        
-        if (!tableResult.success || !tableResult.data || tableResult.data.length === 0) {
-            throw new Error('Impossibile ottenere le tabelle dal database ECHA.');
-        }
-        
-        // Assume che la prima tabella sia quella principale dei dati ECHA
-        const echaTableName = tableResult.data[0].name;
-        
-        // Ottieni i dati ECHA (limita a 100 risultati per performance)
-        const echaDataResult = await window.electronAPI.querySQLite(
-            `SELECT * FROM "${echaTableName}" LIMIT 100`, 
-            [],
-            echaDbPath
-        );
-        
-        if (!echaDataResult.success || !echaDataResult.data) {
-            throw new Error('Errore nel recupero dei dati ECHA.');
-        }
-        
-        const echaData = echaDataResult.data;
-        
-        // 2. Ottieni i dati dal database interno di sostanze e frasi H
-        const sosResult = await window.electronAPI.querySQLite(
-            'SELECT ID, Nome, CAS, Categoria FROM sostanze', 
-            []
-        );
-        
-        if (!sosResult.success) {
-            throw new Error('Errore nel recupero delle sostanze dal database interno.');
-        }
-        
-        const frasiResult = await window.electronAPI.querySQLite(
-            'SELECT ID_PK, Nome_sostanza, CAS, Hazard_Statement, Hazard_Class_and_Category FROM "frasi H"', 
-            []
-        );
-        
-        if (!frasiResult.success) {
-            throw new Error('Errore nel recupero delle frasi H dal database interno.');
-        }
-        
-        // Crea una mappa delle sostanze per un accesso più veloce
-        const sostanzeMap = {};
-        sosResult.data.forEach(sostanza => {
-            sostanzeMap[sostanza.CAS] = sostanza;
-        });
-        
-        // Mappa delle frasi H per sostanza (CAS)
-        const frasiHMap = {};
-        frasiResult.data.forEach(fraseH => {
-            if (!frasiHMap[fraseH.CAS]) {
-                frasiHMap[fraseH.CAS] = [];
-            }
-            frasiHMap[fraseH.CAS].push(fraseH);
-        });
-        
-        // 3. Confronta le sostanze - solo matching basato su CAS
-        const confrontoData = [];
-        
-        // Determina le colonne della tabella ECHA per CAS, nome e hazard statement
-        // Le colonne possono variare in base al file ECHA, quindi facciamo un match approssimativo
-        let casColumn = null;
-        let nameColumn = null;
-        let hazardStmtColumn = null;
-        let hazardClassColumn = null;
-        
-        if (echaData.length > 0) {
-            const columns = Object.keys(echaData[0]);
-            
-            // Trova le colonne pertinenti basandosi sui nomi - priorità al CAS
-            for (const col of columns) {
-                const colLower = col.toLowerCase();
-                if (colLower.includes('cas')) {
-                    casColumn = col;
-                } else if (colLower.includes('name') || colLower.includes('nome') || colLower.includes('chemical')) {
-                    nameColumn = col;
-                } else if (colLower.includes('hazard_statement') || colLower.includes('frase') || colLower.includes('h_')) {
-                    hazardStmtColumn = col;
-                } else if (colLower.includes('hazard_class') || colLower.includes('class') || colLower.includes('category')) {
-                    hazardClassColumn = col;
-                }
-            }
-            
-            // Se non troviamo colonne specifiche, usiamo le prime
-            if (!casColumn && columns.length > 0) casColumn = columns[0];
-            if (!nameColumn && columns.length > 1) nameColumn = columns[1];
-            if (!hazardStmtColumn && columns.length > 2) hazardStmtColumn = columns[2];
-            if (!hazardClassColumn && columns.length > 3) hazardClassColumn = columns[3];
-        }
-        
-        // Ora confronta i dati SOLO per CAS
-        echaData.forEach(echaItem => {
-            // Estrai il CAS (criterio esclusivo di matching)
-            const echaCAS = echaItem[casColumn] || '';
-            
-            // Solo se abbiamo un CAS valido, procedere con il confronto
-            if (echaCAS && echaCAS.trim() !== '') {
-                // Cerca corrispondenze nel database interno SOLO tramite CAS
-                const sostanzaInterna = sostanzeMap[echaCAS];
-                
-                if (sostanzaInterna) {
-                    // Abbiamo trovato una corrispondenza esatta per CAS
-                    const frasi = frasiHMap[echaCAS] || [];
-                    
-                    const frasiHInterne = frasi.map(f => f.Hazard_Statement).join(', ');
-                    const hazardClassInterne = frasi.map(f => f.Hazard_Class_and_Category).join(', ');
-                    
-                    confrontoData.push({
-                        id: sostanzaInterna.ID,
-                        cas: echaCAS,
-                        sostanza: sostanzaInterna.Nome,
-                        nome: echaItem[nameColumn] || 'N/A',
-                        fraseH: frasiHInterne,
-                        hazardClass: hazardClassInterne,
-                        outputFraseH: echaItem[hazardStmtColumn] || 'N/A',
-                        outputHazClass: echaItem[hazardClassColumn] || 'N/A'
-                    });
-                }
-            }
-        });
-        
-        // Usiamo una versione modificata di renderConfronto
-        renderConfrontoData(confrontoData);
         
     } catch (error) {
         console.error('Errore nel caricamento dei dati di confronto:', error);
@@ -696,6 +568,11 @@ function getEchaDbPath() {
                 console.error('Errore nel parsing delle info ECHA:', e);
             }
         }
+    }
+    
+    // Se non è stato trovato un percorso valido, restituisci un messaggio di errore
+    if (!dbPath) {
+        console.warn("Nessun percorso database ECHA trovato. Controlla se un file ECHA è stato caricato.");
     }
     
     return dbPath;
