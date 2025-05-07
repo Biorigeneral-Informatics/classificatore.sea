@@ -697,21 +697,15 @@ class ClassificatoreRifiuti:
                             # hazard class ce l'hanno, quindi non dovrebbe esserci errore
                             frase_key = self._determina_frase_key_hp6(frase_h_clean, hazard_class)
                             
-                            # Crea una chiave specifica per la sommatoria che include la categoria
-                            somma_key = f"{frase_h_clean}_{frase_key.split('_')[-1]}" if "_" in frase_key else frase_h_clean
-                            
                             # Inizializza la sommatoria per questa categoria se non esiste già
-                            if somma_key not in sommatoria_per_frase:
-                                sommatoria_per_frase[somma_key] = 0
+                            if frase_key not in sommatoria_per_frase:
+                                sommatoria_per_frase[frase_key] = 0
                             
                             # Aggiungi alla sommatoria per categoria
-                            sommatoria_per_frase[somma_key] += concentrazione_percentuale
+                            sommatoria_per_frase[frase_key] += concentrazione_percentuale
                             
-                            # Aggiungi anche alla sommatoria generale della frase H (per retrocompatibilità)
-                            sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
-                            
-                            # Aggiungi HP6 alle HP della sostanza
-                            hp_sostanza.add("HP6")
+                            # RIMUOVI O COMMENTA LA SEGUENTE RIGA PER EVITARE LA DOPPIA SOMMATORIA
+                            # sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
                 
                 # Salva le caratteristiche di pericolo associate alla sostanza
                 if hp_sostanza:
@@ -1123,18 +1117,23 @@ class ClassificatoreRifiuti:
         condizioni_soddisfatte = []
         
         # Verifica per esposizione orale (H300, H301, H302)
-        if 'H300' in sommatoria_per_frase:
-            sommatoria = sommatoria_per_frase['H300']
+        # Verifica esplicita per H300_1 (Acute Tox. 1)
+        if 'H300_1' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H300_1']
             limite_cat1 = self.database.valori_limite.get('H300_1', 0.1)
-            limite_cat2 = self.database.valori_limite.get('H300_2', 0.25)
             
-            # Verifichiamo prima con il limite più conservativo (categoria 1)
             if sommatoria >= limite_cat1:
                 condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 1) = {sommatoria:.4f}% >= {limite_cat1}%")
-            # Altrimenti verifichiamo con il limite di categoria 2
-            elif sommatoria >= limite_cat2:
+        
+        # Verifica esplicita per H300_2 (Acute Tox. 2)
+        if 'H300_2' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H300_2']
+            limite_cat2 = self.database.valori_limite.get('H300_2', 0.25)
+            
+            if sommatoria >= limite_cat2:
                 condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 2) = {sommatoria:.4f}% >= {limite_cat2}%")
         
+        # Verifica per H301
         if 'H301' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H301']
             limite = self.database.valori_limite.get('H301', 5.0)
@@ -1150,16 +1149,20 @@ class ClassificatoreRifiuti:
                 condizioni_soddisfatte.append(f"Somma H302 (Acute Tox. 4) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica per esposizione cutanea (H310, H311, H312)
-        if 'H310' in sommatoria_per_frase:
-            sommatoria = sommatoria_per_frase['H310']
+        # Verifica esplicita per H310_1 (Acute Tox. 1)
+        if 'H310_1' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H310_1']
             limite_cat1 = self.database.valori_limite.get('H310_1', 0.25)
-            limite_cat2 = self.database.valori_limite.get('H310_2', 2.5)
             
-            # Verifichiamo prima con il limite più conservativo (categoria 1)
             if sommatoria >= limite_cat1:
                 condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 1) = {sommatoria:.4f}% >= {limite_cat1}%")
-            # Altrimenti verifichiamo con il limite di categoria 2
-            elif sommatoria >= limite_cat2:
+        
+        # Verifica esplicita per H310_2 (Acute Tox. 2)
+        if 'H310_2' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H310_2']
+            limite_cat2 = self.database.valori_limite.get('H310_2', 2.5)
+            
+            if sommatoria >= limite_cat2:
                 condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 2) = {sommatoria:.4f}% >= {limite_cat2}%")
         
         if 'H311' in sommatoria_per_frase:
@@ -1177,16 +1180,20 @@ class ClassificatoreRifiuti:
                 condizioni_soddisfatte.append(f"Somma H312 (Acute Tox. 4) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica per esposizione per inalazione (H330, H331, H332)
-        if 'H330' in sommatoria_per_frase:
-            sommatoria = sommatoria_per_frase['H330']
+        # Verifica esplicita per H330_1 (Acute Tox. 1)
+        if 'H330_1' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H330_1']
             limite_cat1 = self.database.valori_limite.get('H330_1', 0.1)
-            limite_cat2 = self.database.valori_limite.get('H330_2', 0.5)
             
-            # Verifichiamo prima con il limite più conservativo (categoria 1)
             if sommatoria >= limite_cat1:
                 condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 1) = {sommatoria:.4f}% >= {limite_cat1}%")
-            # Altrimenti verifichiamo con il limite di categoria 2
-            elif sommatoria >= limite_cat2:
+        
+        # Verifica esplicita per H330_2 (Acute Tox. 2)
+        if 'H330_2' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H330_2']
+            limite_cat2 = self.database.valori_limite.get('H330_2', 0.5)
+            
+            if sommatoria >= limite_cat2:
                 condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 2) = {sommatoria:.4f}% >= {limite_cat2}%")
         
         if 'H331' in sommatoria_per_frase:

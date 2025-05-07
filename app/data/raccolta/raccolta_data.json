@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-05-07T18:14:34.174299",
+  "timestamp": "2025-05-07T19:21:53.582685",
   "filename": "temp_raccolta_data.json",
   "data": [
     {
@@ -48,7 +48,7 @@
     },
     {
       "Descriz": "Tallio e suoi composti espressi come Tl",
-      "Valore_Txt": "1000"
+      "Valore_Txt": "2500"
     }
   ],
   "columns": [

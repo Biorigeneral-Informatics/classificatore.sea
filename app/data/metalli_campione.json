@@ -6,8 +6,8 @@
     "metallo_db_id": 1
   },
   "Tallio e suoi composti espressi come Tl": {
-    "concentrazione_ppm": 1000.0,
-    "concentrazione_percentuale": 0.1,
+    "concentrazione_ppm": 2500.0,
+    "concentrazione_percentuale": 0.25,
     "metallo_db_nome": "Tallio e suoi composti espressi come Tl",
     "metallo_db_id": 8
   }
