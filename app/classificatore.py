@@ -104,6 +104,9 @@ class DatabaseSostanze:
         
         # Mappatura delle sostanze alle frasi H
         self.sostanze_frasi_h = {}
+
+        # Mappatura delle sostanze alle frasi H con le loro hazard class
+        self.sostanze_frasi_h_con_class = {}
         
         # Mappatura delle frasi H alle caratteristiche di pericolo (HP)
         # Questa associazione è fissa e verrà usata per determinare quali frasi H sono rilevanti per ogni HP
@@ -131,6 +134,13 @@ class DatabaseSostanze:
             
             # Altre HP verranno aggiunte in seguito
         }
+
+                # Lista di frasi H che richiedono obbligatoriamente la hazard class
+        self.frasi_h_require_class = [
+            "H300",  # Richiede distinzione tra Acute Tox. 1 e Acute Tox. 2
+            "H310",  # Richiede distinzione tra Acute Tox. 1 e Acute Tox. 2
+            "H330",  # Richiede distinzione tra Acute Tox. 1 e Acute Tox. 2
+        ]
 
         # Valori CUT-OFF (soglia) per ogni caratteristica di pericolo (in percentuale)
         # Questi valori fungono da filtro: se la concentrazione è < cut-off, 
@@ -241,7 +251,7 @@ class DatabaseSostanze:
 
     def carica_frasi_h(self):
         """
-        Carica i dati delle sostanze e frasi H dal database SQLite
+        Carica i dati delle sostanze, frasi H e hazard class dal database SQLite
         
         Returns:
             bool: True se il caricamento ha avuto successo, False altrimenti
@@ -258,9 +268,9 @@ class DatabaseSostanze:
             tables = [table[0] for table in cursor.fetchall()]
             print(f"Tabelle presenti nel database: {', '.join(tables)}")
             
-            # Query corretta per leggere dalla tabella "frasi H"
+            # Query per leggere dalla tabella "frasi H" includendo Hazard_Class_and_Category
             query = """
-                SELECT Nome_sostanza, Hazard_Statement
+                SELECT Nome_sostanza, Hazard_Statement, Hazard_Class_and_Category
                 FROM "frasi H"
             """
             
@@ -268,41 +278,53 @@ class DatabaseSostanze:
                 cursor.execute(query)
             except sqlite3.OperationalError as e:
                 print(f"Errore nella query SQL: {e}")
-                # Tenta una query alternativa se la tabella ha un nome diverso
-                alternative_names = [name for name in tables if "frasi" in name.lower() or "h" in name.lower()]
-                if alternative_names:
-                    print(f"Tentativo con tabelle alternative: {alternative_names}")
-                    for table_name in alternative_names:
-                        try:
-                            query = f"""
-                                SELECT Nome_sostanza, Hazard_Statement
-                                FROM "{table_name}"
-                            """
-                            cursor.execute(query)
-                            break
-                        except sqlite3.OperationalError:
-                            continue
-                else:
-                    # Se non ci sono alternative, mostra la struttura delle tabelle
-                    for table in tables:
-                        cursor.execute(f'PRAGMA table_info("{table}")')
-                        columns = cursor.fetchall()
-                        print(f"Struttura della tabella {table}: {[col[1] for col in columns]}")
+                # Verifica se la colonna Hazard_Class_and_Category esiste
+                try:
+                    # Ottieni informazioni sulle colonne della tabella
+                    cursor.execute('PRAGMA table_info("frasi H")')
+                    columns = [col[1] for col in cursor.fetchall()]
+                    print(f"Colonne nella tabella 'frasi H': {columns}")
+                    
+                    # Se la colonna Hazard_Class_and_Category non esiste, mostra errore
+                    if "Hazard_Class_and_Category" not in columns:
+                        print("ERRORE: La colonna 'Hazard_Class_and_Category' non è presente nel database!")
+                        print("Questa informazione è necessaria per la corretta classificazione delle sostanze.")
+                        return False
+                    else:
+                        # Se la colonna esiste ma c'è stato un altro errore
+                        print("La colonna Hazard_Class_and_Category esiste ma si è verificato un altro errore")
+                        return False
+                except sqlite3.OperationalError as e:
+                    print(f"Errore nel verificare le colonne della tabella: {e}")
                     return False
             
-            # Costruisci il dizionario di sostanze e frasi H
+            # Costruisci i dizionari di sostanze e frasi H (con hazard class)
             for row in cursor.fetchall():
                 nome_sostanza = row[0]
                 frase_h = row[1]
+                hazard_class = row[2] if len(row) > 2 else None
                 
                 if nome_sostanza not in self.sostanze_frasi_h:
                     self.sostanze_frasi_h[nome_sostanza] = []
+                
+                if nome_sostanza not in self.sostanze_frasi_h_con_class:
+                    self.sostanze_frasi_h_con_class[nome_sostanza] = []
                 
                 # Pulisci la frase H da eventuali asterischi e spazi
                 frase_h_clean = re.sub(r'\s*\*+\s*', '', str(frase_h))
                 
                 if frase_h_clean and frase_h_clean not in self.sostanze_frasi_h[nome_sostanza]:
                     self.sostanze_frasi_h[nome_sostanza].append(frase_h_clean)
+                    
+                    # Se la frase H richiede hazard class ma non è disponibile, genera un avviso
+                    if frase_h_clean in self.frasi_h_require_class and (not hazard_class or hazard_class.strip() == ""):
+                        print(f"AVVISO: La sostanza '{nome_sostanza}' ha la frase {frase_h_clean} ma manca la hazard class!")
+                    
+                    # Aggiungi anche al dizionario con hazard class
+                    self.sostanze_frasi_h_con_class[nome_sostanza].append({
+                        "frase_h": frase_h_clean,
+                        "hazard_class": hazard_class
+                    })
             
             print(f"Database caricato: {len(self.sostanze_frasi_h)} sostanze con frasi H")
             
@@ -337,6 +359,47 @@ class DatabaseSostanze:
             list: Lista delle frasi H associate alla sostanza
         """
         return self.sostanze_frasi_h.get(nome_sostanza, [])
+    
+    def verifica_hazard_class_required(self, nome_sostanza):
+        """
+        Verifica se una sostanza ha frasi H che richiedono hazard class e se queste sono disponibili
+        
+        Args:
+            nome_sostanza (str): Nome della sostanza da verificare
+            
+        Returns:
+            dict: Dizionario con il risultato della verifica:
+                  - success: True se la verifica è passata, False altrimenti
+                  - message: Messaggio di errore o successo
+                  - missing_hazard_class: Lista di frasi H per cui manca la hazard class
+        """
+        risultato = {
+            "success": True,
+            "message": "Verifica hazard class completata con successo",
+            "missing_hazard_class": []
+        }
+        
+        # Se la sostanza non è nel database, errore
+        if nome_sostanza not in self.sostanze_frasi_h_con_class:
+            risultato["success"] = False
+            risultato["message"] = f"Sostanza '{nome_sostanza}' non trovata nel database"
+            return risultato
+        
+        # Verifica se ci sono frasi H che richiedono hazard class
+        for info in self.sostanze_frasi_h_con_class[nome_sostanza]:
+            frase_h = info["frase_h"]
+            hazard_class = info["hazard_class"]
+            
+            # Se la frase H richiede hazard class ma questa è assente o vuota
+            if frase_h in self.frasi_h_require_class and (not hazard_class or hazard_class.strip() == ""):
+                risultato["success"] = False
+                risultato["missing_hazard_class"].append(frase_h)
+        
+        # Se ci sono frasi H senza hazard class, aggiorna il messaggio
+        if risultato["missing_hazard_class"]:
+            risultato["message"] = f"Sostanza '{nome_sostanza}' ha frasi H che richiedono hazard class ma questa è mancante: {', '.join(risultato['missing_hazard_class'])}"
+        
+        return risultato
 
 
 
@@ -463,6 +526,29 @@ class ClassificatoreRifiuti:
                 print("Verificare i nomi delle sostanze e assicurarsi che corrispondano esattamente a quelli nella Tabella di Riscontro.")
                 return None
             
+            # VERIFICA AGGIUNTIVA: controlla se tutte le sostanze hanno le hazard class necessarie
+            sostanze_senza_hazard_class = []
+            
+            for nome_sostanza in campione_dati.keys():
+                verifica = self.database.verifica_hazard_class_required(nome_sostanza)
+                if not verifica["success"]:
+                    sostanze_senza_hazard_class.append({
+                        "sostanza": nome_sostanza,
+                        "errore": verifica["message"],
+                        "frasi_mancanti": verifica["missing_hazard_class"]
+                    })
+            # Se ci sono sostanze senza le hazard class richieste, interrompi la classificazione
+            if sostanze_senza_hazard_class:
+                print("\nERRORE: Impossibile avviare la classificazione.")
+                print("Le seguenti sostanze hanno frasi H che richiedono hazard class ma questa informazione è mancante:")
+                for info in sostanze_senza_hazard_class:
+                    print(f"  - {info['sostanza']}: mancano hazard class per {', '.join(info['frasi_mancanti'])}")
+                print("\nLa classificazione richiede l'informazione sulla hazard class per determinare correttamente i limiti da applicare.")
+                print("Si consiglia di aggiornare il database con le hazard class corrette per queste sostanze.")
+                return None
+            
+            
+            #DEFINIZIONE DIZIONARI E VARIABILI
             # Dizionario per memorizzare le informazioni complete del campione
             campione = {}
             
@@ -495,8 +581,11 @@ class ClassificatoreRifiuti:
                 concentrazione_ppm = dati["concentrazione_ppm"]
                 concentrazione_percentuale = dati["concentrazione_percentuale"]
                 
-                # Cerca la sostanza nel database per ottenere le frasi H associate
-                frasi_h_associate = self.database.get_frasi_h(nome_sostanza)
+                # Cerca la sostanza nel database per ottenere le frasi H associate con le hazard class
+                frasi_h_con_class = self.database.get_frasi_h_con_class(nome_sostanza)
+                
+                # Estrai solo le frasi H per retrocompatibilità
+                frasi_h_associate = [info["frase_h"] for info in frasi_h_con_class]
                 
                 # Se la sostanza non è trovata, avvisa ma continua
                 if not frasi_h_associate:
@@ -513,10 +602,10 @@ class ClassificatoreRifiuti:
                 hp_sostanza = set()
                 
                 #------AGGIORNAMENTO SOMMATORIE E VERIFICA DEI CUT-OFF--------#
-                # Per ogni frase H associata alla sostanza, aggiorna le sommatorie
-                for frase_h in frasi_h_associate:
-                    # Assicurati che la frase H sia pulita e normalizzata rispetto agli spazi
-                    frase_h_clean = re.sub(r'\s+', '', re.sub(r'\s*\*+\s*', '', str(frase_h)))
+                # Per ogni frase H con hazard class associata alla sostanza, aggiorna le sommatorie
+                for frase_info in frasi_h_con_class:
+                    frase_h_clean = frase_info["frase_h"]
+                    hazard_class = frase_info["hazard_class"]
                     
                     # Inizializza la sommatoria per questa frase se non esiste già
                     if frase_h_clean not in sommatoria_per_frase:
@@ -576,22 +665,25 @@ class ClassificatoreRifiuti:
                             # Aggiungi HP5 alle HP della sostanza
                             hp_sostanza.add("HP5")
                     
-                    # Per HP6, verifica frasi H con cut-off 1%
+                    # Per HP6, verifica frasi H con cut-off 1% e considera la hazard class
                     if frase_h_clean in self.database.hp_mapping["HP6"]:
                         # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
                         if concentrazione_percentuale >= self.database.valori_cut_off.get("HP6", 1.0):
-                            # Per le frasi H300 e H310 e H330 che possono essere di categoria 1 o 2
-                            # useremo la categoria più conservativa (categoria 1)
-                            if frase_h_clean == "H300":
-                                frase_key = "H300_1"  # Categoria 1, valore più basso
-                            elif frase_h_clean == "H310":
-                                frase_key = "H310_1"  # Categoria 1, valore più basso
-                            elif frase_h_clean == "H330":
-                                frase_key = "H330_1"  # Categoria 1, valore più basso
-                            else:
-                                frase_key = frase_h_clean
+                            # A questo punto abbiamo già verificato che tutte le frasi che richiedono
+                            # hazard class ce l'hanno, quindi non dovrebbe esserci errore
+                            frase_key = self._determina_frase_key_hp6(frase_h_clean, hazard_class)
                             
-                            # Aggiungi alla sommatoria
+                            # Crea una chiave specifica per la sommatoria che include la categoria
+                            somma_key = f"{frase_h_clean}_{frase_key.split('_')[-1]}" if "_" in frase_key else frase_h_clean
+                            
+                            # Inizializza la sommatoria per questa categoria se non esiste già
+                            if somma_key not in sommatoria_per_frase:
+                                sommatoria_per_frase[somma_key] = 0
+                            
+                            # Aggiungi alla sommatoria per categoria
+                            sommatoria_per_frase[somma_key] += concentrazione_percentuale
+                            
+                            # Aggiungi anche alla sommatoria generale della frase H (per retrocompatibilità)
                             sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
                             
                             # Aggiungi HP6 alle HP della sostanza
@@ -1094,6 +1186,71 @@ class ClassificatoreRifiuti:
             print(f"HP6 assegnata: {risultato['motivo']}")
         
         return risultato
+    
+    def _determina_frase_key_hp6(self, frase_h, hazard_class):
+        """
+        Determina la chiave corretta per i limiti HP6 in base alla frase H e alla hazard class
+        
+        Args:
+            frase_h (str): Frase H (es. H300, H310, H330)
+            hazard_class (str): Hazard Class associata (es. Acute Tox. 1, Acute Tox. 2)
+            
+        Returns:
+            str: Chiave da utilizzare per i valori limite
+            
+        Raises:
+            ValueError: Se la frase H richiede hazard class ma questa non è disponibile
+        """
+        # Se la frase H richiede hazard class ma non è disponibile, genera un errore
+        # Questo blocco non dovrebbe mai essere eseguito grazie alla verifica preliminare,
+        # ma è una sicurezza aggiuntiva
+        if frase_h in self.database.frasi_h_require_class and (not hazard_class or hazard_class.strip() == ""):
+            raise ValueError(f"La frase {frase_h} richiede una hazard class valida per determinare il limite corretto")
+        
+        # Se la frase è H300, determina la categoria dalla hazard class
+        if frase_h == "H300":
+            if hazard_class and "Acute Tox. 1" in hazard_class:
+                return "H300_1"
+            elif hazard_class and "Acute Tox. 2" in hazard_class:
+                return "H300_2"
+            elif hazard_class and "Acute Tox. 3" in hazard_class:
+                return "H301"  # Se è Acute Tox. 3, dovrebbe essere H301, non H300
+            elif hazard_class and "Acute Tox. 4" in hazard_class:
+                return "H302"  # Se è Acute Tox. 4, dovrebbe essere H302, non H300
+            else:
+                # Se non è specificata correttamente, solleva un errore
+                raise ValueError(f"Hazard class '{hazard_class}' non valida per H300")
+                
+        # Se la frase è H310, determina la categoria dalla hazard class
+        elif frase_h == "H310":
+            if hazard_class and "Acute Tox. 1" in hazard_class:
+                return "H310_1"
+            elif hazard_class and "Acute Tox. 2" in hazard_class:
+                return "H310_2"
+            elif hazard_class and "Acute Tox. 3" in hazard_class:
+                return "H311"  # Se è Acute Tox. 3, dovrebbe essere H311, non H310
+            elif hazard_class and "Acute Tox. 4" in hazard_class:
+                return "H312"  # Se è Acute Tox. 4, dovrebbe essere H312, non H310
+            else:
+                # Se non è specificata correttamente, solleva un errore
+                raise ValueError(f"Hazard class '{hazard_class}' non valida per H310")
+                
+        # Se la frase è H330, determina la categoria dalla hazard class
+        elif frase_h == "H330":
+            if hazard_class and "Acute Tox. 1" in hazard_class:
+                return "H330_1"
+            elif hazard_class and "Acute Tox. 2" in hazard_class:
+                return "H330_2"
+            elif hazard_class and "Acute Tox. 3" in hazard_class:
+                return "H331"  # Se è Acute Tox. 3, dovrebbe essere H331, non H330
+            elif hazard_class and "Acute Tox. 4" in hazard_class:
+                return "H332"  # Se è Acute Tox. 4, dovrebbe essere H332, non H330
+            else:
+                # Se non è specificata correttamente, solleva un errore
+                raise ValueError(f"Hazard class '{hazard_class}' non valida per H330")
+        
+        # Per altre frasi H, la chiave è la frase stessa
+        return frase_h
     
 
     def _verifica_hp1_sommatoria(self, sommatoria_per_frase):
