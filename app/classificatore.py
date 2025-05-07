@@ -114,6 +114,9 @@ class DatabaseSostanze:
             # HP4 - Irritante
             "HP4": ["H314", "H315", "H318", "H319"],
 
+            # HP5 - Tossicità specifica per organi bersaglio (STOT)/Tossicità in caso di aspirazione
+            "HP5": ["H370", "H371", "H335", "H372", "H373", "H304"],
+
             # HP8 - Corrosivo
             "HP8": ["H314"],
             
@@ -126,6 +129,7 @@ class DatabaseSostanze:
         self.valori_cut_off = {
             "HP3": 0,  # HP3 non ha valori soglia cut-off
             "HP4": 1.0,  # HP4 ha valore soglia dell'1%
+            "HP5": 1.0,  # HP5 ha valore soglia dell'1% per H370, H372
             "HP8": 1.0,  # HP8 ha valore soglia dell'1%
             
             # Altri valori soglia verranno aggiunti in seguito
@@ -151,6 +155,14 @@ class DatabaseSostanze:
             "H314_HP4": 1.0,  # Per HP4: Somma delle sostanze con H314 deve essere ≥ 1%
             "H318": 10.0,     # Somma delle sostanze con H318 deve essere ≥ 10%
             "H315_H319": 20.0, # Somma delle sostanze con H315 e/o H319 deve essere ≥ 20%
+
+            # HP5 - Tossicità specifica per organi bersaglio (STOT)
+            "H370": 1.0,   # STOT SE 1 limite 1%
+            "H371": 10.0,  # STOT SE 2 limite 10%
+            "H335": 20.0,  # STOT SE 3 limite 20%
+            "H372": 1.0,   # STOT RE 1 limite 1%
+            "H373": 10.0,  # STOT RE 2 limite 10%
+            "H304": 10.0,  # Asp. Tox. 1 limite 10%
 
             # HP8 - Corrosivo
             "H314": 5.0,  # Somma delle concentrazioni delle sostanze con H314 deve essere ≥ 5%
@@ -456,6 +468,15 @@ class ClassificatoreRifiuti:
                             
                             # Aggiungi HP4 alle HP della sostanza
                             hp_sostanza.add("HP4")
+                    
+                    # Per HP5, verifica frasi H con cut-off 1%
+                    if frase_h_clean in self.database.hp_mapping["HP5"]:
+                        # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
+                        if concentrazione_percentuale >= self.database.valori_cut_off.get("HP5", 1.0):
+                            sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
+                            
+                            # Aggiungi HP5 alle HP della sostanza
+                            hp_sostanza.add("HP5")
                 
                 # Salva le caratteristiche di pericolo associate alla sostanza
                 if hp_sostanza:
@@ -492,6 +513,16 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP4"] = f"{motivazioni_hp['HP4']}; {hp4_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP4"] = hp4_sommatoria["motivo"]
+
+            # STEP 6: Verifica le sommatorie per HP5
+            hp5_sommatoria = self._verifica_hp5_sommatoria(sommatoria_per_frase)
+            if hp5_sommatoria["assegnata"]:
+                hp_assegnate.add("HP5")
+                # Aggiungi o aggiorna la motivazione
+                if "HP5" in motivazioni_hp:
+                    motivazioni_hp["HP5"] = f"{motivazioni_hp['HP5']}; {hp5_sommatoria['motivo']}"
+                else:
+                    motivazioni_hp["HP5"] = hp5_sommatoria["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -745,7 +776,72 @@ class ClassificatoreRifiuti:
             print(f"HP4 assegnata: {risultato['motivo']}")
         
         return risultato
+
+    def _verifica_hp5_sommatoria(self, sommatoria_per_frase):
+        """
+        Verifica i criteri di HP5 basati sulle sommatorie delle frasi H
         
+        Args:
+            sommatoria_per_frase (dict): Sommatoria delle concentrazioni per ciascuna frase H
+            
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Verifica STOT SE 1 (H370)
+        hp5_conditions = []
+        if 'H370' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H370']
+            limite = self.database.valori_limite.get('H370', 1.0)
+            if sommatoria >= limite:
+                hp5_conditions.append(f"STOT SE 1 (H370) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Verifica STOT SE 2 (H371)
+        if 'H371' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H371']
+            limite = self.database.valori_limite.get('H371', 10.0)
+            if sommatoria >= limite:
+                hp5_conditions.append(f"STOT SE 2 (H371) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Verifica STOT SE 3 (H335)
+        if 'H335' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H335']
+            limite = self.database.valori_limite.get('H335', 20.0)
+            if sommatoria >= limite:
+                hp5_conditions.append(f"STOT SE 3 (H335) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Verifica STOT RE 1 (H372)
+        if 'H372' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H372']
+            limite = self.database.valori_limite.get('H372', 1.0)
+            if sommatoria >= limite:
+                hp5_conditions.append(f"STOT RE 1 (H372) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Verifica STOT RE 2 (H373)
+        if 'H373' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H373']
+            limite = self.database.valori_limite.get('H373', 10.0)
+            if sommatoria >= limite:
+                hp5_conditions.append(f"STOT RE 2 (H373) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Verifica Asp. Tox. 1 (H304)
+        if 'H304' in sommatoria_per_frase:
+            sommatoria = sommatoria_per_frase['H304']
+            limite = self.database.valori_limite.get('H304', 10.0)
+            if sommatoria >= limite:
+                hp5_conditions.append(f"Asp. Tox. 1 (H304) = {sommatoria:.4f}% ≥ {limite}%")
+        
+        # Se almeno una condizione è soddisfatta, assegna HP5
+        if hp5_conditions:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP5 assegnata per: {'; '.join(hp5_conditions)}"
+            print(f"HP5 assegnata: {risultato['motivo']}")
+        
+        return risultato
     
 
 def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
