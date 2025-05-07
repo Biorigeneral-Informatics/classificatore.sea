@@ -151,9 +151,18 @@ class DatabaseSostanze:
             "HP3": 0,  # HP3 non ha valori soglia cut-off
             "HP4": 1.0,  # HP4 ha valore soglia dell'1%
             "HP5": 1.0,  # HP5 ha valore soglia dell'1% per H370, H372
-            "HP6": 1.0,  # HP6 ha valore soglia dell'1%
+            # HP6 ha valori soglia differenziati per categoria
+            "H300": 0.1,  # Tossicità acuta Cat. 1/2 orale (VS=0,1%)
+            "H301": 0.1,  # Tossicità acuta Cat. 3 orale (VS=0,1%)
+            "H302": 1.0,  # Tossicità acuta Cat. 4 orale (VS=1%)
+            "H310": 0.1,  # Tossicità acuta Cat. 1/2 cutanea (VS=0,1%)
+            "H311": 0.1,  # Tossicità acuta Cat. 3 cutanea (VS=0,1%)
+            "H312": 1.0,  # Tossicità acuta Cat. 4 cutanea (VS=1%)
+            "H330": 0.1,  # Tossicità acuta Cat. 1/2 inalazione (VS=0,1%)
+            "H331": 0.1,  # Tossicità acuta Cat. 3 inalazione (VS=0,1%)
+            "H332": 1.0,  # Tossicità acuta Cat. 4 inalazione (VS=1%)
+            # FINE HP6
             "HP8": 1.0,  # HP8 ha valore soglia dell'1%
-            
             # Altri valori soglia verranno aggiunti in seguito
         }
 
@@ -677,10 +686,13 @@ class ClassificatoreRifiuti:
                             # Aggiungi HP5 alle HP della sostanza
                             hp_sostanza.add("HP5")
                     
-                    # Per HP6, verifica frasi H con cut-off 1% e considera la hazard class
+                    # Per HP6, verifica frasi H con cut-off specifici per frase
                     if frase_h_clean in self.database.hp_mapping["HP6"]:
+                        # Ottieni il cut-off specifico per questa frase H
+                        cutoff_frase = self.database.valori_cut_off.get(frase_h_clean, 1.0)
+                        
                         # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
-                        if concentrazione_percentuale >= self.database.valori_cut_off.get("HP6", 1.0):
+                        if concentrazione_percentuale >= cutoff_frase:
                             # A questo punto abbiamo già verificato che tutte le frasi che richiedono
                             # hazard class ce l'hanno, quindi non dovrebbe esserci errore
                             frase_key = self._determina_frase_key_hp6(frase_h_clean, hazard_class)

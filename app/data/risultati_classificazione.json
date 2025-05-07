@@ -10,14 +10,17 @@
         "H410"
       ]
     },
-    "TetraidroFurano": {
-      "concentrazione_ppm": 3,
-      "concentrazione_percentuale": 0.0003,
+    "Tallio e suoi composti espressi come Tl": {
+      "concentrazione_ppm": 1000,
+      "concentrazione_percentuale": 0.1,
       "frasi_h": [
-        "H225",
-        "H351",
-        "H335",
-        "H319"
+        "H330",
+        "H300",
+        "H373",
+        "H413"
+      ],
+      "caratteristiche_pericolo": [
+        "HP6"
       ]
     }
   },
@@ -26,13 +29,19 @@
     "H301": 0,
     "H400": 0,
     "H410": 0,
-    "H225": 0.0003,
-    "H351": 0,
-    "H335": 0,
-    "H319": 0
+    "H330": 0.1,
+    "H330_2": 0.1,
+    "H300": 0.1,
+    "H300_2": 0.1,
+    "H373": 0,
+    "H413": 0
   },
-  "caratteristiche_pericolo": [],
-  "motivazioni_hp": {},
+  "caratteristiche_pericolo": [
+    "HP6"
+  ],
+  "motivazioni_hp": {
+    "HP6": "HP6 assegnata per: Somma H300 (Acute Tox. 1) = 0.1000% >= 0.1%; Somma H330 (Acute Tox. 1) = 0.1000% >= 0.1%"
+  },
   "valori_limite": {
     "H200": 0.1,
     "H201": 0.1,
@@ -84,7 +93,15 @@
     "HP3": 0,
     "HP4": 1.0,
     "HP5": 1.0,
-    "HP6": 1.0,
+    "H300": 0.1,
+    "H301": 0.1,
+    "H302": 1.0,
+    "H310": 0.1,
+    "H311": 0.1,
+    "H312": 1.0,
+    "H330": 0.1,
+    "H331": 0.1,
+    "H332": 1.0,
     "HP8": 1.0
   },
   "stato_fisico": "Liquido",
