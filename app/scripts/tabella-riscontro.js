@@ -3440,7 +3440,160 @@ async function inserisciNuovaFraseEUH(datiNuovaFraseEUH) {
 
 
 
+// Funzione per aggiungere il controllo di validazione
+function aggiungiControlloFrasiH() {
+    // Controlla se siamo nella pagina corretta
+    if (!document.getElementById('frasiHContainer') || !document.getElementById('frasiEUHContainer')) {
+        // Non siamo nella pagina di inserimento, usciamo
+        return;
+    }
+    
+    // Definisci le espressioni regolari per le validazioni
+    const regexH = /^H\d{3}$/;    // H seguito da esattamente 3 numeri
+    const regexEUH = /^EUH\d{3}$/; // EUH seguito da esattamente 3 numeri
+    
+    // Funzione per aggiungere stile CSS al documento
+    function aggiungiStile() {
+        if (!document.getElementById('stileValidazione')) {
+            const style = document.createElement('style');
+            style.id = 'stileValidazione';
+            style.textContent = `
+                .input-error {
+                    border: 2px solid #e74c3c !important;
+                }
+                .messaggio-errore {
+                    color: #e74c3c;
+                    font-size: 0.8rem;
+                    margin-top: 0.25rem;
+                    display: block;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    
+    // Aggiungi lo stile necessario
+    aggiungiStile();
+    
+    // Funzione per validare un input
+    function validaInput(input, regex, messaggioErrore) {
+        const valore = input.value.trim();
+        const contenitore = input.parentNode;
+        
+        // Rimuovi eventuali messaggi di errore esistenti
+        const vecchioErrore = contenitore.querySelector('.messaggio-errore');
+        if (vecchioErrore) {
+            vecchioErrore.remove();
+        }
+        
+        // Se l'input è vuoto, non mostrare errori
+        if (valore === '') {
+            input.classList.remove('input-error');
+            return;
+        }
+        
+        // Verifica se il valore corrisponde al formato richiesto
+        if (!regex.test(valore)) {
+            input.classList.add('input-error');
+            
+            // Crea e aggiungi messaggio di errore
+            const errore = document.createElement('span');
+            errore.className = 'messaggio-errore';
+            errore.textContent = messaggioErrore;
+            contenitore.appendChild(errore);
+        } else {
+            input.classList.remove('input-error');
+        }
+    }
+    
+    // Funzione per monitorare gli input esistenti
+    function monitoraInputEsistenti() {
+        // Monitora tutte le frasi H esistenti
+        document.querySelectorAll('.frase-h-input').forEach(input => {
+            // Rimuovi eventuali listener esistenti per evitare duplicati
+            input.removeEventListener('input', validazioneFraseH);
+            input.addEventListener('input', validazioneFraseH);
+        });
+        
+        // Monitora tutte le frasi EUH esistenti
+        document.querySelectorAll('.frase-euh-input').forEach(input => {
+            // Rimuovi eventuali listener esistenti per evitare duplicati
+            input.removeEventListener('input', validazioneFraseEUH);
+            input.addEventListener('input', validazioneFraseEUH);
+        });
+    }
+    
+    // Funzioni di validazione specifiche
+    function validazioneFraseH() {
+        validaInput(this, regexH, 'Formato richiesto: H seguito da 3 cifre (es. H230)');
+    }
+    
+    function validazioneFraseEUH() {
+        validaInput(this, regexEUH, 'Formato richiesto: EUH seguito da 3 cifre (es. EUH029)');
+    }
+    
+    // Osserva le modifiche al DOM per intercettare nuovi input aggiunti
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.addedNodes.length) {
+                mutation.addedNodes.forEach(node => {
+                    // Verifica se il nodo è un elemento HTML
+                    if (node.nodeType === 1) {
+                        // Cerca nuovi input frase H
+                        const inputsH = node.querySelectorAll ? node.querySelectorAll('.frase-h-input') : [];
+                        inputsH.forEach(input => {
+                            input.addEventListener('input', validazioneFraseH);
+                        });
+                        
+                        // Cerca nuovi input frase EUH
+                        const inputsEUH = node.querySelectorAll ? node.querySelectorAll('.frase-euh-input') : [];
+                        inputsEUH.forEach(input => {
+                            input.addEventListener('input', validazioneFraseEUH);
+                        });
+                    }
+                });
+            }
+        });
+    });
+    
+    // Avvia l'osservazione dei container
+    observer.observe(document.getElementById('frasiHContainer'), { 
+        childList: true, 
+        subtree: true 
+    });
+    
+    observer.observe(document.getElementById('frasiEUHContainer'), { 
+        childList: true, 
+        subtree: true 
+    });
+    
+    // Monitora gli input già esistenti
+    monitoraInputEsistenti();
+    
+    // Assicuriamoci di monitorare anche quando si aggiungono nuovi campi
+    const aggiungiHBtn = document.getElementById('aggiungiHBtn');
+    if (aggiungiHBtn) {
+        aggiungiHBtn.addEventListener('click', () => {
+            // Attendiamo che il DOM sia aggiornato
+            setTimeout(monitoraInputEsistenti, 50);
+        });
+    }
+    
+    const aggiungiEUHBtn = document.getElementById('aggiungiEUHBtn');
+    if (aggiungiEUHBtn) {
+        aggiungiEUHBtn.addEventListener('click', () => {
+            // Attendiamo che il DOM sia aggiornato
+            setTimeout(monitoraInputEsistenti, 50);
+        });
+    }
+}
 
+// Esegui la funzione quando il documento è pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', aggiungiControlloFrasiH);
+} else {
+    aggiungiControlloFrasiH();
+}
 
 
 
