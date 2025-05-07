@@ -944,7 +944,7 @@ class ClassificatoreRifiuti:
             
             if sommatoria >= limite:
                 risultato["assegnata"] = True
-                risultato["motivo"] = f"Sommatoria sostanze con frase H314 (SkinCorr. 1A/1B/1C) pari a {sommatoria:.4f}% ≥ {limite}%"
+                risultato["motivo"] = f"Sommatoria sostanze con frase H314 (SkinCorr. 1A/1B/1C) pari a {sommatoria:.4f}% >= {limite}%"
                 print(f"HP8 assegnata: {risultato['motivo']}")
         
         return risultato
@@ -972,7 +972,7 @@ class ClassificatoreRifiuti:
             
             if sommatoria_h314 >= limite_hp8:
                 # HP8 è già assegnata, quindi HP4 non si applica
-                risultato["motivo"] = "HP4 non assegnata per precedenza di HP8 (H314 ≥ 5%)"
+                risultato["motivo"] = "HP4 non assegnata per precedenza di HP8 (H314 >= 5%)"
                 print(risultato["motivo"])
                 return risultato
         
@@ -1006,17 +1006,17 @@ class ClassificatoreRifiuti:
         limite_h314_hp4_max = self.database.valori_limite.get('H314_HP4_MAX', 5.0)
         
         if sommatoria_h314_hp4 >= limite_h314_hp4_min and sommatoria_h314_hp4 < limite_h314_hp4_max:
-            condizioni_soddisfatte.append(f"Somma H314 = {sommatoria_h314_hp4:.4f}% ≥ {limite_h314_hp4_min}% e < {limite_h314_hp4_max}%")
+            condizioni_soddisfatte.append(f"Somma H314 = {sommatoria_h314_hp4:.4f}% >= {limite_h314_hp4_min}% e < {limite_h314_hp4_max}%")
         
         # Verifica condizione 2: H318 >= 10%
         limite_h318 = self.database.valori_limite.get('H318', 10.0)
         if sommatoria_h318 >= limite_h318:
-            condizioni_soddisfatte.append(f"Somma H318 = {sommatoria_h318:.4f}% ≥ {limite_h318}%")
+            condizioni_soddisfatte.append(f"Somma H318 = {sommatoria_h318:.4f}% >= {limite_h318}%")
         
         # Verifica condizione 3: H315/H319 >= 20%
         limite_h315_h319 = self.database.valori_limite.get('H315_H319', 20.0)
         if sommatoria_h315_h319 >= limite_h315_h319:
-            condizioni_soddisfatte.append(f"Somma H315 e/o H319 = {sommatoria_h315_h319:.4f}% ≥ {limite_h315_h319}%")
+            condizioni_soddisfatte.append(f"Somma H315 e/o H319 = {sommatoria_h315_h319:.4f}% >= {limite_h315_h319}%")
         
         # Se almeno una condizione è soddisfatta, assegna HP4
         if condizioni_soddisfatte:
@@ -1047,42 +1047,42 @@ class ClassificatoreRifiuti:
             sommatoria = sommatoria_per_frase['H370']
             limite = self.database.valori_limite.get('H370', 1.0)
             if sommatoria >= limite:
-                hp5_conditions.append(f"STOT SE 1 (H370) = {sommatoria:.4f}% ≥ {limite}%")
+                hp5_conditions.append(f"STOT SE 1 (H370) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica STOT SE 2 (H371)
         if 'H371' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H371']
             limite = self.database.valori_limite.get('H371', 10.0)
             if sommatoria >= limite:
-                hp5_conditions.append(f"STOT SE 2 (H371) = {sommatoria:.4f}% ≥ {limite}%")
+                hp5_conditions.append(f"STOT SE 2 (H371) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica STOT SE 3 (H335)
         if 'H335' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H335']
             limite = self.database.valori_limite.get('H335', 20.0)
             if sommatoria >= limite:
-                hp5_conditions.append(f"STOT SE 3 (H335) = {sommatoria:.4f}% ≥ {limite}%")
+                hp5_conditions.append(f"STOT SE 3 (H335) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica STOT RE 1 (H372)
         if 'H372' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H372']
             limite = self.database.valori_limite.get('H372', 1.0)
             if sommatoria >= limite:
-                hp5_conditions.append(f"STOT RE 1 (H372) = {sommatoria:.4f}% ≥ {limite}%")
+                hp5_conditions.append(f"STOT RE 1 (H372) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica STOT RE 2 (H373)
         if 'H373' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H373']
             limite = self.database.valori_limite.get('H373', 10.0)
             if sommatoria >= limite:
-                hp5_conditions.append(f"STOT RE 2 (H373) = {sommatoria:.4f}% ≥ {limite}%")
+                hp5_conditions.append(f"STOT RE 2 (H373) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica Asp. Tox. 1 (H304)
         if 'H304' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H304']
             limite = self.database.valori_limite.get('H304', 10.0)
             if sommatoria >= limite:
-                hp5_conditions.append(f"Asp. Tox. 1 (H304) = {sommatoria:.4f}% ≥ {limite}%")
+                hp5_conditions.append(f"Asp. Tox. 1 (H304) = {sommatoria:.4f}% >= {limite}%")
         
         # Se almeno una condizione è soddisfatta, assegna HP5
         if hp5_conditions:
@@ -1118,24 +1118,24 @@ class ClassificatoreRifiuti:
             
             # Verifichiamo prima con il limite più conservativo (categoria 1)
             if sommatoria >= limite_cat1:
-                condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 1) = {sommatoria:.4f}% ≥ {limite_cat1}%")
+                condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 1) = {sommatoria:.4f}% >= {limite_cat1}%")
             # Altrimenti verifichiamo con il limite di categoria 2
             elif sommatoria >= limite_cat2:
-                condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 2) = {sommatoria:.4f}% ≥ {limite_cat2}%")
+                condizioni_soddisfatte.append(f"Somma H300 (Acute Tox. 2) = {sommatoria:.4f}% >= {limite_cat2}%")
         
         if 'H301' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H301']
             limite = self.database.valori_limite.get('H301', 5.0)
             
             if sommatoria >= limite:
-                condizioni_soddisfatte.append(f"Somma H301 (Acute Tox. 3) = {sommatoria:.4f}% ≥ {limite}%")
+                condizioni_soddisfatte.append(f"Somma H301 (Acute Tox. 3) = {sommatoria:.4f}% >= {limite}%")
         
         if 'H302' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H302']
             limite = self.database.valori_limite.get('H302', 25.0)
             
             if sommatoria >= limite:
-                condizioni_soddisfatte.append(f"Somma H302 (Acute Tox. 4) = {sommatoria:.4f}% ≥ {limite}%")
+                condizioni_soddisfatte.append(f"Somma H302 (Acute Tox. 4) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica per esposizione cutanea (H310, H311, H312)
         if 'H310' in sommatoria_per_frase:
@@ -1145,24 +1145,24 @@ class ClassificatoreRifiuti:
             
             # Verifichiamo prima con il limite più conservativo (categoria 1)
             if sommatoria >= limite_cat1:
-                condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 1) = {sommatoria:.4f}% ≥ {limite_cat1}%")
+                condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 1) = {sommatoria:.4f}% >= {limite_cat1}%")
             # Altrimenti verifichiamo con il limite di categoria 2
             elif sommatoria >= limite_cat2:
-                condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 2) = {sommatoria:.4f}% ≥ {limite_cat2}%")
+                condizioni_soddisfatte.append(f"Somma H310 (Acute Tox. 2) = {sommatoria:.4f}% >= {limite_cat2}%")
         
         if 'H311' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H311']
             limite = self.database.valori_limite.get('H311', 15.0)
             
             if sommatoria >= limite:
-                condizioni_soddisfatte.append(f"Somma H311 (Acute Tox. 3) = {sommatoria:.4f}% ≥ {limite}%")
+                condizioni_soddisfatte.append(f"Somma H311 (Acute Tox. 3) = {sommatoria:.4f}% >= {limite}%")
         
         if 'H312' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H312']
             limite = self.database.valori_limite.get('H312', 55.0)
             
             if sommatoria >= limite:
-                condizioni_soddisfatte.append(f"Somma H312 (Acute Tox. 4) = {sommatoria:.4f}% ≥ {limite}%")
+                condizioni_soddisfatte.append(f"Somma H312 (Acute Tox. 4) = {sommatoria:.4f}% >= {limite}%")
         
         # Verifica per esposizione per inalazione (H330, H331, H332)
         if 'H330' in sommatoria_per_frase:
@@ -1172,24 +1172,24 @@ class ClassificatoreRifiuti:
             
             # Verifichiamo prima con il limite più conservativo (categoria 1)
             if sommatoria >= limite_cat1:
-                condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 1) = {sommatoria:.4f}% ≥ {limite_cat1}%")
+                condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 1) = {sommatoria:.4f}% >= {limite_cat1}%")
             # Altrimenti verifichiamo con il limite di categoria 2
             elif sommatoria >= limite_cat2:
-                condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 2) = {sommatoria:.4f}% ≥ {limite_cat2}%")
+                condizioni_soddisfatte.append(f"Somma H330 (Acute Tox. 2) = {sommatoria:.4f}% >= {limite_cat2}%")
         
         if 'H331' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H331']
             limite = self.database.valori_limite.get('H331', 3.5)
             
             if sommatoria >= limite:
-                condizioni_soddisfatte.append(f"Somma H331 (Acute Tox. 3) = {sommatoria:.4f}% ≥ {limite}%")
+                condizioni_soddisfatte.append(f"Somma H331 (Acute Tox. 3) = {sommatoria:.4f}% >= {limite}%")
         
         if 'H332' in sommatoria_per_frase:
             sommatoria = sommatoria_per_frase['H332']
             limite = self.database.valori_limite.get('H332', 22.5)
             
             if sommatoria >= limite:
-                condizioni_soddisfatte.append(f"Somma H332 (Acute Tox. 4) = {sommatoria:.4f}% ≥ {limite}%")
+                condizioni_soddisfatte.append(f"Somma H332 (Acute Tox. 4) = {sommatoria:.4f}% >= {limite}%")
         
         # Se almeno una condizione è soddisfatta, assegna HP6
         if condizioni_soddisfatte:
