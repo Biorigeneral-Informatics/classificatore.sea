@@ -90,9 +90,14 @@
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="echaSearchInput" placeholder="Cerca nella tabella..." oninput="searchEchaData(this.value)">
                     </div>
-                    <button id="clearEchaDataBtn" class="btn btn-danger">
-                        <i class="fas fa-trash"></i> Elimina dati ECHA
-                    </button>
+                    <div class="button-group">
+                        <button id="updateEchaBtn" class="btn btn-primary">
+                            <i class="fas fa-sync"></i> Aggiorna ECHA
+                        </button>
+                        <button id="clearEchaDataBtn" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Elimina dati ECHA
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Container per selettore tabelle (aggiunto dinamicamente) -->

@@ -334,6 +334,58 @@ function initEventListeners() {
     });
 
 
+
+    // Verifica se siamo nella sezione tabella-di-riscontro quando la pagina carica
+if (window.location.hash === '#tabella-di-riscontro') {
+    // Esegui con un leggero ritardo per assicurarsi che tutto sia caricato
+    setTimeout(() => {
+        // Se ci sono risultati di confronto ECHA, caricali nella tab aggiornamenti
+        if (localStorage.getItem('echaComparisonResults')) {
+            console.log("Rilevati risultati confronto ECHA al caricamento pagina");
+            
+            // Attiva la tab aggiornamenti
+            document.querySelectorAll('.tab-item').forEach(tab => {
+                if (tab.getAttribute('data-tab') === 'aggiornamenti') {
+                    tab.click();
+                }
+            });
+            
+            // Carica i risultati se la funzione è disponibile
+            if (typeof window.loadEchaComparisonResults === 'function') {
+                window.loadEchaComparisonResults();
+            }
+        }
+    }, 500);
+}
+
+// Aggiungi un listener per il cambio di hash/sezione
+window.addEventListener('hashchange', function() {
+    const newHash = window.location.hash.slice(1);
+    console.log("Hash changed to:", newHash);
+    
+    // Se il cambio è verso tabella-di-riscontro, verifica i risultati ECHA
+    if (newHash === 'tabella-di-riscontro' && localStorage.getItem('echaComparisonResults')) {
+        console.log("Hash change: tabella-di-riscontro con risultati ECHA");
+        
+        // Attendi che la sezione sia attivata e poi carica i risultati
+        setTimeout(() => {
+            // Attiva la tab aggiornamenti
+            document.querySelectorAll('.tab-item').forEach(tab => {
+                if (tab.getAttribute('data-tab') === 'aggiornamenti') {
+                    tab.click();
+                }
+            });
+            
+            // Carica i risultati ECHA
+            if (typeof window.loadEchaComparisonResults === 'function') {
+                window.loadEchaComparisonResults();
+            } else {
+                console.error("Funzione loadEchaComparisonResults non disponibile");
+            }
+        }, 500);
+    }
+});
+
     
 }
 

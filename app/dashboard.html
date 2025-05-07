@@ -216,13 +216,34 @@
         </div>
     </div>
 
-    <!-- Sottosezione Aggiornamenti -->
-    <div id="aggiornamenti" class="subsection active">
-        <div class="data-table">
-            <h3>Tabella Confronto</h3>
-            <p class="subsection-description">Confronto visivo delle sostanze presenti sia nel file ECHA che nel database.</p>
-            
-            <table class="riscontro-table" id="confrontoTable">
+ <!-- Sottosezione Aggiornamenti -->
+<div id="aggiornamenti" class="subsection active">
+    <div class="data-table">
+        <h3>Tabella Confronto</h3>
+        <p class="subsection-description">Confronto visivo delle sostanze presenti sia nel file ECHA che nel database.</p>
+        
+        <!-- Punto inserimento riepilogo confronto ECHA -->
+        <div id="echa-comparison-summary" style="display: none;"></div>
+        
+        <table class="riscontro-table" id="confrontoTable">
+            <thead>
+                <tr>
+                    <th>Sostanza</th>
+                    <th>CAS</th>
+                    <th>Frase H Originale</th>
+                    <th>Frase H Nuova</th>
+                    <th>Stato</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody id="confrontoTableBody">
+                <!-- Dati caricati dinamicamente -->
+            </tbody>
+        </table>
+        
+        <div class="mt-4" id="modificatiContainer" style="display: none;">
+            <h3>Sostanze Modificate</h3>
+            <table class="riscontro-table" id="modificatiTable">
                 <thead>
                     <tr>
                         <th>Sostanza</th>
@@ -231,40 +252,21 @@
                         <th>Hazard Class</th>
                         <th>Output - Frase H</th>
                         <th>Output - Haz. Class</th>
-                        <th>Azioni</th>
                     </tr>
                 </thead>
-                <tbody id="confrontoTableBody">
-                    <!-- Dati caricati dinamicamente -->
+                <tbody id="modificatiTableBody">
+                    <!-- Sostanze modificate caricate dinamicamente -->
                 </tbody>
             </table>
             
-            <div class="mt-4" id="modificatiContainer" style="display: none;">
-                <h3>Sostanze Modificate</h3>
-                <table class="riscontro-table" id="modificatiTable">
-                    <thead>
-                        <tr>
-                            <th>Sostanza</th>
-                            <th>Nome</th>
-                            <th>Frase H</th>
-                            <th>Hazard Class</th>
-                            <th>Output - Frase H</th>
-                            <th>Output - Haz. Class</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modificatiTableBody">
-                        <!-- Sostanze modificate caricate dinamicamente -->
-                    </tbody>
-                </table>
-                
-                <div class="mt-4 text-right">
-                    <button id="completaModificheBtn" class="btn btn-primary">
-                        <i class="fas fa-check"></i> Completa Modifiche
-                    </button>
-                </div>
+            <div class="mt-4 text-right">
+                <button id="completaModificheBtn" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Completa Modifiche
+                </button>
             </div>
         </div>
     </div>
+</div>
 
    <!-- Sottosezione Inserimenti rivista -->
 <div id="inserimenti" class="subsection">

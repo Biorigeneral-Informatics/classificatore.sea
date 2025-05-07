@@ -7,31 +7,48 @@
 // Con l'inizializzazione inizia
 
 // Inizializzazione della sezione Tabella di Riscontro
-function initTabellaRiscontro() {
-       // Inizializza le tab e i form
-       initSubsectionTabs();
-       initFormTabs();
-       
-       // Carica dati per le varie sottosezioni
-       loadConfronto(); // Questa è la funzione che abbiamo modificato
-       loadTabellaRiscontroSali();
-       loadTabellaRiscontroSostanze();
-       loadTabellaRiscontroFrasiH();
-       loadTabellaRiscontroFrasiEUH(); // Carica anche la tabella EUH
-       
-       // Carica le sostanze nel select per inserimento sali
-       loadSostanzeSelect();
-       loadCategorieSelect();
-       
-       // Inizializza tutti gli event handlers
-       setupFormHandlers();
-       setupSaliEditButtons();
-       setupSostanzeEventListeners();
-       setupFrasiHEventListeners();
-       setupFrasiEUHEventListeners(); // Configura i listener per la tabella EUH
-       inserisciNuovaFraseEUH(); // Aggiungi il listener per il pulsante di aggiunta frase EUH
 
-      // Inizializza la ricerca per la tabella di confronto (nuova funzionalità)
+function initTabellaRiscontro() {
+    // Inizializza le tab e i form
+    initSubsectionTabs();
+    initFormTabs();
+    
+    // Verifica se ci sono risultati di confronto ECHA da visualizzare
+    const hasComparisonResults = localStorage.getItem('echaComparisonResults');
+    console.log("Check risultati confronto ECHA:", hasComparisonResults ? "trovati" : "non trovati");
+    
+    // Inizializza le tab e i form
+    initSubsectionTabs();
+    initFormTabs();
+    
+    // Se ci sono risultati di confronto, caricali invece del confronto standard
+    if (hasComparisonResults) {
+        console.log("Trovati risultati confronto ECHA, caricamento...");
+        setTimeout(() => loadEchaComparisonResults(), 100);
+    } else {
+        // Carica dati per le varie sottosezioni
+        loadConfronto();
+    }
+    
+    // Il resto della funzione rimane uguale
+    loadTabellaRiscontroSali();
+    loadTabellaRiscontroSostanze();
+    loadTabellaRiscontroFrasiH();
+    loadTabellaRiscontroFrasiEUH();
+    
+    // Carica le sostanze nel select per inserimento sali
+    loadSostanzeSelect();
+    loadCategorieSelect();
+    
+    // Inizializza tutti gli event handlers
+    setupFormHandlers();
+    setupSaliEditButtons();
+    setupSostanzeEventListeners();
+    setupFrasiHEventListeners();
+    setupFrasiEUHEventListeners();
+    inserisciNuovaFraseEUH();
+
+    // Inizializza la ricerca per la tabella di confronto
     setupConfrontoSearch();
     
     // Aggiungi event listener per il pulsante di completamento modifiche
@@ -80,6 +97,295 @@ let frasiEUHInEditMode = false;
 //-----------------------------------//
 //------------ FUNZIONI ------------//
 //-----------------------------------//
+
+// Carica i risultati del confronto ECHA nella sezione Aggiornamenti
+function loadEchaComparisonResults() {
+    console.log("Tentativo di caricamento risultati confronto ECHA...");
+    
+    try {
+        // Recupera i risultati del confronto da localStorage
+        const comparisonResultsStr = localStorage.getItem('echaComparisonResults');
+        
+        if (!comparisonResultsStr) {
+            console.log("Nessun risultato di confronto ECHA trovato in localStorage");
+            return;
+        }
+        
+        const comparisonResults = JSON.parse(comparisonResultsStr);
+        console.log("Dati di confronto ECHA trovati:", comparisonResults);
+        
+        // Assicurati che siamo nella sezione tabella-di-riscontro
+        const tabRiscontroSection = document.getElementById('tabella-di-riscontro');
+        if (!tabRiscontroSection || !tabRiscontroSection.classList.contains('active')) {
+            console.log("Non siamo nella sezione tabella-di-riscontro");
+            return;
+        }
+        
+        // Assicurati che siamo nella tab "aggiornamenti"
+        const aggiornamenti = document.getElementById('aggiornamenti');
+        if (!aggiornamenti || !aggiornamenti.classList.contains('active')) {
+            console.log("Non siamo nella tab aggiornamenti, attiviamola");
+            // Trova e clicca sulla tab "aggiornamenti"
+            const aggiornTab = document.querySelector('.tab-item[data-tab="aggiornamenti"]');
+            if (aggiornTab) {
+                aggiornTab.click();
+            } else {
+                console.error("Tab aggiornamenti non trovata");
+                return;
+            }
+        }
+        
+        // Ottieni il container per la tabella di confronto
+        const confrontoTable = document.getElementById('confrontoTable');
+        const confrontoTableBody = document.getElementById('confrontoTableBody');
+        
+        if (!confrontoTable || !confrontoTableBody) {
+            console.error("Tabella confronto non trovata");
+            return;
+        }
+        
+        // Aggiorna la descrizione
+        const description = document.querySelector('#aggiornamenti .subsection-description');
+        if (description) {
+            const timestamp = localStorage.getItem('echaComparisonTimestamp');
+            description.textContent = `Confronto ECHA effettuato il ${timestamp ? new Date(timestamp).toLocaleString('it-IT') : 'data sconosciuta'}`;
+        }
+        
+        // Aggiorna intestazione
+        const heading = document.querySelector('#aggiornamenti .data-table h3');
+        if (heading) {
+            heading.textContent = 'Confronto Database ECHA';
+        }
+        
+        // Svuota la tabella
+        confrontoTableBody.innerHTML = '';
+        
+        // Estrai i dati
+        const added = comparisonResults.added || [];
+        const removed = comparisonResults.removed || [];
+        const modified = comparisonResults.modified || [];
+        
+        // Nascondi eventuali altre tabelle o container
+        const modificatiContainer = document.getElementById('modificatiContainer');
+        if (modificatiContainer) {
+            modificatiContainer.style.display = 'none';
+        }
+        
+        // Crea un riepilogo
+        let summaryHtml = `
+            <div class="echa-summary">
+                <p><strong>Risultati del confronto ECHA:</strong></p>
+                <ul>
+                    <li><span class="badge badge-success">${added.length}</span> sostanze aggiunte</li>
+                    <li><span class="badge badge-warning">${modified.length}</span> sostanze modificate</li>
+                    <li><span class="badge badge-danger">${removed.length}</span> sostanze rimosse</li>
+                </ul>
+            </div>
+        `;
+        
+        // Mostra il div di riepilogo
+        let summaryDiv = document.getElementById('echa-comparison-summary');
+        if (summaryDiv) {
+            summaryDiv.style.display = 'block';
+            summaryDiv.innerHTML = summaryHtml;
+        }
+        
+        // Verifica se ci sono cambiamenti
+        if (added.length === 0 && removed.length === 0 && modified.length === 0) {
+            confrontoTableBody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty-table-message">
+                        <div class="no-changes-message">
+                            <i class="fas fa-check-circle"></i>
+                            <p>Non ci sono cambiamenti nel nuovo file ECHA</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            console.log("Nessun cambiamento rilevato nella comparazione ECHA");
+            return;
+        }
+        
+        // Aggiungi le sostanze aggiunte
+        added.forEach(substance => {
+            const row = document.createElement('tr');
+            row.className = 'added';
+            row.innerHTML = `
+                <td>${substance.name || ''}</td>
+                <td>${substance.cas || ''}</td>
+                <td></td>
+                <td>${substance.hazard || ''}</td>
+                <td><span class="badge badge-success">Aggiunta</span></td>
+                <td>
+                    <button class="btn btn-sm btn-primary import-btn" data-cas="${substance.cas}" data-type="added">
+                        <i class="fas fa-plus"></i> Importa
+                    </button>
+                </td>
+            `;
+            confrontoTableBody.appendChild(row);
+        });
+        
+        // Aggiungi le sostanze rimosse
+        removed.forEach(substance => {
+            const row = document.createElement('tr');
+            row.className = 'removed';
+            row.innerHTML = `
+                <td>${substance.name || ''}</td>
+                <td>${substance.cas || ''}</td>
+                <td>${substance.hazard || ''}</td>
+                <td></td>
+                <td><span class="badge badge-danger">Rimossa</span></td>
+                <td>
+                    <button class="btn btn-sm btn-secondary ignore-btn" data-cas="${substance.cas}" data-type="removed">
+                        <i class="fas fa-eye-slash"></i> Ignora
+                    </button>
+                </td>
+            `;
+            confrontoTableBody.appendChild(row);
+        });
+        
+        // Aggiungi le sostanze modificate
+        modified.forEach(substance => {
+            const row = document.createElement('tr');
+            row.className = 'modified';
+            row.innerHTML = `
+                <td>${substance.name || ''}</td>
+                <td>${substance.cas || ''}</td>
+                <td>${substance.old_hazard || ''}</td>
+                <td>${substance.new_hazard || ''}</td>
+                <td><span class="badge badge-warning">Modificata</span></td>
+                <td>
+                    <button class="btn btn-sm btn-primary update-btn" data-cas="${substance.cas}" data-type="modified">
+                        <i class="fas fa-sync"></i> Aggiorna
+                    </button>
+                </td>
+            `;
+            confrontoTableBody.appendChild(row);
+        });
+        
+        // Aggiungi event listeners ai pulsanti
+        confrontoTableBody.querySelectorAll('.import-btn, .update-btn').forEach(btn => {
+            btn.addEventListener('click', handleEchaUpdateAction);
+        });
+        
+        confrontoTableBody.querySelectorAll('.ignore-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                // Nascondi la riga
+                this.closest('tr').style.display = 'none';
+                showNotification('Sostanza ignorata');
+            });
+        });
+        
+        console.log("Visualizzazione dati confronto ECHA completata");
+        
+        // Mostra notifica di completamento
+        showNotification(`Visualizzazione confronto ECHA: ${added.length} aggiunte, ${modified.length} modificate, ${removed.length} rimosse`);
+        
+    } catch (error) {
+        console.error('Errore nel caricamento dei risultati del confronto ECHA:', error);
+        showNotification('Errore nel caricamento dei risultati del confronto: ' + error.message, 'error');
+    }
+}
+
+// Gestisce le azioni di aggiornamento/importazione per ECHA
+async function handleEchaUpdateAction(event) {
+    try {
+        const button = event.currentTarget;
+        const cas = button.getAttribute('data-cas');
+        const type = button.getAttribute('data-type');
+        
+        // Cambia lo stato del pulsante
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> In corso...';
+        
+        // Ottieni i dati dalla riga
+        const row = button.closest('tr');
+        const name = row.cells[0].textContent.trim();
+        let hazard = '';
+        
+        if (type === 'added') {
+            hazard = row.cells[3].textContent.trim();
+        } else if (type === 'modified') {
+            hazard = row.cells[3].textContent.trim();
+        }
+        
+        console.log(`Aggiornamento ${type} per ${name} (${cas}) con hazard ${hazard}`);
+        
+        // Esegui l'azione appropriata
+        if (type === 'added') {
+            // Importa nuova sostanza
+            await window.electronAPI.executeSQLite(
+                'INSERT INTO sostanze (Nome, CAS, Categoria) VALUES (?, ?, ?)',
+                [name, cas, 'Importato da ECHA']
+            );
+            
+            // Aggiungi frasi H se presenti
+            if (hazard && hazard !== 'N/A') {
+                const hazardParts = hazard.split(',').map(h => h.trim()).filter(h => h);
+                
+                for (const h of hazardParts) {
+                    await window.electronAPI.executeSQLite(
+                        'INSERT INTO "frasi H" (Nome_sostanza, CAS, Hazard_Statement, Hazard_Class_and_Category) VALUES (?, ?, ?, ?)',
+                        [name, cas, h, '']
+                    );
+                }
+            }
+            
+            showNotification(`Sostanza "${name}" importata con successo`);
+        } else if (type === 'modified') {
+            // Aggiorna frasi H
+            // Prima elimina le esistenti
+            await window.electronAPI.executeSQLite(
+                'DELETE FROM "frasi H" WHERE CAS = ?',
+                [cas]
+            );
+            
+            // Poi inserisci le nuove
+            if (hazard && hazard !== 'N/A') {
+                const hazardParts = hazard.split(',').map(h => h.trim()).filter(h => h);
+                
+                for (const h of hazardParts) {
+                    await window.electronAPI.executeSQLite(
+                        'INSERT INTO "frasi H" (Nome_sostanza, CAS, Hazard_Statement, Hazard_Class_and_Category) VALUES (?, ?, ?, ?)',
+                        [name, cas, h, '']
+                    );
+                }
+            }
+            
+            showNotification(`Frasi H per "${name}" aggiornate con successo`);
+        }
+        
+        // Aggiorna lo stato del pulsante
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-check"></i> Completato';
+        button.className = 'btn btn-sm btn-success';
+        
+        // Aggiungi classe per indicare che è stato elaborato
+        row.classList.add('processed');
+        
+    } catch (error) {
+        console.error('Errore nell\'azione di aggiornamento ECHA:', error);
+        showNotification('Errore: ' + error.message, 'error');
+        
+        // Ripristina il pulsante
+        const button = event.currentTarget;
+        button.disabled = false;
+        
+        if (button.getAttribute('data-type') === 'added') {
+            button.innerHTML = '<i class="fas fa-plus"></i> Importa';
+        } else {
+            button.innerHTML = '<i class="fas fa-sync"></i> Aggiorna';
+        }
+    }
+}
+
+// Assicurati che esista la struttura UI per i risultati del confronto
+function ensureComparisonUIStructure() {
+    // Implementa questa funzione simile a ensureConfrontoUIStructure
+    // ma adattata specificamente per i risultati del confronto ECHA
+    // ...
+}
+
 
 
 function setupSaliEditButtons() {
@@ -166,6 +472,11 @@ function initFormTabs() {
         });
     });
 }
+
+
+
+
+
 
 // Carica i dati per la tabella di confronto
 // Funzione migliorata per caricare e confrontare i dati ECHA con il database interno
@@ -497,6 +808,10 @@ function aggiungiSostanzaModificata(item) {
         completaBtn.innerHTML = `<i class="fas fa-check"></i> Completa Modifiche (${count})`;
     }
 }
+
+
+
+
 
 // Funzione migliorata per completare tutte le modifiche
 async function completaModifiche() {
@@ -2491,8 +2806,13 @@ function initConfrontoSection() {
         completaModificheBtn.addEventListener('click', completaModifiche);
     }
     
-    // Carica i dati iniziali
-    loadConfronto();
+    // Verifica se ci sono risultati di confronto ECHA e caricali
+    if (localStorage.getItem('echaComparisonResults')) {
+        loadEchaComparisonResults();
+    } else {
+        // Carica i dati iniziali se non ci sono risultati ECHA
+        loadConfronto();
+    }
 }
 
 
@@ -3630,3 +3950,8 @@ window.inserisciNuovaFraseH = inserisciNuovaFraseH;
 window.inserisciNuovaFraseEUH = inserisciNuovaFraseEUH;
 window.initConfrontoSection = initConfrontoSection;
 window.inserisciNuovaFraseEUH = inserisciNuovaFraseEUH;
+
+
+// Esponi le funzioni utilizzate da altri moduli
+window.loadEchaComparisonResults = loadEchaComparisonResults;
+window.handleEchaUpdateAction = handleEchaUpdateAction;

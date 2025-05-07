@@ -2876,3 +2876,78 @@ select[disabled] {
 [data-theme="dark"] .form-section {
     background: rgba(0, 0, 0, 0.2);
 }
+
+
+
+/* STILI TABELLA DI RISCONTRO AGGIORNAMENTO ECHA */
+/* Stili per il confronto ECHA */
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.6em;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-right: 0.5rem;
+}
+
+.badge-success {
+    background-color: rgba(46, 204, 113, 0.2);
+    color: #27ae60;
+}
+
+.badge-danger {
+    background-color: rgba(231, 76, 60, 0.2);
+    color: #c0392b;
+}
+
+.badge-warning {
+    background-color: rgba(241, 196, 15, 0.2);
+    color: #f39c12;
+}
+
+.riscontro-table tr.added {
+    background-color: rgba(46, 204, 113, 0.05);
+}
+
+.riscontro-table tr.removed {
+    background-color: rgba(231, 76, 60, 0.05);
+}
+
+.riscontro-table tr.modified {
+    background-color: rgba(241, 196, 15, 0.05);
+}
+
+.riscontro-table tr.processed {
+    opacity: 0.7;
+}
+
+.no-changes-message {
+    text-align: center;
+    padding: 2rem;
+}
+
+.no-changes-message i {
+    font-size: 2rem;
+    color: #27ae60;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+#echa-comparison-summary {
+    margin: 1rem 0;
+    padding: 1rem;
+    background-color: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.echa-summary ul {
+    list-style-type: none;
+    padding-left: 0;
+    margin-top: 0.5rem;
+}
+
+.echa-summary li {
+    margin-bottom: 0.25rem;
+}

@@ -161,6 +161,12 @@ function initEchaEventListeners() {
         });
     }
     
+    // Event listener for update button
+    const updateButton = document.getElementById('updateEchaBtn');
+    if (updateButton) {
+        updateButton.addEventListener('click', updateEchaDatabase);
+    }
+
     // Event listener per clear button
     const clearButton = document.getElementById('clearEchaDataBtn');
     if (clearButton) {
@@ -189,6 +195,129 @@ async function selectEchaFile() {
         showNotification('Errore nella selezione del file', 'error');
     }
 }
+
+
+// Funzione per aggiornare il database ECHA
+async function updateEchaDatabase() {
+    try {
+        console.log("Inizio funzione updateEchaDatabase");
+        
+        // Verifica che esista un database ECHA caricato in precedenza
+        const echaDbPath = sessionStorage.getItem('echaDbPath');
+        if (!echaDbPath) {
+            showNotification('Nessun database ECHA trovato. Carica prima un file ECHA.', 'warning');
+            return;
+        }
+        
+        console.log("echaDbPath:", echaDbPath);
+
+        // Apri il file selector per selezionare il nuovo file ECHA
+        const newFilePath = await window.electronAPI.selectFile({
+            title: 'Seleziona nuovo file Excel ECHA',
+            filters: [
+                { name: 'Excel Files', extensions: ['xlsx', 'xls'] }
+            ],
+            properties: ['openFile']
+        });
+        
+        if (!newFilePath) {
+            console.log("Selezione file annullata dall'utente");
+            return; // Utente ha annullato la selezione
+        }
+        
+        console.log("Nuovo file selezionato:", newFilePath);
+        
+        // Mostra notifica di inizio aggiornamento
+        showNotification('Aggiornamento ECHA in corso...', 'info');
+        
+        console.log('Avvio script Python con:', echaDbPath, newFilePath);
+        
+        // Esegui lo script Python per confrontare i database
+        const result = await window.electronAPI.runPythonScript(
+            'echa/aggiornamento_echa.py', 
+            [echaDbPath, newFilePath]
+        );
+        
+        console.log('Risultato script Python:', result);
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Errore nell\'aggiornamento del database ECHA');
+        }
+        
+        // Aggiorna il path del database ECHA con quello nuovo
+        if (result.new_db_path) {
+            console.log("Aggiornamento percorso DB:", result.new_db_path);
+            
+            // Salva percorso assoluto in sessionStorage
+            sessionStorage.setItem('echaDbPath', result.new_db_path);
+            
+            // Calcola e salva percorso relativo
+            let relativePath = result.new_db_path;
+            // Estrai il nome del file dal percorso
+            const dbFilename = result.new_db_path.split(/[\\/]/).pop();
+            // Ricostruisci il percorso relativo
+            relativePath = `echa/data/${dbFilename}`;
+            sessionStorage.setItem('echaDbRelativePath', relativePath);
+            
+            console.log("Percorso relativo DB:", relativePath);
+            
+            // Aggiorna anche l'info del file nel localStorage
+            const fileInfoStr = localStorage.getItem('echaFileInfo');
+            if (fileInfoStr) {
+                const fileInfo = JSON.parse(fileInfoStr);
+                fileInfo.dbPath = result.new_db_path;
+                fileInfo.dbInfo = {
+                    ...fileInfo.dbInfo,
+                    updated: new Date().toISOString(),
+                    original_db_path: echaDbPath
+                };
+                localStorage.setItem('echaFileInfo', JSON.stringify(fileInfo));
+            }
+        }
+        
+        // Salva i risultati del confronto in localStorage
+        if (result.comparison) {
+            console.log('Salvataggio risultati confronto in localStorage');
+            localStorage.setItem('echaComparisonResults', JSON.stringify(result.comparison));
+            localStorage.setItem('echaComparisonTimestamp', new Date().toISOString());
+            
+            console.log('Statistiche confronto:', {
+                added: result.comparison.added?.length || 0,
+                modified: result.comparison.modified?.length || 0,
+                removed: result.comparison.removed?.length || 0
+            });
+        }
+        
+        // Mostra notifica di successo con dettagli
+        const totalAdded = result.comparison?.added?.length || 0;
+        const totalModified = result.comparison?.modified?.length || 0;
+        const totalRemoved = result.comparison?.removed?.length || 0;
+        
+        showNotification(`Database ECHA aggiornato! Trovate ${totalAdded} aggiunte, ${totalModified} modifiche, ${totalRemoved} rimozioni.`);
+        
+        // Aggiungi attività
+        addActivity('ECHA aggiornato', `File ${newFilePath.split(/[\\/]/).pop()} confrontato. Aggiunti: ${totalAdded}, Modificati: ${totalModified}, Rimossi: ${totalRemoved}`, 'fas fa-sync');
+        
+        // Carica di nuovo i dati ECHA per visualizzarli aggiornati
+        console.log("Ricaricamento ECHA database:", result.new_db_path || echaDbPath);
+        await loadEchaFromDatabase(result.new_db_path || echaDbPath);
+        
+        // Chiedi se si vuole andare alla sezione di confronto
+        const confirmRedirect = confirm(`Confronto ECHA completato con successo!\n\nRisultati: ${totalAdded} sostanze aggiunte, ${totalModified} modificate, ${totalRemoved} rimosse.\n\nVuoi andare alla sezione Tabella di Riscontro per vedere i cambiamenti?`);
+        
+        if (confirmRedirect) {
+            console.log("Redirezione a dashboard.html#tabella-di-riscontro");
+            window.electronAPI.openPage('../dashboard.html#tabella-di-riscontro');
+        } else {
+            console.log("Utente ha scelto di non reindirizzare");
+        }
+        
+    } catch (error) {
+        console.error('Errore nell\'aggiornamento ECHA:', error);
+        showNotification('Errore nell\'aggiornamento ECHA: ' + error.message, 'error');
+    }
+}
+
 
 // Importa file Excel ECHA
 async function importEchaExcel(filePath) {
