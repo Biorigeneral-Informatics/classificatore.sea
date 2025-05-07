@@ -400,6 +400,18 @@ class DatabaseSostanze:
             risultato["message"] = f"Sostanza '{nome_sostanza}' ha frasi H che richiedono hazard class ma questa è mancante: {', '.join(risultato['missing_hazard_class'])}"
         
         return risultato
+    
+    def get_frasi_h_con_class(self, nome_sostanza):
+        """
+        Ottiene le frasi H con le loro hazard class associate a una sostanza
+        
+        Args:
+            nome_sostanza (str): Nome della sostanza
+                
+        Returns:
+            list: Lista di dizionari con frasi H e hazard class associate alla sostanza
+        """
+        return self.sostanze_frasi_h_con_class.get(nome_sostanza, [])
 
 
 
