@@ -129,28 +129,37 @@ class DatabaseSostanze:
             # HP6 - Tossicità acuta
             "HP6": ["H300", "H301", "H302", "H310", "H311", "H312", "H330", "H331", "H332"],
 
+            # HP7 - cancerogeno
+            "HP7": ["H350", "H351"],
+
             # HP8 - Corrosivo
             "HP8": ["H314"],
             
             # Altre HP verranno aggiunte in seguito
         }
 
-                # Lista di frasi H che richiedono obbligatoriamente la hazard class
+        # Lista di frasi H che richiedono obbligatoriamente la hazard class
         self.frasi_h_require_class = [
             "H300",  # Richiede distinzione tra Acute Tox. 1 e Acute Tox. 2
             "H310",  # Richiede distinzione tra Acute Tox. 1 e Acute Tox. 2
             "H330",  # Richiede distinzione tra Acute Tox. 1 e Acute Tox. 2
+            "H350",  # Richiede distinzione tra Carc. 1A e Carc. 1B
         ]
 
         # Valori CUT-OFF (soglia) per ogni caratteristica di pericolo (in percentuale)
         # Questi valori fungono da filtro: se la concentrazione è < cut-off, 
         # la sostanza NON viene considerata nella classificazione
         self.valori_cut_off = {
-            "HP1": 0,  # HP1 non ha valori soglia cut-off
-            "HP2": 0,  # HP2 non ha valori soglia cut-off
-            "HP3": 0,  # HP3 non ha valori soglia cut-off
-            "HP4": 1.0,  # HP4 ha valore soglia dell'1%
-            "HP5": 1.0,  # HP5 ha valore soglia dell'1% per H370, H372
+            # HP1 non ha valori soglia cut-off
+            "HP1": 0,  
+            # HP2 non ha valori soglia cut-off
+            "HP2": 0,  
+            # HP3 non ha valori soglia cut-off
+            "HP3": 0,
+            # HP4 ha valore soglia dell'1%
+            "HP4": 1.0,  
+            # HP5 ha valore soglia dell'1% per H370, H372
+            "HP5": 1.0,  
             # HP6 ha valori soglia differenziati per categoria
             "H300": 0.1,  # Tossicità acuta Cat. 1/2 orale (VS=0,1%)
             "H301": 0.1,  # Tossicità acuta Cat. 3 orale (VS=0,1%)
@@ -161,8 +170,12 @@ class DatabaseSostanze:
             "H330": 0.1,  # Tossicità acuta Cat. 1/2 inalazione (VS=0,1%)
             "H331": 0.1,  # Tossicità acuta Cat. 3 inalazione (VS=0,1%)
             "H332": 1.0,  # Tossicità acuta Cat. 4 inalazione (VS=1%)
-            # FINE HP6
-            "HP8": 1.0,  # HP8 ha valore soglia dell'1%
+            # HP7 - Cancerogeno
+            "H350_1A": 0.1,   # Carc. 1A limite 0.1% 
+            "H350_1B": 0.1,   # Carc. 1B limite 0.1%
+            "H351": 1.0,      # Carc. 2 limite 1.0%
+            # HP8 ha valore soglia dell'1%
+            "HP8": 1.0,
             # Altri valori soglia verranno aggiunti in seguito
         }
 
@@ -706,13 +719,50 @@ class ClassificatoreRifiuti:
                             
                             # RIMUOVI O COMMENTA LA SEGUENTE RIGA PER EVITARE LA DOPPIA SOMMATORIA
                             # sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
-                
-                # Salva le caratteristiche di pericolo associate alla sostanza
-                if hp_sostanza:
-                    campione[nome_sostanza]["caratteristiche_pericolo"] = list(hp_sostanza)
-                    # Aggiorna l'insieme globale delle HP assegnate
-                    hp_assegnate.update(hp_sostanza)
-            
+                    
+                    # Per HP7, verifica delle frasi H cancerogene (senza sommatoria)
+                    if frase_h_clean in self.database.hp_mapping["HP7"]:
+                        # Per H350, determina la categoria dalla hazard class
+                        if frase_h_clean == "H350":
+                            try:
+                                # Ottieni la chiave corretta per il limite in base alla hazard class
+                                frase_key = self._determina_frase_key_hp7(frase_h_clean, hazard_class)
+                                
+                                # Salva la concentrazione individuale della sostanza per la verifica finale
+                                # Nota: NON facciamo sommatoria, registriamo solo ogni sostanza individualmente
+                                chiave_sostanza = f"{nome_sostanza}_{frase_key}"
+                                if chiave_sostanza not in sommatoria_per_frase:
+                                    sommatoria_per_frase[chiave_sostanza] = {
+                                        "sostanza": nome_sostanza,
+                                        "frase": frase_h_clean,
+                                        "categoria": "Carc. 1A" if frase_key == "H350_1A" else "Carc. 1B",
+                                        "concentrazione": concentrazione_percentuale,
+                                        "limite": self.database.valori_limite.get(frase_key, 0.1)
+                                    }
+                                
+                                # Verifica se supera il limite per HP7
+                                if concentrazione_percentuale >= self.database.valori_limite.get(frase_key, 0.1):
+                                    hp_sostanza.add("HP7")
+                            except ValueError as e:
+                                print(f"Errore nella determinazione della categoria per H350: {e}")
+                        
+                        # Per H351, gestione più semplice
+                        elif frase_h_clean == "H351":
+                            # Salva la concentrazione individuale della sostanza per la verifica finale
+                            chiave_sostanza = f"{nome_sostanza}_{frase_h_clean}"
+                            if chiave_sostanza not in sommatoria_per_frase:
+                                sommatoria_per_frase[chiave_sostanza] = {
+                                    "sostanza": nome_sostanza,
+                                    "frase": frase_h_clean,
+                                    "categoria": "Carc. 2",
+                                    "concentrazione": concentrazione_percentuale,
+                                    "limite": self.database.valori_limite.get(frase_h_clean, 1.0)
+                                }
+                            
+                            # Verifica se supera il limite per HP7
+                            if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 1.0):
+                                hp_sostanza.add("HP7")
+                                
             # STEP 3: Verifica le sommatorie per HP3
             hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
             if hp3_sommatoria["assegnata"]:
@@ -776,6 +826,16 @@ class ClassificatoreRifiuti:
                 hp_assegnate.add("HP2")
                 # Aggiungi o aggiorna la motivazione
                 motivazioni_hp["HP2"] = hp2_sommatoria["motivo"]
+            
+            # STEP 10: Verifica per HP7 (valutazione individuale, non sommatoria)
+            hp7_verifica = self._verifica_hp7_individuale(sommatoria_per_frase)
+            if hp7_verifica["assegnata"]:
+                hp_assegnate.add("HP7")
+                # Aggiungi o aggiorna la motivazione
+                if "HP7" in motivazioni_hp:
+                    motivazioni_hp["HP7"] = f"{motivazioni_hp['HP7']}; {hp7_verifica['motivo']}"
+                else:
+                    motivazioni_hp["HP7"] = hp7_verifica["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -1281,6 +1341,78 @@ class ClassificatoreRifiuti:
                 raise ValueError(f"Hazard class '{hazard_class}' non valida per H330")
         
         # Per altre frasi H, la chiave è la frase stessa
+        return frase_h
+    
+    def _verifica_hp7_individuale(self, sommatoria_per_frase):
+        """
+        Verifica i criteri di HP7 (Cancerogeno) basati sulle concentrazioni individuali delle sostanze.
+        NOTA: Per HP7 non si calcola una sommatoria, ma si verifica se ogni singola sostanza
+        supera individualmente il proprio valore limite.
+        
+        Args:
+            sommatoria_per_frase (dict): Contiene i dettagli di ogni sostanza con frasi H cancerogene
+                
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Lista di sostanze che superano i limiti per HP7
+        sostanze_sopra_limite = []
+        
+        # Verifica ogni sostanza registrata con frasi H cancerogene
+        for chiave, info in sommatoria_per_frase.items():
+            # Verifica solo le chiavi relative a HP7 (che iniziano con il nome della sostanza)
+            if (isinstance(info, dict) and "sostanza" in info and 
+                ("frase" in info and info["frase"] in self.database.hp_mapping["HP7"])):
+                
+                # Controlla se la sostanza supera il suo limite specifico
+                if info["concentrazione"] >= info["limite"]:
+                    sostanze_sopra_limite.append(
+                        f"Sostanza '{info['sostanza']}' con {info['frase']} ({info['categoria']}) = "
+                        f"{info['concentrazione']:.4f}% >= {info['limite']}%"
+                    )
+                    risultato["assegnata"] = True
+        
+        # Compila la motivazione se ci sono sostanze sopra limite
+        if sostanze_sopra_limite:
+            risultato["motivo"] = f"HP7 assegnata per: {'; '.join(sostanze_sopra_limite)}"
+            print(f"HP7 assegnata: {risultato['motivo']}")
+        
+        return risultato
+
+    def _determina_frase_key_hp7(self, frase_h, hazard_class):
+        """
+        Determina la chiave corretta per i limiti HP7 in base alla frase H e alla hazard class
+        
+        Args:
+            frase_h (str): Frase H (es. H350, H351)
+            hazard_class (str): Hazard Class associata (es. Carc. 1A, Carc. 1B, Carc. 2)
+            
+        Returns:
+            str: Chiave da utilizzare per i valori limite
+            
+        Raises:
+            ValueError: Se la frase H richiede hazard class ma questa non è disponibile
+        """
+        # Se la frase H richiede hazard class ma non è disponibile, genera un errore
+        if frase_h == "H350" and (not hazard_class or hazard_class.strip() == ""):
+            raise ValueError(f"La frase {frase_h} richiede una hazard class valida per determinare il limite corretto")
+        
+        # Per H350, determina la categoria dalla hazard class
+        if frase_h == "H350":
+            if hazard_class and "Carc. 1A" in hazard_class:
+                return "H350_1A"
+            elif hazard_class and "Carc. 1B" in hazard_class:
+                return "H350_1B"
+            else:
+                # Se non è specificata correttamente, solleva un errore
+                raise ValueError(f"Hazard class '{hazard_class}' non valida per H350")
+        
+        # Per H351, la chiave è la frase stessa
         return frase_h
     
 
