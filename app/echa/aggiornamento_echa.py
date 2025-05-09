@@ -34,8 +34,8 @@ def compare_echa_excel_files(new_excel_path):
             raise Exception(f"Il nuovo file Excel non esiste: {new_excel_path}")
         
         # Determina la directory di destinazione
-        script_dir = os.path.dirname(os.path.abspath(__file__))  # Directory dello script attuale
-        data_dir = os.path.join(script_dir, "data")  # Directory app/echa/data
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        data_dir = os.path.join(script_dir, "data")
         
         print(f"Script directory: {script_dir}", file=sys.stderr)
         print(f"Directory dati ECHA: {data_dir}", file=sys.stderr)
@@ -130,10 +130,9 @@ def compare_echa_excel_files(new_excel_path):
         print("Colonne vecchio file:", old_data.columns.tolist(), file=sys.stderr)
         print("Colonne nuovo file:", new_data.columns.tolist(), file=sys.stderr)
         
-        # Confronta i dati vecchi e nuovi
-        # Trova colonne con nomi simili tra i due dataframe
+        # Identifica le colonne chiave per il confronto
         
-        # Per il CAS
+        # Per il CAS (chiave primaria per il confronto)
         cas_column_old = None
         for col in old_data.columns:
             if 'cas' in col.lower():
@@ -176,13 +175,13 @@ def compare_echa_excel_files(new_excel_path):
         # Per le frasi H
         h_column_old = None
         for col in old_data.columns:
-            if 'hazard' in col.lower() or 'h_' in col.lower() or 'fras' in col.lower():
+            if 'hazard' in col.lower() or 'h_' in col.lower() or 'fras' in col.lower() or 'classificat' in col.lower():
                 h_column_old = col
                 break
         
         h_column_new = None
         for col in new_data.columns:
-            if 'hazard' in col.lower() or 'h_' in col.lower() or 'fras' in col.lower():
+            if 'hazard' in col.lower() or 'h_' in col.lower() or 'fras' in col.lower() or 'classificat' in col.lower():
                 h_column_new = col
                 break
         
@@ -203,96 +202,171 @@ def compare_echa_excel_files(new_excel_path):
         
         # Converti i valori CAS in stringhe per un confronto più semplice
         print("Conversione colonne CAS in stringhe...", file=sys.stderr)
-        old_data[cas_column_old] = old_data[cas_column_old].astype(str)
-        new_data[cas_column_new] = new_data[cas_column_new].astype(str)
+        old_data[cas_column_old] = old_data[cas_column_old].astype(str).str.strip()
+        new_data[cas_column_new] = new_data[cas_column_new].astype(str).str.strip()
         
-        # OTTIMIZZAZIONE: Crea un dizionario per il lookup veloce
-        print("Creazione dizionario per lookup veloce...", file=sys.stderr)
-        old_cas_dict = {str(row[cas_column_old]): idx for idx, row in old_data.iterrows()}
-        new_cas_dict = {str(row[cas_column_new]): idx for idx, row in new_data.iterrows()}
+        # Identifica tutte le colonne comuni per il confronto completo
+        print("Identificazione delle colonne comuni per il confronto completo...", file=sys.stderr)
+        old_columns_set = set(old_data.columns)
+        new_columns_set = set(new_data.columns)
+        common_columns = old_columns_set.intersection(new_columns_set)
         
-        # Trova sostanze presenti solo nel vecchio file Excel (rimosse)
-        print("Ricerca sostanze rimosse...", file=sys.stderr)
-        removed_substances = []
-        removed_count = 0
+        # Rimuovi le colonne CAS e nome dalle colonne di confronto (solo per il rilevamento delle modifiche)
+        compare_columns = [col for col in common_columns if col != cas_column_old and col != name_column_old]
         
-        # Usa i set per un confronto più veloce
-        old_cas_set = set(old_cas_dict.keys())
-        new_cas_set = set(new_cas_dict.keys())
+        print(f"Colonne comuni per confronto completo: {len(common_columns)}", file=sys.stderr)
+        print(f"Colonne per rilevamento modifiche: {len(compare_columns)}", file=sys.stderr)
         
-        # Le sostanze rimosse sono quelle presenti nel vecchio ma non nel nuovo
-        removed_cas_set = old_cas_set - new_cas_set
+        # Crea indici per un accesso più veloce basato sul CAS
+        print("Creazione indici per confronto veloce...", file=sys.stderr)
+        old_data_dict = {}
+        for idx, row in old_data.iterrows():
+            cas = row[cas_column_old]
+            if cas and cas.strip() != 'nan' and cas.strip():
+                # Memorizza la riga completa per un confronto dettagliato
+                old_data_dict[cas] = {
+                    'row': row,
+                    'idx': idx
+                }
         
-        for cas in removed_cas_set:
-            idx = old_cas_dict[cas]
-            row = old_data.iloc[idx]
-            removed_substances.append({
-                'cas': cas,
-                'name': str(row[name_column_old]),
-                'hazard': str(row[h_column_old]) if h_column_old else "N/A"
-            })
-            removed_count += 1
-            if removed_count % 100 == 0:
-                print(f"  Trovate {removed_count} sostanze rimosse...", file=sys.stderr)
+        new_data_dict = {}
+        for idx, row in new_data.iterrows():
+            cas = row[cas_column_new]
+            if cas and cas.strip() != 'nan' and cas.strip():
+                # Memorizza la riga completa per un confronto dettagliato
+                new_data_dict[cas] = {
+                    'row': row,
+                    'idx': idx
+                }
         
-        print(f"Trovate {len(removed_substances)} sostanze rimosse", file=sys.stderr)
+        print(f"Indice vecchio file: {len(old_data_dict)} elementi", file=sys.stderr)
+        print(f"Indice nuovo file: {len(new_data_dict)} elementi", file=sys.stderr)
         
-        # Trova sostanze presenti solo nel nuovo file Excel (aggiunte)
-        print("Ricerca sostanze aggiunte...", file=sys.stderr)
-        added_substances = []
-        added_count = 0
+        # Set per un confronto più efficiente
+        old_cas_set = set(old_data_dict.keys())
+        new_cas_set = set(new_data_dict.keys())
         
-        # Le sostanze aggiunte sono quelle presenti nel nuovo ma non nel vecchio
-        added_cas_set = new_cas_set - old_cas_set
-        
-        for cas in added_cas_set:
-            idx = new_cas_dict[cas]
-            row = new_data.iloc[idx]
-            added_substances.append({
-                'cas': cas,
-                'name': str(row[name_column_new]),
-                'hazard': str(row[h_column_new]) if h_column_new else "N/A"
-            })
-            added_count += 1
-            if added_count % 100 == 0:
-                print(f"  Trovate {added_count} sostanze aggiunte...", file=sys.stderr)
-        
-        print(f"Trovate {len(added_substances)} sostanze aggiunte", file=sys.stderr)
-        
-        # Trova sostanze modificate
-        print("Ricerca sostanze modificate...", file=sys.stderr)
-        modified_substances = []
-        modified_count = 0
-        
-        # Le potenziali modifiche sono nelle sostanze presenti in entrambi i file
+        # Sostanze comuni (presenti in entrambi i file)
         common_cas_set = old_cas_set.intersection(new_cas_set)
         
+        # Sostanze rimosse (presenti solo nel vecchio file)
+        removed_cas_set = old_cas_set - new_cas_set
+        
+        # Sostanze aggiunte (presenti solo nel nuovo file)
+        added_cas_set = new_cas_set - old_cas_set
+        
+        print(f"Sostanze comuni a entrambi i file: {len(common_cas_set)}", file=sys.stderr)
+        print(f"Sostanze rimosse: {len(removed_cas_set)}", file=sys.stderr)
+        print(f"Sostanze aggiunte: {len(added_cas_set)}", file=sys.stderr)
+        
+        # Liste per i risultati
+        removed_substances = []
+        added_substances = []
+        modified_substances = []
+        
+        # Verifica delle sostanze modificate (presenti in entrambi i file ma con dati diversi)
+        print("Verifica delle sostanze modificate...", file=sys.stderr)
+        modified_count = 0
+        unchanged_count = 0
+        
         for cas in common_cas_set:
-            old_idx = old_cas_dict[cas]
-            new_idx = new_cas_dict[cas]
+            old_data_row = old_data_dict[cas]['row']
+            new_data_row = new_data_dict[cas]['row']
             
-            old_row = old_data.iloc[old_idx]
-            new_row = new_data.iloc[new_idx]
+            # Verifica se ci sono modifiche in qualsiasi colonna di confronto
+            is_modified = False
+            modifiche = []
             
-            # Verifica se ci sono cambiamenti nelle frasi H
-            new_hazard = str(new_row[h_column_new]) if h_column_new else "N/A"
-            old_hazard = str(old_row[h_column_old]) if h_column_old else "N/A"
+            # Confronta il campo hazard (priorità)
+            if h_column_old and h_column_new:
+                old_hazard = str(old_data_row[h_column_old]).strip()
+                new_hazard = str(new_data_row[h_column_new]).strip()
+                
+                if new_hazard != old_hazard and new_hazard != "nan" and old_hazard != "nan":
+                    is_modified = True
+                    modifiche.append({
+                        'campo': 'hazard',
+                        'vecchio': old_hazard,
+                        'nuovo': new_hazard
+                    })
             
-            if new_hazard != old_hazard and new_hazard != "N/A" and old_hazard != "N/A":
+            # Confronta il campo nome
+            old_name = str(old_data_row[name_column_old]).strip()
+            new_name = str(new_data_row[name_column_new]).strip()
+            
+            if new_name != old_name and new_name != "nan" and old_name != "nan":
+                is_modified = True
+                modifiche.append({
+                    'campo': 'nome',
+                    'vecchio': old_name,
+                    'nuovo': new_name
+                })
+            
+            # Confronta anche le altre colonne comuni
+            for col in compare_columns:
+                if col in old_data.columns and col in new_data.columns:
+                    old_value = str(old_data_row[col]).strip()
+                    new_value = str(new_data_row[col]).strip()
+                    
+                    if new_value != old_value and new_value != "nan" and old_value != "nan":
+                        is_modified = True
+                        modifiche.append({
+                            'campo': col,
+                            'vecchio': old_value,
+                            'nuovo': new_value
+                        })
+            
+            # Se è stata rilevata una modifica, aggiungi alla lista
+            if is_modified:
                 modified_substances.append({
                     'cas': cas,
-                    'name': str(new_row[name_column_new]),
-                    'old_hazard': old_hazard,
-                    'new_hazard': new_hazard
+                    'name': new_name if new_name != "nan" else old_name,
+                    'old_hazard': old_hazard if 'old_hazard' in locals() else "N/A",
+                    'new_hazard': new_hazard if 'new_hazard' in locals() else "N/A",
+                    'modifiche': modifiche  # Dettagli sulle modifiche
                 })
                 modified_count += 1
                 if modified_count % 100 == 0:
                     print(f"  Trovate {modified_count} sostanze modificate...", file=sys.stderr)
+            else:
+                unchanged_count += 1
+                if unchanged_count % 1000 == 0:
+                    print(f"  Verificate {unchanged_count} sostanze senza modifiche...", file=sys.stderr)
         
         print(f"Trovate {len(modified_substances)} sostanze modificate", file=sys.stderr)
         
+        # Raccogli le sostanze rimosse
+        print("Raccolta delle sostanze rimosse...", file=sys.stderr)
+        for cas in removed_cas_set:
+            old_data_row = old_data_dict[cas]['row']
+            old_name = str(old_data_row[name_column_old]).strip()
+            old_hazard = str(old_data_row[h_column_old]).strip() if h_column_old else "N/A"
+            
+            removed_substances.append({
+                'cas': cas,
+                'name': old_name if old_name != "nan" else cas,
+                'hazard': old_hazard if old_hazard != "nan" else "N/A"
+            })
+        
+        print(f"Raccolte {len(removed_substances)} sostanze rimosse", file=sys.stderr)
+        
+        # Raccogli le sostanze aggiunte
+        print("Raccolta delle sostanze aggiunte...", file=sys.stderr)
+        for cas in added_cas_set:
+            new_data_row = new_data_dict[cas]['row']
+            new_name = str(new_data_row[name_column_new]).strip()
+            new_hazard = str(new_data_row[h_column_new]).strip() if h_column_new else "N/A"
+            
+            added_substances.append({
+                'cas': cas,
+                'name': new_name if new_name != "nan" else cas,
+                'hazard': new_hazard if new_hazard != "nan" else "N/A"
+            })
+        
+        print(f"Raccolte {len(added_substances)} sostanze aggiunte", file=sys.stderr)
+        
         # Limita il numero di elementi per evitare risposte troppo grandi
-        max_items = 100
+        max_items = 500
         if len(added_substances) > max_items:
             print(f"Limitato le sostanze aggiunte da {len(added_substances)} a {max_items}", file=sys.stderr)
             added_substances = added_substances[:max_items]
@@ -329,7 +403,6 @@ def compare_echa_excel_files(new_excel_path):
             print(f"File JSON salvato con successo", file=sys.stderr)
         except Exception as json_error:
             print(f"ERRORE nel salvataggio del file JSON: {str(json_error)}", file=sys.stderr)
-            # Non interrompere l'esecuzione, continua a restituire i risultati
         
         # Stampa il messaggio di completamento con sintesi dei risultati
         print("=" * 80, file=sys.stderr)
@@ -348,18 +421,25 @@ def compare_echa_excel_files(new_excel_path):
             print("\nEsempi di sostanze aggiunte:", file=sys.stderr)
             for i, substance in enumerate(added_substances[:5]):
                 print(f"  {i+1}. {substance['name']} (CAS: {substance['cas']})", file=sys.stderr)
+                print(f"     Hazard: {substance['hazard']}", file=sys.stderr)
         
         if removed_substances:
             print("\nEsempi di sostanze rimosse:", file=sys.stderr)
             for i, substance in enumerate(removed_substances[:5]):
                 print(f"  {i+1}. {substance['name']} (CAS: {substance['cas']})", file=sys.stderr)
+                print(f"     Hazard: {substance['hazard']}", file=sys.stderr)
         
         if modified_substances:
             print("\nEsempi di sostanze modificate:", file=sys.stderr)
             for i, substance in enumerate(modified_substances[:5]):
                 print(f"  {i+1}. {substance['name']} (CAS: {substance['cas']})", file=sys.stderr)
-                print(f"     Vecchio hazard: {substance['old_hazard']}", file=sys.stderr)
-                print(f"     Nuovo hazard: {substance['new_hazard']}", file=sys.stderr)
+                if 'old_hazard' in substance and 'new_hazard' in substance:
+                    print(f"     Vecchio hazard: {substance['old_hazard']}", file=sys.stderr)
+                    print(f"     Nuovo hazard: {substance['new_hazard']}", file=sys.stderr)
+                # Mostra anche le altre modifiche
+                if 'modifiche' in substance:
+                    for mod in substance['modifiche']:
+                        print(f"     {mod['campo']}: {mod['vecchio']} -> {mod['nuovo']}", file=sys.stderr)
         
         result = {
             "success": True,

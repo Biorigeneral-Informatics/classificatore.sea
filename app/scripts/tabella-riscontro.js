@@ -3610,6 +3610,11 @@ function setupFrasiEUHEventListeners() {
 
 // Funzione per l'inserimento di una nuova frase EUH
 async function inserisciNuovaFraseEUH(datiNuovaFraseEUH) {
+    // Se la funzione viene chiamata senza parametri, interrompi silenziosamente
+    if (arguments.length === 0) {
+        return false;
+    }
+
     try {
         // Validazione dei dati
         if (!datiNuovaFraseEUH.EUH) {
