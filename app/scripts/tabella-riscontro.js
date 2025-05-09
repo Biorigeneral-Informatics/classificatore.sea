@@ -45,7 +45,7 @@ function initTabellaRiscontro() {
     setupSaliEditButtons();
     setupSostanzeEventListeners();
     setupFrasiHEventListeners();
-    setupFrasiEUHEventListeners();
+    setupFrasiEUHEventListeners(); // Assicurati che questa funzione venga chiamata
     inserisciNuovaFraseEUH();
 
     // Inizializza la ricerca per la tabella di confronto
