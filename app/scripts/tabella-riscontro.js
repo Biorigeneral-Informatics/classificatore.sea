@@ -99,7 +99,6 @@ let frasiEUHInEditMode = false;
 //-----------------------------------//
 
 // Carica i risultati del confronto ECHA nella sezione Aggiornamenti
-// Carica i risultati del confronto ECHA nella sezione Aggiornamenti
 function loadEchaComparisonResults() {
     console.log("Tentativo di caricamento risultati confronto ECHA...");
     
@@ -166,6 +165,18 @@ function loadEchaComparisonResults() {
             }
         }
         
+        // Modifica l'intestazione della tabella per usare la nuova struttura
+        const tableHeaders = confrontoTable.querySelector('thead tr');
+        if (tableHeaders) {
+            tableHeaders.innerHTML = `
+                <th>Sostanza</th>
+                <th>CAS</th>
+                <th>Valori Modificati</th>
+                <th>Stato</th>
+                <!-- <th>Azioni</th> -->
+            `;
+        }
+        
         // Aggiorna la descrizione
         const description = document.querySelector('#aggiornamenti .subsection-description');
         if (description) {
@@ -213,7 +224,7 @@ function loadEchaComparisonResults() {
         if (added.length === 0 && removed.length === 0 && modified.length === 0) {
             confrontoTableBody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="empty-table-message">
+                    <td colspan="5" class="empty-table-message">
                         <div class="no-changes-message">
                             <i class="fas fa-check-circle"></i>
                             <p>Non ci sono cambiamenti nel nuovo file ECHA</p>
@@ -232,14 +243,15 @@ function loadEchaComparisonResults() {
             row.innerHTML = `
                 <td>${substance.name || ''}</td>
                 <td>${substance.cas || ''}</td>
-                <td></td>
-                <td>${substance.hazard || ''}</td>
+                <td>${substance.hazard || 'N/A'}</td>
                 <td><span class="badge badge-success">Aggiunta</span></td>
+                <!-- 
                 <td>
                     <button class="btn btn-sm btn-primary import-btn" data-cas="${substance.cas}" data-type="added">
                         <i class="fas fa-plus"></i> Importa
                     </button>
                 </td>
+                -->
             `;
             confrontoTableBody.appendChild(row);
         });
@@ -251,38 +263,54 @@ function loadEchaComparisonResults() {
             row.innerHTML = `
                 <td>${substance.name || ''}</td>
                 <td>${substance.cas || ''}</td>
-                <td>${substance.hazard || ''}</td>
-                <td></td>
+                <td>${substance.hazard || 'N/A'}</td>
                 <td><span class="badge badge-danger">Rimossa</span></td>
+                <!-- 
                 <td>
                     <button class="btn btn-sm btn-secondary ignore-btn" data-cas="${substance.cas}" data-type="removed">
                         <i class="fas fa-eye-slash"></i> Ignora
                     </button>
                 </td>
+                -->
             `;
             confrontoTableBody.appendChild(row);
         });
         
         // Aggiungi le sostanze modificate
         modified.forEach(substance => {
+            // Prepara il testo per la colonna "Valori Modificati"
+            let valoriModificatiText = '';
+            
+            if (substance.modifiche && substance.modifiche.length > 0) {
+                // Se abbiamo dettagli sulle modifiche, mostriamo quelle
+                valoriModificatiText = substance.modifiche.map(modifica => 
+                    `${modifica.campo}: ${modifica.vecchio} → ${modifica.nuovo}`
+                ).join('<br>');
+            } else {
+                // Altrimenti, mostriamo hazard old → new
+                valoriModificatiText = `Hazard: ${substance.old_hazard || 'N/A'} → ${substance.new_hazard || 'N/A'}`;
+            }
+            
             const row = document.createElement('tr');
             row.className = 'modified';
             row.innerHTML = `
                 <td>${substance.name || ''}</td>
                 <td>${substance.cas || ''}</td>
-                <td>${substance.old_hazard || ''}</td>
-                <td>${substance.new_hazard || ''}</td>
+                <td>${valoriModificatiText}</td>
                 <td><span class="badge badge-warning">Modificata</span></td>
+                <!-- 
                 <td>
                     <button class="btn btn-sm btn-primary update-btn" data-cas="${substance.cas}" data-type="modified">
                         <i class="fas fa-sync"></i> Aggiorna
                     </button>
                 </td>
+                -->
             `;
             confrontoTableBody.appendChild(row);
         });
         
-        // Aggiungi event listeners ai pulsanti
+        // Aggiungi event listeners ai pulsanti - commentato ma mantenuto per riferimento futuro
+        /*
         confrontoTableBody.querySelectorAll('.import-btn, .update-btn').forEach(btn => {
             btn.addEventListener('click', handleEchaUpdateAction);
         });
@@ -294,6 +322,7 @@ function loadEchaComparisonResults() {
                 showNotification('Sostanza ignorata');
             });
         });
+        */
         
         console.log("Visualizzazione dati confronto ECHA completata");
         
@@ -2636,12 +2665,10 @@ function ensureConfrontoUIStructure() {
             <thead>
                 <tr>
                     <th>Sostanza</th>
-                    <th>Nome</th>
-                    <th>Frase H</th>
-                    <th>Hazard Class</th>
-                    <th>Output - Frase H</th>
-                    <th>Output - Haz. Class</th>
-                    <th>Azioni</th>
+                    <th>CAS</th>
+                    <th>Valori Modificati</th>
+                    <th>Stato</th>
+                    <!-- <th>Azioni</th> -->
                 </tr>
             </thead>
             <tbody id="confrontoTableBody">
@@ -2659,11 +2686,10 @@ function ensureConfrontoUIStructure() {
                 <thead>
                     <tr>
                         <th>Sostanza</th>
-                        <th>Nome</th>
-                        <th>Frase H</th>
-                        <th>Hazard Class</th>
-                        <th>Output - Frase H</th>
-                        <th>Output - Haz. Class</th>
+                        <th>CAS</th>
+                        <th>Valori Modificati</th>
+                        <th>Stato</th>
+                        <!-- <th>Azioni</th> -->
                     </tr>
                 </thead>
                 <tbody id="modificatiTableBody">
