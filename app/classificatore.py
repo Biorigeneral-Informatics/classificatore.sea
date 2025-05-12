@@ -137,6 +137,9 @@ class DatabaseSostanze:
 
             # HP10 - Tossico per la riproduzione
             "HP10": ["H360", "H361"],
+
+            # HP11 - Mutageno
+            "HP11": ["H340", "H341"], 
             
             # Altre HP verranno aggiunte in seguito
         }
@@ -179,9 +182,7 @@ class DatabaseSostanze:
             "H351": 1.0,      # Carc. 2 limite 1.0%
             # HP8 ha valore soglia dell'1%
             "HP8": 1.0,
-            # HP10 - Tossico per la riproduzione
-            "H360": 0.3,   # Tossico per la riproduzione Cat. 1A/1B
-            "H361": 3.0,   # Tossico per la riproduzione Cat. 2
+
             # Altri valori soglia verranno aggiunti in seguito
         }
 
@@ -248,6 +249,10 @@ class DatabaseSostanze:
 
             # HP8 - Corrosivo
             "H314": 5.0,  # Somma delle concentrazioni delle sostanze con H314 deve essere ≥ 5%
+
+            # HP10 - Tossico per la riproduzione
+            "H360": 0.3,   # Tossico per la riproduzione Cat. 1A/1B
+            "H361": 3.0,   # Tossico per la riproduzione Cat. 2
             
 
             # Altri valori limite verranno aggiunti in seguito
