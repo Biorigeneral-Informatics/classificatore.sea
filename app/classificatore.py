@@ -140,6 +140,9 @@ class DatabaseSostanze:
 
             # HP11 - Mutageno
             "HP11": ["H340", "H341"],
+
+            # HP13 - Sensibilizzante respiratorio
+            "HP13": ["H317", "H334"],
             
             # Altre HP verranno aggiunte in seguito
         }
@@ -188,6 +191,9 @@ class DatabaseSostanze:
             # HP11 - Mutageno
             "H340": 0,   #Non ha cut-off
             "H341": 0,   #Non ha cut-off
+            # HP13 - Sensibilizzante
+            "H317": 0.0,   # Non ha cut-off
+            "H334": 0.0,   # Non ha cut-off
 
             # Altri valori soglia verranno aggiunti in seguito
         }
@@ -263,6 +269,10 @@ class DatabaseSostanze:
             # HP11 - Mutageno
             "H340": 0.1,   # Muta. 1A/1B limite 0.1%
             "H341": 1.0,   # Muta. 2 limite 1.0%
+
+            # HP13 - Sensibilizzante
+            "H317": 10.0,   # Skin Sens. 1 limite 10%
+            "H334": 10.0,   # Resp. Sens. 1 limite 10%
 
             # Altri valori limite verranno aggiunti in seguito
         }
@@ -855,16 +865,52 @@ class ClassificatoreRifiuti:
                             # Verifica se supera il limite per HP11 (non si applica cut-off)
                             if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 1.0):
                                 hp_sostanza.add("HP11")
-                                
-            # STEP 3: Verifica le sommatorie per HP3
-            hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
-            if hp3_sommatoria["assegnata"]:
-                hp_assegnate.add("HP3")
-                # Aggiungi o aggiorna la motivazione
-                if "HP3" in motivazioni_hp:
-                    motivazioni_hp["HP3"] = f"{motivazioni_hp['HP3']}; {hp3_sommatoria['motivo']}"
-                else:
-                    motivazioni_hp["HP3"] = hp3_sommatoria["motivo"]
+
+                    # Per HP13, verifica delle frasi H sensibilizzanti (senza sommatoria e senza cut-off)
+                    if frase_h_clean in self.database.hp_mapping["HP13"]:
+                        # Per H317, gestione per sensibilizzazione cutanea
+                        if frase_h_clean == "H317":
+                            # Salva la concentrazione individuale della sostanza per la verifica finale
+                            chiave_sostanza = f"{nome_sostanza}_{frase_h_clean}"
+                            if chiave_sostanza not in sommatoria_per_frase:
+                                sommatoria_per_frase[chiave_sostanza] = {
+                                    "sostanza": nome_sostanza,
+                                    "frase": frase_h_clean,
+                                    "categoria": "Skin Sens. 1",
+                                    "concentrazione": concentrazione_percentuale,
+                                    "limite": self.database.valori_limite.get(frase_h_clean, 10.0)
+                                }
+                            
+                            # Verifica se supera il limite per HP13 (non si applica cut-off)
+                            if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 10.0):
+                                hp_sostanza.add("HP13")
+                        
+                        # Per H334, gestione per sensibilizzazione respiratoria
+                        elif frase_h_clean == "H334":
+                            # Salva la concentrazione individuale della sostanza per la verifica finale
+                            chiave_sostanza = f"{nome_sostanza}_{frase_h_clean}"
+                            if chiave_sostanza not in sommatoria_per_frase:
+                                sommatoria_per_frase[chiave_sostanza] = {
+                                    "sostanza": nome_sostanza,
+                                    "frase": frase_h_clean,
+                                    "categoria": "Resp. Sens. 1",
+                                    "concentrazione": concentrazione_percentuale,
+                                    "limite": self.database.valori_limite.get(frase_h_clean, 10.0)
+                                }
+                            
+                            # Verifica se supera il limite per HP13 (non si applica cut-off)
+                            if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 10.0):
+                                hp_sostanza.add("HP13")
+                                                    
+                                # STEP 3: Verifica le sommatorie per HP3
+                                hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
+                                if hp3_sommatoria["assegnata"]:
+                                    hp_assegnate.add("HP3")
+                                    # Aggiungi o aggiorna la motivazione
+                                    if "HP3" in motivazioni_hp:
+                                        motivazioni_hp["HP3"] = f"{motivazioni_hp['HP3']}; {hp3_sommatoria['motivo']}"
+                                    else:
+                                        motivazioni_hp["HP3"] = hp3_sommatoria["motivo"]
             
             # STEP 4: Verifica le sommatorie per HP8
             hp8_sommatoria = self._verifica_hp8_sommatoria(sommatoria_per_frase)
@@ -941,6 +987,12 @@ class ClassificatoreRifiuti:
             if hp11_individuale["assegnata"]:
                 hp_assegnate.add("HP11")
                 motivazioni_hp["HP11"] = hp11_individuale["motivo"]
+            
+            # STEP 13: Verifica HP13 (valutazione individuale, senza additività e senza cut-off)
+            hp13_individuale = self._verifica_hp13_individuale(campione)
+            if hp13_individuale["assegnata"]:
+                hp_assegnate.add("HP13")
+                motivazioni_hp["HP13"] = hp13_individuale["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -1602,6 +1654,50 @@ class ClassificatoreRifiuti:
             risultato["assegnata"] = True
             risultato["motivo"] = f"HP11 assegnata per: {'; '.join(sostanze_sopra_limite)}"
             print(f"HP11 assegnata: {risultato['motivo']}")
+        
+        return risultato
+    
+    def _verifica_hp13_individuale(self, campione):
+        """
+        Verifica i criteri di HP13 (Sensibilizzante) basati sulle concentrazioni individuali
+        delle sostanze, senza applicare il principio di additività.
+        Per HP13 non si applicano valori cut-off.
+        
+        Args:
+            campione (dict): Dizionario con i dati del campione processato
+                
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Per tenere traccia delle sostanze che superano i limiti
+        sostanze_sopra_limite = []
+        
+        # Verifica ogni sostanza nel campione
+        for nome_sostanza, info in campione.items():
+            concentrazione = info["concentrazione_percentuale"]
+            frasi_h = info.get("frasi_h", [])
+            
+            # Verifica se la sostanza ha frasi H relative a HP13
+            for frase_h in frasi_h:
+                if frase_h in self.database.hp_mapping["HP13"]:
+                    limite = self.database.valori_limite.get(frase_h, 10.0)
+                    
+                    # Verifica se la concentrazione supera il limite (non si applica cut-off)
+                    if concentrazione >= limite:
+                        categoria = "Skin Sens. 1" if frase_h == "H317" else "Resp. Sens. 1"
+                        # La sostanza supera il limite per questa frase H
+                        sostanze_sopra_limite.append(f"Sostanza '{nome_sostanza}' con {frase_h} ({categoria}) = {concentrazione:.4f}% >= {limite}%")
+        
+        # Se almeno una sostanza è sopra il limite, assegna HP13
+        if sostanze_sopra_limite:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP13 assegnata per: {'; '.join(sostanze_sopra_limite)}"
+            print(f"HP13 assegnata: {risultato['motivo']}")
         
         return risultato
 
