@@ -182,6 +182,9 @@ class DatabaseSostanze:
             "H351": 1.0,      # Carc. 2 limite 1.0%
             # HP8 ha valore soglia dell'1%
             "HP8": 1.0,
+            # HP10 - Tossico per la riproduzione
+            "H360": 0.0,   # Non ha cut-off 
+            "H361": 0.0,   # Non ha cut-off 
 
             # Altri valori soglia verranno aggiunti in seguito
         }
