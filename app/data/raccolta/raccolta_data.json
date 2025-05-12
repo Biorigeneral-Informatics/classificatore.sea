@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-05-06T12:13:46.748944",
+  "timestamp": "2025-05-08T18:50:13.236119",
   "filename": "temp_raccolta_data.json",
   "data": [
     {
@@ -47,8 +47,8 @@
       "Valore_Txt": "< 10"
     },
     {
-      "Descriz": "TetraidroFurano",
-      "Valore_Txt": "300"
+      "Descriz": "Cobalto e suoi composti  come Co",
+      "Valore_Txt": "450"
     }
   ],
   "columns": [
