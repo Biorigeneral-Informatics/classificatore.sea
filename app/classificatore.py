@@ -139,7 +139,7 @@ class DatabaseSostanze:
             "HP10": ["H360", "H361"],
 
             # HP11 - Mutageno
-            "HP11": ["H340", "H341"], 
+            "HP11": ["H340", "H341"],
             
             # Altre HP verranno aggiunte in seguito
         }
@@ -185,6 +185,9 @@ class DatabaseSostanze:
             # HP10 - Tossico per la riproduzione
             "H360": 0.0,   # Non ha cut-off 
             "H361": 0.0,   # Non ha cut-off 
+            # HP11 - Mutageno
+            "H340": 0,   #Non ha cut-off
+            "H341": 0,   #Non ha cut-off
 
             # Altri valori soglia verranno aggiunti in seguito
         }
@@ -257,6 +260,9 @@ class DatabaseSostanze:
             "H360": 0.3,   # Tossico per la riproduzione Cat. 1A/1B
             "H361": 3.0,   # Tossico per la riproduzione Cat. 2
             
+            # HP11 - Mutageno
+            "H340": 0.1,   # Muta. 1A/1B limite 0.1%
+            "H341": 1.0,   # Muta. 2 limite 1.0%
 
             # Altri valori limite verranno aggiunti in seguito
         }
@@ -812,6 +818,43 @@ class ClassificatoreRifiuti:
                             # Verifica se supera il limite per HP10
                             if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 3.0):
                                 hp_sostanza.add("HP10")
+
+
+                    # Per HP11, verifica delle frasi H mutagene (senza sommatoria e senza cut-off)
+                    if frase_h_clean in self.database.hp_mapping["HP11"]:
+                        # Per H340, gestione per mutagenicità Cat. 1A/1B
+                        if frase_h_clean == "H340":
+                            # Salva la concentrazione individuale della sostanza per la verifica finale
+                            chiave_sostanza = f"{nome_sostanza}_{frase_h_clean}"
+                            if chiave_sostanza not in sommatoria_per_frase:
+                                sommatoria_per_frase[chiave_sostanza] = {
+                                    "sostanza": nome_sostanza,
+                                    "frase": frase_h_clean,
+                                    "categoria": "Muta. 1A/1B",
+                                    "concentrazione": concentrazione_percentuale,
+                                    "limite": self.database.valori_limite.get(frase_h_clean, 0.1)
+                                }
+                            
+                            # Verifica se supera il limite per HP11 (non si applica cut-off)
+                            if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0.1):
+                                hp_sostanza.add("HP11")
+                        
+                        # Per H341, gestione per mutagenicità Cat. 2
+                        elif frase_h_clean == "H341":
+                            # Salva la concentrazione individuale della sostanza per la verifica finale
+                            chiave_sostanza = f"{nome_sostanza}_{frase_h_clean}"
+                            if chiave_sostanza not in sommatoria_per_frase:
+                                sommatoria_per_frase[chiave_sostanza] = {
+                                    "sostanza": nome_sostanza,
+                                    "frase": frase_h_clean,
+                                    "categoria": "Muta. 2",
+                                    "concentrazione": concentrazione_percentuale,
+                                    "limite": self.database.valori_limite.get(frase_h_clean, 1.0)
+                                }
+                            
+                            # Verifica se supera il limite per HP11 (non si applica cut-off)
+                            if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 1.0):
+                                hp_sostanza.add("HP11")
                                 
             # STEP 3: Verifica le sommatorie per HP3
             hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
@@ -892,6 +935,12 @@ class ClassificatoreRifiuti:
             if hp10_individuale["assegnata"]:
                 hp_assegnate.add("HP10")
                 motivazioni_hp["HP10"] = hp10_individuale["motivo"]
+
+            # STEP 12: Verifica HP11 (valutazione individuale, senza additività e senza cut-off)
+            hp11_individuale = self._verifica_hp11_individuale(campione)
+            if hp11_individuale["assegnata"]:
+                hp_assegnate.add("HP11")
+                motivazioni_hp["HP11"] = hp11_individuale["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -1510,6 +1559,49 @@ class ClassificatoreRifiuti:
             risultato["assegnata"] = True
             risultato["motivo"] = f"HP10 assegnata per: {'; '.join(sostanze_sopra_limite)}"
             print(f"HP10 assegnata: {risultato['motivo']}")
+        
+        return risultato
+    
+    def _verifica_hp11_individuale(self, campione):
+        """
+        Verifica i criteri di HP11 (Mutageno) basati sulle concentrazioni individuali
+        delle sostanze, senza applicare il principio di additività.
+        Per HP11 non si applicano valori cut-off.
+        
+        Args:
+            campione (dict): Dizionario con i dati del campione processato
+                
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Per tenere traccia delle sostanze che superano i limiti
+        sostanze_sopra_limite = []
+        
+        # Verifica ogni sostanza nel campione
+        for nome_sostanza, info in campione.items():
+            concentrazione = info["concentrazione_percentuale"]
+            frasi_h = info.get("frasi_h", [])
+            
+            # Verifica se la sostanza ha frasi H relative a HP11
+            for frase_h in frasi_h:
+                if frase_h in self.database.hp_mapping["HP11"]:
+                    limite = self.database.valori_limite.get(frase_h, 0)
+                    
+                    # Verifica se la concentrazione supera il limite (non si applica cut-off)
+                    if concentrazione >= limite:
+                        # La sostanza supera il limite per questa frase H
+                        sostanze_sopra_limite.append(f"Sostanza '{nome_sostanza}' con {frase_h} ({concentrazione:.4f}% >= {limite}%)")
+        
+        # Se almeno una sostanza è sopra il limite, assegna HP11
+        if sostanze_sopra_limite:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP11 assegnata per: {'; '.join(sostanze_sopra_limite)}"
+            print(f"HP11 assegnata: {risultato['motivo']}")
         
         return risultato
 
