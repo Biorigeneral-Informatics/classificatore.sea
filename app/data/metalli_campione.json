@@ -1,0 +1,14 @@
+{
+  "Arsenico e suoi composti come As": {
+    "concentrazione_ppm": 122.0,
+    "concentrazione_percentuale": 0.0122,
+    "metallo_db_nome": "Arsenico  e suoi composti come As",
+    "metallo_db_id": 1
+  },
+  "Cobalto e suoi composti  come Co": {
+    "concentrazione_ppm": 450.0,
+    "concentrazione_percentuale": 0.045,
+    "metallo_db_nome": "Cobalto e suoi composti  come Co",
+    "metallo_db_id": 3
+  }
+}
