@@ -134,6 +134,9 @@ class DatabaseSostanze:
 
             # HP8 - Corrosivo
             "HP8": ["H314"],
+
+            # HP10 - Tossico per la riproduzione
+            "HP10": ["H360", "H361"],
             
             # Altre HP verranno aggiunte in seguito
         }
@@ -176,6 +179,9 @@ class DatabaseSostanze:
             "H351": 1.0,      # Carc. 2 limite 1.0%
             # HP8 ha valore soglia dell'1%
             "HP8": 1.0,
+            # HP10 - Tossico per la riproduzione
+            "H360": 0.3,   # Tossico per la riproduzione Cat. 1A/1B
+            "H361": 3.0,   # Tossico per la riproduzione Cat. 2
             # Altri valori soglia verranno aggiunti in seguito
         }
 
@@ -762,6 +768,42 @@ class ClassificatoreRifiuti:
                             # Verifica se supera il limite per HP7
                             if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 1.0):
                                 hp_sostanza.add("HP7")
+
+                    # Per HP10, verifica delle frasi H tossiche per la riproduzione (senza sommatoria)
+                    if frase_h_clean in self.database.hp_mapping["HP10"]:
+                        # Per H360, gestione per tossicità per la riproduzione Cat. 1A/1B
+                        if frase_h_clean == "H360":
+                            # Salva la concentrazione individuale della sostanza per la verifica finale
+                            chiave_sostanza = f"{nome_sostanza}_{frase_h_clean}"
+                            if chiave_sostanza not in sommatoria_per_frase:
+                                sommatoria_per_frase[chiave_sostanza] = {
+                                    "sostanza": nome_sostanza,
+                                    "frase": frase_h_clean,
+                                    "categoria": "Repr. 1A/1B",
+                                    "concentrazione": concentrazione_percentuale,
+                                    "limite": self.database.valori_limite.get(frase_h_clean, 0.3)
+                                }
+                            
+                            # Verifica se supera il limite per HP10
+                            if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0.3):
+                                hp_sostanza.add("HP10")
+                        
+                        # Per H361, gestione per tossicità per la riproduzione Cat. 2
+                        elif frase_h_clean == "H361":
+                            # Salva la concentrazione individuale della sostanza per la verifica finale
+                            chiave_sostanza = f"{nome_sostanza}_{frase_h_clean}"
+                            if chiave_sostanza not in sommatoria_per_frase:
+                                sommatoria_per_frase[chiave_sostanza] = {
+                                    "sostanza": nome_sostanza,
+                                    "frase": frase_h_clean,
+                                    "categoria": "Repr. 2",
+                                    "concentrazione": concentrazione_percentuale,
+                                    "limite": self.database.valori_limite.get(frase_h_clean, 3.0)
+                                }
+                            
+                            # Verifica se supera il limite per HP10
+                            if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 3.0):
+                                hp_sostanza.add("HP10")
                                 
             # STEP 3: Verifica le sommatorie per HP3
             hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
@@ -836,6 +878,12 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP7"] = f"{motivazioni_hp['HP7']}; {hp7_verifica['motivo']}"
                 else:
                     motivazioni_hp["HP7"] = hp7_verifica["motivo"]
+            
+            # STEP 11: Verifica HP10 (valutazione individuale, senza additività)
+            hp10_individuale = self._verifica_hp10_individuale(campione)
+            if hp10_individuale["assegnata"]:
+                hp_assegnate.add("HP10")
+                motivazioni_hp["HP10"] = hp10_individuale["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -1415,6 +1463,48 @@ class ClassificatoreRifiuti:
         # Per H351, la chiave è la frase stessa
         return frase_h
     
+    def _verifica_hp10_individuale(self, campione):
+        """
+        Verifica i criteri di HP10 (Tossico per la riproduzione) basati sulle concentrazioni individuali
+        delle sostanze, senza applicare il principio di additività.
+        
+        Args:
+            campione (dict): Dizionario con i dati del campione processato
+                
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Per tenere traccia delle sostanze che superano i limiti
+        sostanze_sopra_limite = []
+        
+        # Verifica ogni sostanza nel campione
+        for nome_sostanza, info in campione.items():
+            concentrazione = info["concentrazione_percentuale"]
+            frasi_h = info.get("frasi_h", [])
+            
+            # Verifica se la sostanza ha frasi H relative a HP10
+            for frase_h in frasi_h:
+                if frase_h in self.database.hp_mapping["HP10"]:
+                    limite = self.database.valori_limite.get(frase_h, 0)
+                    
+                    # Verifica se la concentrazione supera il limite
+                    if concentrazione >= limite:
+                        # La sostanza supera il limite per questa frase H
+                        sostanze_sopra_limite.append(f"Sostanza '{nome_sostanza}' con {frase_h} ({concentrazione:.4f}% >= {limite}%)")
+        
+        # Se almeno una sostanza è sopra il limite, assegna HP10
+        if sostanze_sopra_limite:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP10 assegnata per: {'; '.join(sostanze_sopra_limite)}"
+            print(f"HP10 assegnata: {risultato['motivo']}")
+        
+        return risultato
+
 
     def _verifica_hp1_sommatoria(self, sommatoria_per_frase):
         """
