@@ -1561,13 +1561,35 @@ class ClassificatoreRifiuti:
         
         # Per H350, determina la categoria dalla hazard class
         if frase_h == "H350":
-            if hazard_class and "Carc. 1A" in hazard_class:
+            # Normalizza la hazard class: converti in minuscolo e rimuovi spazi extra
+            hazard_class_normalized = hazard_class.lower().strip()
+            
+            # Cerca in modo più flessibile le categorie
+            if "carc. 1a" in hazard_class_normalized or "carc.1a" in hazard_class_normalized or "carc 1a" in hazard_class_normalized:
                 return "H350_1A"
-            elif hazard_class and "Carc. 1B" in hazard_class:
+            elif "carc. 1b" in hazard_class_normalized or "carc.1b" in hazard_class_normalized or "carc 1b" in hazard_class_normalized:
                 return "H350_1B"
             else:
-                # Se non è specificata correttamente, solleva un errore
-                raise ValueError(f"Hazard class '{hazard_class}' non valida per H350")
+                # Log dettagliato dell'errore per facilitare il debug
+                print(f"AVVISO: Hazard class '{hazard_class}' non riconosciuta per H350. Normalizzata: '{hazard_class_normalized}'")
+                print(f"Cercando di determinare categoria da pattern alternativi...")
+                
+                # Prova con pattern regex più generali
+                import re
+                if re.search(r'carc\W*1\W*a', hazard_class_normalized):
+                    print(f"Categoria 1A determinata tramite pattern regex")
+                    return "H350_1A"
+                elif re.search(r'carc\W*1\W*b', hazard_class_normalized):
+                    print(f"Categoria 1B determinata tramite pattern regex")
+                    return "H350_1B"
+                
+                # Se ancora non riconosciuta, usa una fallback strategy
+                # Opzione 1: Scegli la categoria più severa come fallback di sicurezza
+                print(f"Nessun pattern riconosciuto, fallback alla categoria più severa (1A) per sicurezza")
+                return "H350_1A"
+                
+                # Opzione 2 (alternativa): Solleva un errore ma con più dettagli
+                # raise ValueError(f"Hazard class '{hazard_class}' non valida per H350. Deve contenere 'Carc. 1A' o 'Carc. 1B'")
         
         # Per H351, la chiave è la frase stessa
         return frase_h
