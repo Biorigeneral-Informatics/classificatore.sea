@@ -107,6 +107,10 @@ class DatabaseSostanze:
 
         # Mappatura delle sostanze alle frasi H con le loro hazard class
         self.sostanze_frasi_h_con_class = {}
+
+        # Aggiungi dizionari per le frasi EUH
+        self.sostanze_frasi_euh = {}
+        self.sostanze_frasi_euh_con_class = {}
         
         # Mappatura delle frasi H alle caratteristiche di pericolo (HP)
         # Questa associazione è fissa e verrà usata per determinare quali frasi H sono rilevanti per ogni HP
@@ -140,6 +144,9 @@ class DatabaseSostanze:
 
             # HP11 - Mutageno
             "HP11": ["H340", "H341"],
+
+            # HP12 - Liberazione di gas a tossicità acuta
+            "HP12": ["EUH029", "EUH031", "EUH032"],
 
             # HP13 - Sensibilizzante respiratorio
             "HP13": ["H317", "H334"],
@@ -191,6 +198,11 @@ class DatabaseSostanze:
             # HP11 - Mutageno
             "H340": 0,   #Non ha cut-off
             "H341": 0,   #Non ha cut-off
+            # HP12 non ha valore di cut-off
+            "HP12": 0,
+            "EUH029": 0,
+            "EUH031": 0,
+            "EUH032": 0,
             # HP13 - Sensibilizzante
             "H317": 0.0,   # Non ha cut-off
             "H334": 0.0,   # Non ha cut-off
@@ -269,6 +281,11 @@ class DatabaseSostanze:
             # HP11 - Mutageno
             "H340": 0.1,   # Muta. 1A/1B limite 0.1%
             "H341": 1.0,   # Muta. 2 limite 1.0%
+
+            # Valori limite per HP12
+            "EUH029": 0.1,  # A contatto con l'acqua libera un gas tossico
+            "EUH031": 0.1,  # A contatto con acidi libera un gas tossico
+            "EUH032": 0.1,  # A contatto con acidi libera un gas molto tossico
 
             # HP13 - Sensibilizzante
             "H317": 10.0,   # Skin Sens. 1 limite 10%
@@ -464,7 +481,115 @@ class DatabaseSostanze:
             list: Lista di dizionari con frasi H e hazard class associate alla sostanza
         """
         return self.sostanze_frasi_h_con_class.get(nome_sostanza, [])
+    
+    def carica_frasi_euh(self):
+        """
+        Carica i dati delle frasi EUH dalla tabella EUH con JOIN sulla tabella sostanze
+        per ottenere i nomi delle sostanze tramite il codice CAS
+        
+        Returns:
+            bool: True se il caricamento ha avuto successo, False altrimenti
+        """
+        if not self.conn:
+            print("Errore: Nessuna connessione al database attiva.")
+            return False
+        
+        try:
+            cursor = self.conn.cursor()
+            
+            # Verifica che le tabelle necessarie esistano
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='EUH'")
+            if not cursor.fetchone():
+                print("ERRORE CRITICO: La tabella 'EUH' non esiste nel database!")
+                return False
+                
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='sostanze'")
+            if not cursor.fetchone():
+                print("ERRORE CRITICO: La tabella 'sostanze' non esiste nel database!")
+                return False
+            
+            # Query per effettuare il JOIN tra la tabella EUH e la tabella sostanze usando il CAS
+            query = """
+                SELECT s.Nome, e.EUH
+                FROM "EUH" e
+                JOIN "sostanze" s ON e."CAS (EK)" = s.CAS
+            """
+            
+            try:
+                cursor.execute(query)
+            except sqlite3.OperationalError as e:
+                print(f"Errore nella query SQL per la tabella EUH: {e}")
+                # Verifica le colonne disponibili nelle tabelle
+                try:
+                    cursor.execute('PRAGMA table_info("EUH")')
+                    euh_columns = [col[1] for col in cursor.fetchall()]
+                    print(f"Colonne nella tabella 'EUH': {euh_columns}")
+                    
+                    cursor.execute('PRAGMA table_info("sostanze")')
+                    sostanze_columns = [col[1] for col in cursor.fetchall()]
+                    print(f"Colonne nella tabella 'sostanze': {sostanze_columns}")
+                except sqlite3.OperationalError as e2:
+                    print(f"Errore nel verificare le colonne delle tabelle: {e2}")
+                return False
+            
+            # Costruisci i dizionari di sostanze e frasi EUH
+            for row in cursor.fetchall():
+                nome_sostanza = row[0]
+                frase_euh = row[1]
+                
+                # Inizializza liste vuote per questa sostanza se non esistono già
+                if nome_sostanza not in self.sostanze_frasi_euh:
+                    self.sostanze_frasi_euh[nome_sostanza] = []
+                
+                if nome_sostanza not in self.sostanze_frasi_euh_con_class:
+                    self.sostanze_frasi_euh_con_class[nome_sostanza] = []
+                
+                # Pulisci la frase EUH da eventuali asterischi e spazi
+                frase_euh_clean = re.sub(r'\s*\*+\s*', '', str(frase_euh))
+                
+                # Aggiungi la frase EUH solo se valida e non già presente
+                if frase_euh_clean and frase_euh_clean not in self.sostanze_frasi_euh[nome_sostanza]:
+                    self.sostanze_frasi_euh[nome_sostanza].append(frase_euh_clean)
+                    
+                    # Aggiungi anche al dizionario con hazard class (con hazard_class = None)
+                    self.sostanze_frasi_euh_con_class[nome_sostanza].append({
+                        "frase_euh": frase_euh_clean,
+                        "hazard_class": None
+                    })
+            
+            print(f"Frasi EUH caricate: {sum(len(frasi) for frasi in self.sostanze_frasi_euh.values())} frasi per {len(self.sostanze_frasi_euh)} sostanze")
+            
+            return True
+            
+        except sqlite3.Error as e:
+            print(f"Errore nel caricamento delle frasi EUH dal database: {e}")
+            return False
+        finally:
+            cursor.close()
 
+    def get_frasi_euh(self, nome_sostanza):
+        """
+        Ottiene le frasi EUH associate a una sostanza
+        
+        Args:
+            nome_sostanza (str): Nome della sostanza
+            
+        Returns:
+            list: Lista delle frasi EUH associate alla sostanza
+        """
+        return self.sostanze_frasi_euh.get(nome_sostanza, [])
+
+    def get_frasi_euh_con_class(self, nome_sostanza):
+        """
+        Ottiene le frasi EUH con le loro hazard class associate a una sostanza
+        
+        Args:
+            nome_sostanza (str): Nome della sostanza
+                
+        Returns:
+            list: Lista di dizionari con frasi EUH e hazard class associate alla sostanza
+        """
+        return self.sostanze_frasi_euh_con_class.get(nome_sostanza, [])
 
 
 
@@ -639,7 +764,7 @@ class ClassificatoreRifiuti:
                 hp_assegnate.add("HP8")
                 motivazioni_hp["HP8"] = hp8_ph["motivo"]
             
-            # STEP 2: Processa ogni sostanza nel campione
+            # STEP 2.1: PROCESSARE FRASI H E HAZARD CLASS
             for nome_sostanza, dati in campione_dati.items():
                 # Estrai i dati della sostanza
                 concentrazione_ppm = dati["concentrazione_ppm"]
@@ -647,9 +772,15 @@ class ClassificatoreRifiuti:
                 
                 # Cerca la sostanza nel database per ottenere le frasi H associate con le hazard class
                 frasi_h_con_class = self.database.get_frasi_h_con_class(nome_sostanza)
+
+                # AGGIUNTO: Cerca anche le frasi EUH associate (se esistono per questa sostanza)
+                frasi_euh_con_class = self.database.get_frasi_euh_con_class(nome_sostanza)
                 
                 # Estrai solo le frasi H per retrocompatibilità
                 frasi_h_associate = [info["frase_h"] for info in frasi_h_con_class]
+
+                # AGGIUNTO: Estrai solo le frasi EUH
+                frasi_euh_associate = [info["frase_euh"] for info in frasi_euh_con_class]
                 
                 # Se la sostanza non è trovata, avvisa ma continua
                 if not frasi_h_associate:
@@ -659,7 +790,8 @@ class ClassificatoreRifiuti:
                 campione[nome_sostanza] = {
                     "concentrazione_ppm": concentrazione_ppm,
                     "concentrazione_percentuale": concentrazione_percentuale,
-                    "frasi_h": frasi_h_associate
+                    "frasi_h": frasi_h_associate,
+                    "frasi_euh": frasi_euh_associate  # AGGIUNTO: Memorizza anche le frasi EUH
                 }
                 
                 # Inizializza un insieme per tenere traccia delle caratteristiche di pericolo della sostanza
@@ -911,6 +1043,25 @@ class ClassificatoreRifiuti:
                                         motivazioni_hp["HP3"] = f"{motivazioni_hp['HP3']}; {hp3_sommatoria['motivo']}"
                                     else:
                                         motivazioni_hp["HP3"] = hp3_sommatoria["motivo"]
+
+                # STEP 2.2 PROCESSARE EUH
+                # AGGIUNTO: Processa anche le frasi EUH (solo se la sostanza ne ha)
+                for frase_info in frasi_euh_con_class:
+                    frase_euh_clean = frase_info["frase_euh"]
+                    hazard_class = frase_info["hazard_class"]  
+
+                    # Inizializza la sommatoria per questa frase se non esiste già
+                    if frase_euh_clean not in sommatoria_per_frase:
+                        sommatoria_per_frase[frase_euh_clean] = 0
+
+                    # Per HP12, le frasi EUH non hanno cut-off
+                    if frase_euh_clean in self.database.hp_mapping["HP12"]:
+                        # Aggiungi alla sommatoria senza considerare il cut-off
+                        sommatoria_per_frase[frase_euh_clean] += concentrazione_percentuale
+                        
+                        # Verifica se la frase supera il limite per HP12
+                        if concentrazione_percentuale >= self.database.valori_limite.get(frase_euh_clean, 0.1):
+                            hp_sostanza.add("HP12")
             
             # STEP 4: Verifica le sommatorie per HP8
             hp8_sommatoria = self._verifica_hp8_sommatoria(sommatoria_per_frase)
@@ -993,6 +1144,12 @@ class ClassificatoreRifiuti:
             if hp13_individuale["assegnata"]:
                 hp_assegnate.add("HP13")
                 motivazioni_hp["HP13"] = hp13_individuale["motivo"]
+
+            # STEP 14: Verifica le sommatorie per HP12
+            hp12_sommatoria = self._verifica_hp12_sommatoria(sommatoria_per_frase)
+            if hp12_sommatoria["assegnata"]:
+                hp_assegnate.add("HP12")
+                motivazioni_hp["HP12"] = hp12_sommatoria["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -1796,6 +1953,43 @@ class ClassificatoreRifiuti:
             print(f"HP2 assegnata: {risultato['motivo']}")
         
         return risultato
+    
+    def _verifica_hp12_sommatoria(self, sommatoria_per_frase):
+        """
+        Verifica i criteri di HP12 basati sulle sommatorie delle frasi EUH
+        L'HP12 non ha valori di cut-off, quindi tutte le concentrazioni sono considerate.
+        
+        Args:
+            sommatoria_per_frase (dict): Sommatoria delle concentrazioni per ciascuna frase EUH
+            
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Lista di frasi EUH rilevanti per HP12
+        frasi_hp12 = self.database.hp_mapping["HP12"]
+        
+        # Verifica se qualsiasi frase EUH di HP12 ha una sommatoria sopra il limite
+        frasi_sopra_limite = []
+        for frase_euh in frasi_hp12:
+            if frase_euh in sommatoria_per_frase:
+                sommatoria = sommatoria_per_frase[frase_euh]
+                limite = self.database.valori_limite.get(frase_euh, 0.1)
+                
+                if sommatoria >= limite:
+                    frasi_sopra_limite.append(f"{frase_euh} ({sommatoria:.4f}% >= {limite}%)")
+        
+        # Se almeno una frase è sopra il limite, assegna HP12
+        if frasi_sopra_limite:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP12 assegnata per: {'; '.join(frasi_sopra_limite)}"
+            print(f"HP12 assegnata: {risultato['motivo']}")
+        
+        return risultato
 
 
 
@@ -1883,6 +2077,7 @@ def main():
                 "message": "Impossibile connettersi al database"
             })
 
+        # Carica frasi H
         success_loading = database.carica_frasi_h()
         if not success_loading:
             return json.dumps({
@@ -1890,6 +2085,14 @@ def main():
                 "message": "Impossibile caricare i dati dal database"
             })
         
+        # AGGIUNTO: Carica frasi EUH
+        success_loading_euh = database.carica_frasi_euh()
+        if not success_loading_euh:
+            return json.dumps({
+                "success": False, 
+                "message": "Impossibile caricare le frasi EUH dal database. Le tabelle 'EUH' e 'sostanze' sono necessarie per la classificazione."
+            })
+
         # Inizializza il classificatore
         classificatore = ClassificatoreRifiuti(database)
         
