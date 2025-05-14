@@ -512,7 +512,7 @@ class DatabaseSostanze:
             query = """
                 SELECT s.Nome, e.EUH
                 FROM "EUH" e
-                JOIN "sostanze" s ON e."CAS (EK)" = s.CAS
+                JOIN "sostanze" s ON e.CAS_EK = s.CAS
             """
             
             try:
