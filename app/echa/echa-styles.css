@@ -481,3 +481,42 @@
 .echa-table tbody tr:last-child {
     animation: fadeInRow 0.3s ease-out;
 }
+
+
+/* AGGIORNAMENTO ECHA */
+/* Button group for update and delete buttons */
+.button-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.echa-search {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.search-wrapper {
+    position: relative;
+    width: 60%;
+}
+
+/* Update ECHA button style */
+#updateEchaBtn {
+    padding: 0.75rem 1.25rem;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#updateEchaBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.2);
+}

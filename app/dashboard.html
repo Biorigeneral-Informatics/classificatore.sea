@@ -214,15 +214,41 @@
             <i class="fas fa-exclamation-triangle"></i>
             <span>Frasi H - Sostanze</span>
         </div>
+        <!-- Nuova tab per Frasi EUH -->
+        <div class="tab-item" data-tab="frasi-euh-sostanze">
+            <i class="fas fa-exclamation"></i>
+            <span>Frasi EUH - Sostanze</span>
+        </div>
     </div>
 
-    <!-- Sottosezione Aggiornamenti -->
-    <div id="aggiornamenti" class="subsection active">
-        <div class="data-table">
-            <h3>Tabella Confronto</h3>
-            <p class="subsection-description">Confronto visivo delle sostanze presenti sia nel file ECHA che nel database.</p>
-            
-            <table class="riscontro-table" id="confrontoTable">
+ <!-- Sottosezione Aggiornamenti -->
+<div id="aggiornamenti" class="subsection active">
+    <div class="data-table">
+        <h3>Tabella Confronto</h3>
+        <p class="subsection-description">Confronto visivo delle sostanze presenti sia nel file ECHA che nel database.</p>
+        
+        <!-- Punto inserimento riepilogo confronto ECHA -->
+        <div id="echa-comparison-summary" style="display: none;"></div>
+        
+        <table class="riscontro-table" id="confrontoTable">
+            <thead>
+                <tr>
+                    <th>Sostanza</th>
+                    <th>CAS</th>
+                    <th>Frase H Originale</th>
+                    <th>Frase H Nuova</th>
+                    <th>Stato</th>
+                    <th>Azioni</th>
+                </tr>
+            </thead>
+            <tbody id="confrontoTableBody">
+                <!-- Dati caricati dinamicamente -->
+            </tbody>
+        </table>
+        
+        <div class="mt-4" id="modificatiContainer" style="display: none;">
+            <h3>Sostanze Modificate</h3>
+            <table class="riscontro-table" id="modificatiTable">
                 <thead>
                     <tr>
                         <th>Sostanza</th>
@@ -231,40 +257,21 @@
                         <th>Hazard Class</th>
                         <th>Output - Frase H</th>
                         <th>Output - Haz. Class</th>
-                        <th>Azioni</th>
                     </tr>
                 </thead>
-                <tbody id="confrontoTableBody">
-                    <!-- Dati caricati dinamicamente -->
+                <tbody id="modificatiTableBody">
+                    <!-- Sostanze modificate caricate dinamicamente -->
                 </tbody>
             </table>
             
-            <div class="mt-4" id="modificatiContainer" style="display: none;">
-                <h3>Sostanze Modificate</h3>
-                <table class="riscontro-table" id="modificatiTable">
-                    <thead>
-                        <tr>
-                            <th>Sostanza</th>
-                            <th>Nome</th>
-                            <th>Frase H</th>
-                            <th>Hazard Class</th>
-                            <th>Output - Frase H</th>
-                            <th>Output - Haz. Class</th>
-                        </tr>
-                    </thead>
-                    <tbody id="modificatiTableBody">
-                        <!-- Sostanze modificate caricate dinamicamente -->
-                    </tbody>
-                </table>
-                
-                <div class="mt-4 text-right">
-                    <button id="completaModificheBtn" class="btn btn-primary">
-                        <i class="fas fa-check"></i> Completa Modifiche
-                    </button>
-                </div>
+            <div class="mt-4 text-right">
+                <button id="completaModificheBtn" class="btn btn-primary">
+                    <i class="fas fa-check"></i> Completa Modifiche
+                </button>
             </div>
         </div>
     </div>
+</div>
 
    <!-- Sottosezione Inserimenti rivista -->
 <div id="inserimenti" class="subsection">
@@ -475,8 +482,11 @@
             </tbody>
         </table>
     </div>
-    <div class="data-table mt-4">
-        <h3>Frasi EUH</h3>
+</div>
+ <!-- Nuova sottosezione per Frasi EUH -->
+<div id="frasi-euh-sostanze" class="subsection">
+    <div class="data-table">
+        <h3>Frasi EUH - Sostanze</h3>
         <div class="table-actions">
             <div class="search-wrapper">
                 <i class="fas fa-search search-icon"></i>
@@ -498,6 +508,7 @@
             </tbody>
         </table>
     </div>
+</div>
 
 
 </div>
@@ -730,16 +741,16 @@
             </div>
             
             <!-- Messaggio di informazione su come ottenere i risultati -->
-            <div class="info-box" style="background-color: #f0f7ff; border-left: 4px solid #2196f3; padding: 1rem; margin-top: 2rem;">
-                <h3 style="margin-top: 0;"><i class="fas fa-info-circle"></i> Come funziona la classificazione</h3>
-                <p>Quando avvii la classificazione, il sistema:</p>
-                <ol>
-                    <li>Analizza i dati del campione e le sostanze con le relative frasi H</li>
-                    <li>Applica i valori di cut-off e limite per ogni caratteristica di pericolo (HP)</li>
-                    <li>Genera automaticamente un report nella sezione Reports</li>
-                </ol>
-                <p>Una volta completata la classificazione, usa il pulsante "Vai a Reports" per visualizzare e gestire i risultati.</p>
-            </div>
+        <div class="info-box">
+            <h3><i class="fas fa-info-circle"></i> Come funziona la classificazione</h3>
+            <p>Quando avvii la classificazione, il sistema:</p>
+            <ol>
+                <li>Analizza i dati del campione e le sostanze con le relative frasi H</li>
+                <li>Applica i valori di cut-off e limite per ogni caratteristica di pericolo (HP)</li>
+                <li>Genera automaticamente un report nella sezione Reports</li>
+            </ol>
+            <p>Una volta completata la classificazione, usa il pulsante "Vai a Reports" per visualizzare e gestire i risultati.</p>
+        </div>
         </section>
     </main>
 

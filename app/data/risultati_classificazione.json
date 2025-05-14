@@ -42,8 +42,12 @@
     "H317": 0,
     "H413": 0
   },
-  "caratteristiche_pericolo": [],
-  "motivazioni_hp": {},
+  "caratteristiche_pericolo": [
+    "HP8"
+  ],
+  "motivazioni_hp": {
+    "HP8": "pH ≤ 2.0 (valore rilevato: 2.0)"
+  },
   "valori_limite": {
     "H200": 0.1,
     "H201": 0.1,
@@ -110,6 +114,6 @@
     "HP8": 1.0
   },
   "stato_fisico": "Liquido",
-  "punto_infiammabilita": 70.0,
-  "contiene_gasolio": false
+  "punto_infiammabilita": 40.0,
+  "contiene_gasolio": true
 }
