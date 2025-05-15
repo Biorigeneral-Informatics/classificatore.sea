@@ -863,43 +863,46 @@
 
 
 <!-- Sezione Reports -->
-<section id="report" class="section" style="margin:0;padding:0;max-width:100%;">
+<section id="report" class="section">
     <h2>Report Generati</h2>
     
-    <div style="width:100%;max-width:100%;margin:0;padding:0;">
-        <div class="report-section-header" style="width:100%;margin:0;padding:0;">
+    <div class="report-section-header">
+        <div class="report-section-info">
             <p>Visualizza e gestisci i report di classificazione generati dall'applicazione.</p>
-            
-            <div class="report-filters">
+        </div>
+        
+        <div class="report-filters">
+            <div class="search-wrapper">
+                <i class="fas fa-search search-icon"></i>
                 <input type="text" id="reportSearchInput" placeholder="Cerca report..." class="search-input">
-                <select id="reportFormatFilter" class="form-control">
-                    <option value="all">Tutti i formati</option>
-                    <option value="xlsx">Excel</option>
-                    <option value="pdf">PDF</option>
-                    <option value="docx">Word</option>
-                    <option value="json">JSON</option>
-                </select>
             </div>
+            <select id="reportFormatFilter" class="form-control">
+                <option value="all">Tutti i formati</option>
+                <option value="xlsx">Excel</option>
+                <option value="pdf">PDF</option>
+                <option value="docx">Word</option>
+                <option value="json">JSON</option>
+            </select>
         </div>
-        
-        <div class="reports-container" style="width:100%;margin:0;padding:0;">
-            <!-- Qui verranno caricati i report dinamicamente -->
-        </div>
-        
-        <div class="no-reports-message" style="display:none;text-align:center;padding:2rem;">
-            <i class="fas fa-folder-open" style="font-size:2rem;margin-bottom:1rem;"></i>
-            <p>Nessun Report Disponibile</p>
-            <p>I report generati appariranno qui.</p>
-        </div>
-        
-        <div class="text-center mt-4">
-            <button id="openReportsFolderBtn" class="btn btn-primary">
-                <i class="fas fa-folder-open"></i> Apri Cartella Reports
-            </button>
-            <button id="createDemoReportBtn" class="btn btn-primary">
-                <i class="fas fa-plus"></i> Crea Report Demo
-            </button>
-        </div>
+    </div>
+    
+    <div class="reports-container">
+        <!-- Qui verranno caricati i report dinamicamente -->
+    </div>
+    
+    <div class="no-reports-message" style="display:none;">
+        <i class="fas fa-folder-open"></i>
+        <p>Nessun Report Disponibile</p>
+        <p>I report generati appariranno qui.</p>
+    </div>
+    
+    <div class="reports-actions">
+        <button id="openReportsFolderBtn" class="btn btn-primary">
+            <i class="fas fa-folder-open"></i> Apri Cartella Reports
+        </button>
+        <button id="createDemoReportBtn" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Crea Report Demo
+        </button>
     </div>
 </section>
 

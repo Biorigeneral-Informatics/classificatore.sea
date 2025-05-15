@@ -1448,7 +1448,7 @@ function showCustomAlert(message, onConfirm, onCancel) {
 // Funzioni per la sezione Reports
 
 // Carica e visualizza i report disponibili
-async function loadReports() {
+function loadReports() {
     try {
         console.log("Inizio caricamento reports");
         
@@ -1462,132 +1462,156 @@ async function loadReports() {
         }
         
         // Svuota il container prima di riempirlo
-        reportsContainer.innerHTML = '<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i><p>Caricamento in corso...</p></div>';
+        reportsContainer.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i><p>Caricamento in corso...</p></div>';
         
         // Carica la lista dei report
-        console.log("Richiesta lista report");
-        const reportsList = await window.electronAPI.getReportsList();
-        console.log("Report ricevuti:", reportsList);
-        
-        // Aggiorna conteggio
-        if (document.getElementById('reportsCount')) {
-            document.getElementById('reportsCount').textContent = reportsList.length || 0;
-        }
-        
-        // Verifica se ci sono report
-        if (!reportsList || reportsList.length === 0) {
-            console.log("Nessun report trovato");
-            if (noReportsMessage) {
-                noReportsMessage.style.display = 'block';
-            }
-            reportsContainer.innerHTML = '';
-            return;
-        }
-        
-        // Nascondi messaggio "nessun report"
-        if (noReportsMessage) {
-            noReportsMessage.style.display = 'none';
-        }
-        
-        // Crea HTML per ogni report
-        let html = '';
-        
-        reportsList.forEach(report => {
-            console.log("Elaborazione report:", report);
-            const reportName = report.replace('.json', '');
+        window.electronAPI.getReportsList().then(reportsList => {
+            console.log("Report ricevuti:", reportsList);
             
-            html += `
-                <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}">
-                    <div class="report-icon">
-                        <i class="fas fa-file-alt"></i>
-                    </div>
-                    <div class="report-info">
-                        <h4>${reportName}</h4>
-                        <p>Tipo: JSON</p>
-                        <div class="report-actions">
-                            <button class="action-btn" onclick="previewReport('${report}')" title="Anteprima">
-                                <i class="fas fa-eye"></i>
-                                <span>Anteprima</span>
-                            </button>
-                            <button class="action-btn" onclick="exportReport('${report}', 'excel')" title="Esporta Excel">
-                                <i class="fas fa-file-excel"></i>
-                                <span>Excel</span>
-                            </button>
-                            <button class="action-btn" onclick="exportReport('${report}', 'pdf')" title="Esporta PDF">
-                                <i class="fas fa-file-pdf"></i>
-                                <span>PDF</span>
-                            </button>
-                            <button class="action-btn delete-btn" onclick="deleteReport('${report}')" title="Elimina">
-                                <i class="fas fa-trash"></i>
-                                <span>Elimina</span>
-                            </button>
+            // Aggiorna conteggio
+            if (document.getElementById('reportsCount')) {
+                document.getElementById('reportsCount').textContent = reportsList.length || 0;
+            }
+            
+            // Verifica se ci sono report
+            if (!reportsList || reportsList.length === 0) {
+                console.log("Nessun report trovato");
+                if (noReportsMessage) {
+                    noReportsMessage.style.display = 'flex';
+                }
+                reportsContainer.innerHTML = '';
+                return;
+            }
+            
+            // Nascondi messaggio "nessun report"
+            if (noReportsMessage) {
+                noReportsMessage.style.display = 'none';
+            }
+            
+            // Crea HTML per ogni report
+            let html = '';
+            
+            // Ordina dal più recente
+            reportsList.sort().reverse().forEach(report => {
+                const reportName = report.replace('.json', '');
+                const date = new Date().toLocaleString('it-IT');
+                
+                html += `
+                    <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}">
+                        <div class="report-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="report-info">
+                            <h4>${reportName}</h4>
+                            <p>Generato il: ${date}</p>
+                            <p>Tipo: JSON</p>
+                            <div class="report-actions">
+                                <button class="action-btn" onclick="previewReport('${report}')" title="Anteprima">
+                                    <i class="fas fa-eye"></i>
+                                    <span>Anteprima</span>
+                                </button>
+                                <button class="action-btn" onclick="exportReport('${report}', 'excel')" title="Esporta Excel">
+                                    <i class="fas fa-file-excel"></i>
+                                    <span>Excel</span>
+                                </button>
+                                <button class="action-btn" onclick="exportReport('${report}', 'pdf')" title="Esporta PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                    <span>PDF</span>
+                                </button>
+                                <button class="action-btn delete-btn" onclick="deleteReport('${report}')" title="Elimina">
+                                    <i class="fas fa-trash"></i>
+                                    <span>Elimina</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
-        });
-        
-        // Aggiorna il container con i dati
-        reportsContainer.innerHTML = html;
-        
-        // Log di completamento
-        console.log("Reports caricati:", reportsList.length);
-        showNotification(`Caricati ${reportsList.length} report`);
-        
-    } catch (error) {
-        console.error('Errore dettagliato nel caricamento dei report:', error);
-        
-        // Mostra messaggio di errore nel container
-        if (document.querySelector('.reports-container')) {
-            document.querySelector('.reports-container').innerHTML = `
+                `;
+            });
+            
+            // Aggiorna il container con i dati
+            reportsContainer.innerHTML = html;
+            
+            // Inizializza i filtri
+            setupReportFilters();
+            
+            // Log di completamento
+            console.log("Reports caricati:", reportsList.length);
+            showNotification(`Caricati ${reportsList.length} report`);
+            
+        }).catch(error => {
+            console.error('Errore nel caricamento dei report:', error);
+            reportsContainer.innerHTML = `
                 <div style="text-align:center;padding:2rem;color:red;">
                     <i class="fas fa-exclamation-triangle" style="font-size:2rem;margin-bottom:1rem;"></i>
                     <p>Errore nel caricamento dei report: ${error.message}</p>
                     <p>Controlla la console per maggiori dettagli.</p>
                 </div>
             `;
-        }
+            showNotification('Errore nel caricamento dei report: ' + error.message, 'error');
+        });
         
+    } catch (error) {
+        console.error('Errore dettagliato nel caricamento dei report:', error);
         showNotification('Errore nel caricamento dei report: ' + error.message, 'error');
     }
 }
 
-// Configura filtri e ricerca per i report
+// Funzione per inizializzare i filtri e la ricerca dei report
 function setupReportFilters() {
     const searchInput = document.getElementById('reportSearchInput');
     const formatFilter = document.getElementById('reportFormatFilter');
     
-    if (!searchInput || !formatFilter) return;
+    if (!searchInput || !formatFilter) {
+        console.error("Elementi per il filtro dei report non trovati");
+        return;
+    }
     
     // Funzione per applicare i filtri
     const applyFilters = () => {
-        const searchTerm = searchInput.value.toLowerCase();
+        const searchTerm = searchInput.value.toLowerCase().trim();
         const formatValue = formatFilter.value;
         
+        let visibleCount = 0;
+        
         document.querySelectorAll('.report-card').forEach(card => {
-            const reportName = card.getAttribute('data-name');
-            const reportType = card.getAttribute('data-type');
+            const reportName = card.getAttribute('data-name') || card.querySelector('h4')?.textContent.toLowerCase() || '';
+            const reportType = card.getAttribute('data-type') || '';
             
-            const matchesSearch = reportName.includes(searchTerm);
+            const matchesSearch = searchTerm === '' || reportName.includes(searchTerm);
             const matchesFormat = formatValue === 'all' || reportType === formatValue;
             
-            card.style.display = matchesSearch && matchesFormat ? 'flex' : 'none';
+            if (matchesSearch && matchesFormat) {
+                card.style.display = 'flex';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
         });
         
         // Mostra messaggio se non ci sono risultati
-        const visibleCards = document.querySelectorAll('.report-card[style="display: flex"]').length;
         const noResultsMessage = document.querySelector('.no-reports-message');
         
         if (noResultsMessage) {
-            if (visibleCards === 0) {
-                noResultsMessage.style.display = 'block';
-                noResultsMessage.innerHTML = `
-                    <i class="fas fa-search"></i>
-                    <p>Nessun report corrisponde ai criteri di ricerca</p>
-                    <button class="btn btn-primary" onclick="resetReportFilters()">
-                        Azzera filtri
-                    </button>
-                `;
+            if (visibleCount === 0) {
+                if (document.querySelectorAll('.report-card').length > 0) {
+                    // Ci sono report ma nessuno corrisponde ai filtri
+                    noResultsMessage.style.display = 'flex';
+                    noResultsMessage.innerHTML = `
+                        <i class="fas fa-search"></i>
+                        <p>Nessun report corrisponde ai criteri di ricerca</p>
+                        <button class="btn btn-primary" onclick="resetReportFilters()">
+                            Azzera filtri
+                        </button>
+                    `;
+                } else {
+                    // Non ci sono proprio report
+                    noResultsMessage.style.display = 'flex';
+                    noResultsMessage.innerHTML = `
+                        <i class="fas fa-folder-open"></i>
+                        <p>Nessun Report Disponibile</p>
+                        <p>I report generati appariranno qui.</p>
+                    `;
+                }
             } else {
                 noResultsMessage.style.display = 'none';
             }
@@ -1598,13 +1622,26 @@ function setupReportFilters() {
     searchInput.addEventListener('input', applyFilters);
     formatFilter.addEventListener('change', applyFilters);
     
-    // Esporta la funzione di reset globalmente
+    // Funzione per resettare i filtri
     window.resetReportFilters = function() {
         if (searchInput) searchInput.value = '';
         if (formatFilter) formatFilter.value = 'all';
         applyFilters();
     };
+    
+    // Applica i filtri all'inizio per gestire l'URL con parametri
+    applyFilters();
 }
+
+window.resetReportFilters = function() {
+    if (document.getElementById('reportSearchInput')) {
+        document.getElementById('reportSearchInput').value = '';
+    }
+    if (document.getElementById('reportFormatFilter')) {
+        document.getElementById('reportFormatFilter').value = 'all';
+    }
+    filterReports('', 'all');
+};
 
 // Funzione per aprire un report
 async function openReport(reportPath) {
@@ -1817,7 +1854,7 @@ async function deleteReport(reportName) {
     }
 }
 
-// Modifica la funzione initEventListeners per aggiungere il caricamento dei report
+// Estendi la funzione initEventListenersReports per includere i nuovi listeners
 function initEventListenersReports() {
     // Event listener per il cambio di sezione
     document.querySelectorAll('.nav-links a').forEach(link => {
@@ -1827,22 +1864,74 @@ function initEventListenersReports() {
                 // Carica i report quando si naviga alla sezione
                 setTimeout(() => {
                     loadReports();
+                    setupReportFilters();
                 }, 100);
             }
         });
     });
     
     // Per il caricamento dei report all'avvio della pagina se siamo già nella sezione reports
-    // (ad esempio dopo un refresh o in caso di deep linking)
     if (window.location.hash === '#report') {
         setTimeout(() => {
             loadReports();
+            setupReportFilters();
         }, 100);
+    }
+    
+    // Aggiungi gli event listeners specifici per la ricerca e il filtro
+    if (document.getElementById('reportSearchInput')) {
+        document.getElementById('reportSearchInput').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            filterReports(searchTerm, document.getElementById('reportFormatFilter').value);
+        });
+    }
+    
+    if (document.getElementById('reportFormatFilter')) {
+        document.getElementById('reportFormatFilter').addEventListener('change', function() {
+            const formatValue = this.value;
+            filterReports(document.getElementById('reportSearchInput').value.toLowerCase(), formatValue);
+        });
     }
 }
 
-// Chiamare questa funzione nel documento onload o in initEventListeners
-// initEventListenersReports();
+// Funzione per filtrare i report
+function filterReports(searchTerm, formatValue) {
+    let visibleCount = 0;
+    
+    document.querySelectorAll('.report-card').forEach(card => {
+        const reportName = card.getAttribute('data-name') || card.querySelector('h4')?.textContent.toLowerCase() || '';
+        const reportType = card.getAttribute('data-type') || '';
+        
+        const matchesSearch = searchTerm === '' || reportName.includes(searchTerm);
+        const matchesFormat = formatValue === 'all' || reportType === formatValue;
+        
+        if (matchesSearch && matchesFormat) {
+            card.style.display = 'flex';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Mostra messaggio se non ci sono risultati
+    const noReportsMessage = document.querySelector('.no-reports-message');
+    
+    if (noReportsMessage) {
+        if (visibleCount === 0) {
+            noReportsMessage.style.display = 'flex';
+            noReportsMessage.innerHTML = `
+                <i class="fas fa-search"></i>
+                <p>Nessun report corrisponde ai criteri di ricerca</p>
+                <button class="btn btn-primary" onclick="resetReportFilters()">
+                    Azzera filtri
+                </button>
+            `;
+        } else {
+            noReportsMessage.style.display = 'none';
+        }
+    }
+}
+
 
 // Aggiungi queste funzioni per la generazione di report di classificazione
 async function generateClassificationReport(classificationData = null) {
