@@ -1,0 +1,16 @@
+    Mancano le seguenti cose:
+
+
+            - (FATTO) Risolvere errori in fase di importazione dei file
+            - ( FATTO) Un controllo che verifichi se l'excel caricato è valido come struttura
+            - (FATTO) Creare un dizionario chiamato "metalli_campione{}" 
+            - (FATTO)Creare dinamicamente la sezione salimetalli in dashboard.html generando una
+            tabella con "metalli_campione{}".
+
+        Verifiche e cose da fare in CLASSIFICATORE tramite il pulsante sul front 
+            - Non c'è il bottone per avviare la classificazione nel front-end. 
+            - Verificare se effettivamente il fattore di conversione è stato moltiplicato nei metalli
+            - Verificare se la funzione per caricare i dati reali funziona
+            - Testare un classificazione (Lato Back)
+            - Creare un file word con una classificazione lato front nella sezione "REPORT"
+        

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECHA Database - WasteGuard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../styles/style.css">
+    <link rel="stylesheet" href="./echa-styles.css">
+    <script>
+        // Applica immediatamente il tema salvato
+        (function() {
+          const savedTheme = localStorage.getItem('theme');
+          if (savedTheme === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          }
+        })();
+      </script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-toggle" id="sidebarToggle">
+            <i class="fas fa-bars"></i>
+        </div>
+        <div class="logo">
+            <i class="fas fa-recycle"></i>
+            <span>WasteGuard</span> 
+        </div>
+        
+        <ul class="nav-links">
+            <li><a href="../dashboard.html"><i class="fas fa-home"></i> <span>Home</span></a></li>
+            <li><a href="#" class="active"><i class="fas fa-database"></i> <span>ECHA Database</span></a></li>
+            <li><a href="../dashboard.html#tabella-di-riscontro"><i class="fas fa-table"></i> <span>Tabella di Riscontro</span></a></li>
+            <li><a href="../dashboard.html#raccolta"><i class="fas fa-upload"></i> <span>Raccolta</span></a></li>
+            <li><a href="../dashboard.html#sali-metalli"><i class="fas fa-flask"></i> <span>Sali-Metalli</span></a></li>
+            <li><a href="../dashboard.html#classificazione"><i class="fas fa-tags"></i> <span>Classificazione</span></a></li>
+            <li><a href="../dashboard.html#report"><i class="fas fa-file-alt"></i> <span>Report</span></a></li>
+       </ul>
+       
+        <!-- Contenitore tema e crediti -->
+        <div class="theme-container">
+            <button id="themeToggle" class="theme-btn">
+                <i class="fas fa-sun"></i>
+            </button>
+            <div class="credits">
+                <p>Developed By</p>
+                <p>Biorigeneral Informatics</p>
+                <p class="version" id="appVersion">WasteGuard 1.0</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Bottone espansione (fuori dalla sidebar) -->
+    <div class="sidebar-expand" id="sidebarExpand">
+        <i class="fas fa-chevron-right"></i>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification">
+        <span id="notificationText">Notifica</span>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <section id="echa-main" class="section active">
+            <h2>Database ECHA</h2>
+            
+            <!-- Card Principale ECHA -->
+            <div class="echa-card">
+                <!-- Info file ECHA -->
+                <div class="file-info-header" id="echaFileInfo" style="display: none;">
+                    <p class="text-lg font-semibold" id="echaFileName">File: </p>
+                    <p class="text-sm text-gray-600" id="echaFileDate">Caricato il </p>
+                </div>
+                
+                <!-- Area di caricamento file (visibile solo se nessun file è caricato) -->
+                <div class="upload-area" id="echaDropZone">
+                    <i class="fas fa-file-excel"></i>
+                    <h3>Carica File Excel ECHA</h3>
+                    <p>Trascina qui il tuo file Excel o clicca per selezionarlo</p>
+                    <div class="file-progress">
+                        <div class="progress-bar"></div>
+                    </div>
+                </div>
+                
+                <!-- Wrapper per la search bar con icona (visibile solo quando un file è caricato) -->
+                <div class="echa-search" id="echaSearchContainer" style="display: none;">
+                    <div class="search-wrapper">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="echaSearchInput" placeholder="Cerca nella tabella..." oninput="searchEchaData(this.value)">
+                    </div>
+                    <button id="clearEchaDataBtn" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Elimina dati ECHA
+                    </button>
+                </div>
+                
+                <!-- Container per selettore tabelle (aggiunto dinamicamente) -->
+                <div id="echaTableSelectorContainer" style="display: none;"></div>
+                
+                <!-- Risultati visualizzazione database  -->
+                <div class="echa-results" id="echaResultsContainer" style="display: none;">
+                    <div class="echa-results-header">
+                        <h3>Risultati Database</h3>
+                        <span class="results-count" id="echaResultsCount">0 record</span>
+                    </div>
+                    <div id="echaSearchResults" class="echa-results-table-wrapper">
+                        <div class="no-data-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Nessun risultato disponibile.</p>
+                        </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Script per ECHA -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="./echa.js"></script>
+</body>
+</html>

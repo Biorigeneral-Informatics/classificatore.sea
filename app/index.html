@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - WasteGuard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="./styles/login-style.css">
+</head>
+<body>
+
+
+    <!-- Container principale -->
+    <div class="login-container">
+
+        <!-- Header Section -->
+        <div class="login-header">
+            <!-- Logo animato -->
+            <div class="logo">
+                <i class="fas fa-recycle"></i>
+            </div>
+            <!-- Informazioni applicazione -->
+            <h1 class="app-title">WasteGuard</h1>
+            <p class="app-description">Sistema di classificazione rifiuti</p>
+            <p class="developed-by">Developed by Biorigeneral Informatics</p>
+        </div>
+
+        <!-- Form Section -->
+        <div class="login-form">
+            <!-- Messaggi di feedback -->
+            <div class="error-message" id="errorMessage"></div>
+            <div class="success-message" id="successMessage"></div>
+
+            <!-- Campo password con indicatore di forza -->
+            <div class="form-group">
+                <label for="password">Password di sistema</label>
+                <input type="password" 
+                       id="password" 
+                       name="password" 
+                       placeholder="Inserisci la password" 
+                       required
+                       autocomplete="current-password">
+                <!-- Toggle visibilità password -->
+                <i class="fas fa-eye toggle-password" id="togglePassword"></i>
+                <!-- Indicatore forza password -->
+                <div class="password-strength">
+                    <div class="strength-meter" id="strengthMeter"></div>
+                </div>
+            </div>
+
+            <!-- Pulsante di login -->
+            <button class="btn" id="loginBtn">
+                Accedi al sistema
+            </button>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div class="loading" id="loading">
+            <i class="fas fa-circle-notch"></i>
+        </div>
+    </div>
+
+    <!-- Caricamento dello script separato -->
+    <script src="./scripts/login.js"></script>
+</body>
+</html>
