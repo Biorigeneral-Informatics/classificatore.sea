@@ -150,6 +150,9 @@ class DatabaseSostanze:
 
             # HP13 - Sensibilizzante respiratorio
             "HP13": ["H317", "H334"],
+
+            # HP15 - Potenziale sviluppo di caratteristiche di pericolo
+            "HP15": ["H205", "EUH001", "EUH019", "EUH044"],
             
             # Altre HP verranno aggiunte in seguito
         }
@@ -206,6 +209,12 @@ class DatabaseSostanze:
             # HP13 - Sensibilizzante
             "H317": 0.0,   # Non ha cut-off
             "H334": 0.0,   # Non ha cut-off
+            # HP15 - Potenziale sviluppo di caratteristiche di pericolo
+            "HP15": 0,    # Non ha cut-off
+            "H205": 0,    # Non ha cut-off
+            "EUH001": 0,  # Non ha cut-off
+            "EUH019": 0,  # Non ha cut-off
+            "EUH044": 0,  # Non ha cut-off
 
             # Altri valori soglia verranno aggiunti in seguito
         }
@@ -290,6 +299,12 @@ class DatabaseSostanze:
             # HP13 - Sensibilizzante
             "H317": 10.0,   # Skin Sens. 1 limite 10%
             "H334": 10.0,   # Resp. Sens. 1 limite 10%
+
+            # HP15 - Potenziale sviluppo di caratteristiche di pericolo
+            "H205": 0,    # Limite: presenza a qualsiasi livello
+            "EUH001": 0,  # Limite: presenza a qualsiasi livello
+            "EUH019": 0,  # Limite: presenza a qualsiasi livello
+            "EUH044": 0,  # Limite: presenza a qualsiasi livello
 
             # Altri valori limite verranno aggiunti in seguito
         }
@@ -512,7 +527,7 @@ class DatabaseSostanze:
             query = """
                 SELECT s.Nome, e.EUH
                 FROM "EUH" e
-                JOIN "sostanze" s ON e."CAS (EK)" = s.CAS
+                JOIN "sostanze" s ON e.CAS_EK = s.CAS
             """
             
             try:
@@ -825,14 +840,6 @@ class ClassificatoreRifiuti:
                         if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0):
                             hp_sostanza.add("HP2")
                     
-                    # Per HP3, le frasi H corrispondenti hanno tutte limite 0.1%
-                    if frase_h_clean in self.database.hp_mapping["HP3"]:
-                        # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
-                        sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
-                        
-                        # Verifica se la frase supera il limite per HP3
-                        if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0):
-                            hp_sostanza.add("HP3")
                     
                     # Per HP8, verifica H314 con cut-off 1%
                     if frase_h_clean in self.database.hp_mapping["HP8"]:
@@ -1150,6 +1157,12 @@ class ClassificatoreRifiuti:
             if hp12_sommatoria["assegnata"]:
                 hp_assegnate.add("HP12")
                 motivazioni_hp["HP12"] = hp12_sommatoria["motivo"]
+            
+            # STEP 15: Verifica HP15 (valutazione individuale, senza additività e senza cut-off)
+            hp15_individuale = self._verifica_hp15_individuale(campione)
+            if hp15_individuale["assegnata"]:
+                hp_assegnate.add("HP15")
+                motivazioni_hp["HP15"] = hp15_individuale["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -1988,6 +2001,50 @@ class ClassificatoreRifiuti:
             risultato["assegnata"] = True
             risultato["motivo"] = f"HP12 assegnata per: {'; '.join(frasi_sopra_limite)}"
             print(f"HP12 assegnata: {risultato['motivo']}")
+        
+        return risultato
+    
+    def _verifica_hp15_individuale(self, campione):
+        """
+        Verifica i criteri di HP15 (Rifiuto che può manifestare caratteristiche di pericolo successivamente)
+        basati sulle concentrazioni individuali delle sostanze.
+        HP15 scatta alla sola presenza di sostanze con frasi H205, EUH001, EUH019 o EUH044.
+        Non si applicano valori cut-off o limiti di concentrazione.
+        
+        Args:
+            campione (dict): Dizionario con i dati del campione processato
+                
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Per tenere traccia delle sostanze con frasi HP15
+        sostanze_hp15 = []
+        
+        # Verifica ogni sostanza nel campione
+        for nome_sostanza, info in campione.items():
+            frasi_h = info.get("frasi_h", [])
+            frasi_euh = info.get("frasi_euh", [])
+            
+            # Verifica se la sostanza ha frasi H relative a HP15
+            for frase_h in frasi_h:
+                if frase_h in self.database.hp_mapping["HP15"] and frase_h.startswith("H"):
+                    sostanze_hp15.append(f"Sostanza '{nome_sostanza}' con {frase_h}")
+            
+            # Verifica se la sostanza ha frasi EUH relative a HP15
+            for frase_euh in frasi_euh:
+                if frase_euh in self.database.hp_mapping["HP15"] and frase_euh.startswith("EUH"):
+                    sostanze_hp15.append(f"Sostanza '{nome_sostanza}' con {frase_euh}")
+        
+        # Se è stata trovata almeno una sostanza con frasi HP15, assegna HP15
+        if sostanze_hp15:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP15 assegnata per presenza di: {'; '.join(sostanze_hp15)}"
+            print(f"HP15 assegnata: {risultato['motivo']}")
         
         return risultato
 

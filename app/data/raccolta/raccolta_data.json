@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-05-08T18:50:13.236119",
+  "timestamp": "2025-05-16T12:10:58.265533",
   "filename": "temp_raccolta_data.json",
   "data": [
     {
@@ -47,8 +47,8 @@
       "Valore_Txt": "< 10"
     },
     {
-      "Descriz": "Cobalto e suoi composti  come Co",
-      "Valore_Txt": "450"
+      "Descriz": "test",
+      "Valore_Txt": "1"
     }
   ],
   "columns": [

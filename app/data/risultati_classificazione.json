@@ -8,18 +8,17 @@
         "H301",
         "H400",
         "H410"
-      ]
+      ],
+      "frasi_euh": []
     },
-    "Cobalto e suoi composti  come Co": {
-      "concentrazione_ppm": 990.0000000000001,
-      "concentrazione_percentuale": 0.099,
+    "test": {
+      "concentrazione_ppm": 1,
+      "concentrazione_percentuale": 0.0001,
       "frasi_h": [
-        "H350",
-        "H341",
-        "H360F",
-        "H334",
-        "H317",
-        "H413"
+        "H400"
+      ],
+      "frasi_euh": [
+        "EUH001"
       ]
     }
   },
@@ -28,25 +27,13 @@
     "H301": 0,
     "H400": 0,
     "H410": 0,
-    "H350": 0,
-    "Cobalto e suoi composti  come Co_H350_1B": {
-      "sostanza": "Cobalto e suoi composti  come Co",
-      "frase": "H350",
-      "categoria": "Carc. 1B",
-      "concentrazione": 0.099,
-      "limite": 0.1
-    },
-    "H341": 0,
-    "H360F": 0,
-    "H334": 0,
-    "H317": 0,
-    "H413": 0
+    "EUH001": 0
   },
   "caratteristiche_pericolo": [
-    "HP8"
+    "HP15"
   ],
   "motivazioni_hp": {
-    "HP8": "pH ≤ 2.0 (valore rilevato: 2.0)"
+    "HP15": "HP15 assegnata per presenza di: Sostanza 'test' con EUH001"
   },
   "valori_limite": {
     "H200": 0.1,
@@ -91,7 +78,20 @@
     "H330_2": 0.5,
     "H331": 3.5,
     "H332": 22.5,
-    "H314": 5.0
+    "H314": 5.0,
+    "H360": 0.3,
+    "H361": 3.0,
+    "H340": 0.1,
+    "H341": 1.0,
+    "EUH029": 0.1,
+    "EUH031": 0.1,
+    "EUH032": 0.1,
+    "H317": 10.0,
+    "H334": 10.0,
+    "H205": 0,
+    "EUH001": 0,
+    "EUH019": 0,
+    "EUH044": 0
   },
   "valori_cut_off": {
     "HP1": 0,
@@ -111,9 +111,24 @@
     "H350_1A": 0.1,
     "H350_1B": 0.1,
     "H351": 1.0,
-    "HP8": 1.0
+    "HP8": 1.0,
+    "H360": 0.0,
+    "H361": 0.0,
+    "H340": 0,
+    "H341": 0,
+    "HP12": 0,
+    "EUH029": 0,
+    "EUH031": 0,
+    "EUH032": 0,
+    "H317": 0.0,
+    "H334": 0.0,
+    "HP15": 0,
+    "H205": 0,
+    "EUH001": 0,
+    "EUH019": 0,
+    "EUH044": 0
   },
   "stato_fisico": "Liquido",
-  "punto_infiammabilita": 40.0,
-  "contiene_gasolio": true
+  "punto_infiammabilita": 70.0,
+  "contiene_gasolio": false
 }
