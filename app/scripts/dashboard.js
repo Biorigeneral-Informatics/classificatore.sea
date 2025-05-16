@@ -1448,7 +1448,7 @@ function showCustomAlert(message, onConfirm, onCancel) {
 // Funzioni per la sezione Reports
 
 // Carica e visualizza i report disponibili
-async function loadReports() {
+function loadReports() {
     try {
         console.log("Inizio caricamento reports");
         
@@ -1462,40 +1462,40 @@ async function loadReports() {
         }
         
         // Svuota il container prima di riempirlo
-        reportsContainer.innerHTML = '<div style="text-align:center;padding:2rem;"><i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i><p>Caricamento in corso...</p></div>';
+        reportsContainer.innerHTML = '<div class="loading-indicator"><i class="fas fa-spinner fa-spin"></i><p>Caricamento in corso...</p></div>';
         
         // Carica la lista dei report
-        console.log("Richiesta lista report");
-        const reportsList = await window.electronAPI.getReportsList();
-        console.log("Report ricevuti:", reportsList);
-        
-        // Aggiorna conteggio
-        if (document.getElementById('reportsCount')) {
-            document.getElementById('reportsCount').textContent = reportsList.length || 0;
-        }
-        
-        // Verifica se ci sono report
-        if (!reportsList || reportsList.length === 0) {
-            console.log("Nessun report trovato");
-            if (noReportsMessage) {
-                noReportsMessage.style.display = 'block';
-            }
-            reportsContainer.innerHTML = '';
-            return;
-        }
-        
-        // Nascondi messaggio "nessun report"
-        if (noReportsMessage) {
-            noReportsMessage.style.display = 'none';
-        }
-        
-        // Crea HTML per ogni report
-        let html = '';
-        
-        reportsList.forEach(report => {
-            console.log("Elaborazione report:", report);
-            const reportName = report.replace('.json', '');
+        window.electronAPI.getReportsList().then(reportsList => {
+            console.log("Report ricevuti:", reportsList);
             
+            // Aggiorna conteggio
+            if (document.getElementById('reportsCount')) {
+                document.getElementById('reportsCount').textContent = reportsList.length || 0;
+            }
+            
+            // Verifica se ci sono report
+            if (!reportsList || reportsList.length === 0) {
+                console.log("Nessun report trovato");
+                if (noReportsMessage) {
+                    noReportsMessage.style.display = 'flex';
+                }
+                reportsContainer.innerHTML = '';
+                return;
+            }
+            
+            // Nascondi messaggio "nessun report"
+            if (noReportsMessage) {
+                noReportsMessage.style.display = 'none';
+            }
+            
+            // Crea HTML per ogni report
+            let html = '';
+            
+            // Ordina dal più recente
+            reportsList.sort().reverse().forEach(report => {
+                const reportName = report.replace('.json', '');
+                const date = new Date().toLocaleString('it-IT');
+                
             html += `
                 <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}">
                     <div class="report-icon">
@@ -1503,6 +1503,7 @@ async function loadReports() {
                     </div>
                     <div class="report-info">
                         <h4>${reportName}</h4>
+                        <p>Generato il: ${date}</p>
                         <p>Tipo: JSON</p>
                         <div class="report-actions">
                             <button class="action-btn" onclick="previewReport('${report}')" title="Anteprima">
@@ -1517,6 +1518,10 @@ async function loadReports() {
                                 <i class="fas fa-file-pdf"></i>
                                 <span>PDF</span>
                             </button>
+                            <button class="action-btn" onclick="openNotes('${report}')" title="Note">
+                                <i class="fas fa-sticky-note"></i>
+                                <span>Note</span>
+                            </button>
                             <button class="action-btn delete-btn" onclick="deleteReport('${report}')" title="Elimina">
                                 <i class="fas fa-trash"></i>
                                 <span>Elimina</span>
@@ -1525,69 +1530,95 @@ async function loadReports() {
                     </div>
                 </div>
             `;
-        });
-        
-        // Aggiorna il container con i dati
-        reportsContainer.innerHTML = html;
-        
-        // Log di completamento
-        console.log("Reports caricati:", reportsList.length);
-        showNotification(`Caricati ${reportsList.length} report`);
-        
-    } catch (error) {
-        console.error('Errore dettagliato nel caricamento dei report:', error);
-        
-        // Mostra messaggio di errore nel container
-        if (document.querySelector('.reports-container')) {
-            document.querySelector('.reports-container').innerHTML = `
+            });
+            
+            // Aggiorna il container con i dati
+            reportsContainer.innerHTML = html;
+            
+            // Aggiorna gli indicatori delle note dopo aver caricato i report
+            updateNotesIndicators();
+
+            // Inizializza i filtri
+            setupReportFilters();
+            
+            // Log di completamento
+            console.log("Reports caricati:", reportsList.length);
+            showNotification(`Caricati ${reportsList.length} report`);
+            
+        }).catch(error => {
+            console.error('Errore nel caricamento dei report:', error);
+            reportsContainer.innerHTML = `
                 <div style="text-align:center;padding:2rem;color:red;">
                     <i class="fas fa-exclamation-triangle" style="font-size:2rem;margin-bottom:1rem;"></i>
                     <p>Errore nel caricamento dei report: ${error.message}</p>
                     <p>Controlla la console per maggiori dettagli.</p>
                 </div>
             `;
-        }
+            showNotification('Errore nel caricamento dei report: ' + error.message, 'error');
+        });
         
+    } catch (error) {
+        console.error('Errore dettagliato nel caricamento dei report:', error);
         showNotification('Errore nel caricamento dei report: ' + error.message, 'error');
     }
 }
 
-// Configura filtri e ricerca per i report
+// Funzione per inizializzare i filtri e la ricerca dei report
 function setupReportFilters() {
     const searchInput = document.getElementById('reportSearchInput');
     const formatFilter = document.getElementById('reportFormatFilter');
     
-    if (!searchInput || !formatFilter) return;
+    if (!searchInput || !formatFilter) {
+        console.error("Elementi per il filtro dei report non trovati");
+        return;
+    }
     
     // Funzione per applicare i filtri
     const applyFilters = () => {
-        const searchTerm = searchInput.value.toLowerCase();
+        const searchTerm = searchInput.value.toLowerCase().trim();
         const formatValue = formatFilter.value;
         
+        let visibleCount = 0;
+        
         document.querySelectorAll('.report-card').forEach(card => {
-            const reportName = card.getAttribute('data-name');
-            const reportType = card.getAttribute('data-type');
+            const reportName = card.getAttribute('data-name') || card.querySelector('h4')?.textContent.toLowerCase() || '';
+            const reportType = card.getAttribute('data-type') || '';
             
-            const matchesSearch = reportName.includes(searchTerm);
+            const matchesSearch = searchTerm === '' || reportName.includes(searchTerm);
             const matchesFormat = formatValue === 'all' || reportType === formatValue;
             
-            card.style.display = matchesSearch && matchesFormat ? 'flex' : 'none';
+            if (matchesSearch && matchesFormat) {
+                card.style.display = 'flex';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
         });
         
         // Mostra messaggio se non ci sono risultati
-        const visibleCards = document.querySelectorAll('.report-card[style="display: flex"]').length;
         const noResultsMessage = document.querySelector('.no-reports-message');
         
         if (noResultsMessage) {
-            if (visibleCards === 0) {
-                noResultsMessage.style.display = 'block';
-                noResultsMessage.innerHTML = `
-                    <i class="fas fa-search"></i>
-                    <p>Nessun report corrisponde ai criteri di ricerca</p>
-                    <button class="btn btn-primary" onclick="resetReportFilters()">
-                        Azzera filtri
-                    </button>
-                `;
+            if (visibleCount === 0) {
+                if (document.querySelectorAll('.report-card').length > 0) {
+                    // Ci sono report ma nessuno corrisponde ai filtri
+                    noResultsMessage.style.display = 'flex';
+                    noResultsMessage.innerHTML = `
+                        <i class="fas fa-search"></i>
+                        <p>Nessun report corrisponde ai criteri di ricerca</p>
+                        <button class="btn btn-primary" onclick="resetReportFilters()">
+                            Azzera filtri
+                        </button>
+                    `;
+                } else {
+                    // Non ci sono proprio report
+                    noResultsMessage.style.display = 'flex';
+                    noResultsMessage.innerHTML = `
+                        <i class="fas fa-folder-open"></i>
+                        <p>Nessun Report Disponibile</p>
+                        <p>I report generati appariranno qui.</p>
+                    `;
+                }
             } else {
                 noResultsMessage.style.display = 'none';
             }
@@ -1598,13 +1629,26 @@ function setupReportFilters() {
     searchInput.addEventListener('input', applyFilters);
     formatFilter.addEventListener('change', applyFilters);
     
-    // Esporta la funzione di reset globalmente
+    // Funzione per resettare i filtri
     window.resetReportFilters = function() {
         if (searchInput) searchInput.value = '';
         if (formatFilter) formatFilter.value = 'all';
         applyFilters();
     };
+    
+    // Applica i filtri all'inizio per gestire l'URL con parametri
+    applyFilters();
 }
+
+window.resetReportFilters = function() {
+    if (document.getElementById('reportSearchInput')) {
+        document.getElementById('reportSearchInput').value = '';
+    }
+    if (document.getElementById('reportFormatFilter')) {
+        document.getElementById('reportFormatFilter').value = 'all';
+    }
+    filterReports('', 'all');
+};
 
 // Funzione per aprire un report
 async function openReport(reportPath) {
@@ -1817,7 +1861,7 @@ async function deleteReport(reportName) {
     }
 }
 
-// Modifica la funzione initEventListeners per aggiungere il caricamento dei report
+// Estendi la funzione initEventListenersReports per includere i nuovi listeners
 function initEventListenersReports() {
     // Event listener per il cambio di sezione
     document.querySelectorAll('.nav-links a').forEach(link => {
@@ -1827,22 +1871,77 @@ function initEventListenersReports() {
                 // Carica i report quando si naviga alla sezione
                 setTimeout(() => {
                     loadReports();
+                    setupReportFilters();
                 }, 100);
             }
         });
     });
     
     // Per il caricamento dei report all'avvio della pagina se siamo già nella sezione reports
-    // (ad esempio dopo un refresh o in caso di deep linking)
     if (window.location.hash === '#report') {
         setTimeout(() => {
             loadReports();
+            setupReportFilters();
         }, 100);
+    }
+    
+    // Aggiungi gli event listeners specifici per la ricerca e il filtro
+    if (document.getElementById('reportSearchInput')) {
+        document.getElementById('reportSearchInput').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            filterReports(searchTerm, document.getElementById('reportFormatFilter').value);
+        });
+    }
+    
+    if (document.getElementById('reportFormatFilter')) {
+        document.getElementById('reportFormatFilter').addEventListener('change', function() {
+            const formatValue = this.value;
+            filterReports(document.getElementById('reportSearchInput').value.toLowerCase(), formatValue);
+        });
+    }
+
+    // Inizializza il sistema di note
+    initNotesSystem();
+}
+
+// Funzione per filtrare i report
+function filterReports(searchTerm, formatValue) {
+    let visibleCount = 0;
+    
+    document.querySelectorAll('.report-card').forEach(card => {
+        const reportName = card.getAttribute('data-name') || card.querySelector('h4')?.textContent.toLowerCase() || '';
+        const reportType = card.getAttribute('data-type') || '';
+        
+        const matchesSearch = searchTerm === '' || reportName.includes(searchTerm);
+        const matchesFormat = formatValue === 'all' || reportType === formatValue;
+        
+        if (matchesSearch && matchesFormat) {
+            card.style.display = 'flex';
+            visibleCount++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Mostra messaggio se non ci sono risultati
+    const noReportsMessage = document.querySelector('.no-reports-message');
+    
+    if (noReportsMessage) {
+        if (visibleCount === 0) {
+            noReportsMessage.style.display = 'flex';
+            noReportsMessage.innerHTML = `
+                <i class="fas fa-search"></i>
+                <p>Nessun report corrisponde ai criteri di ricerca</p>
+                <button class="btn btn-primary" onclick="resetReportFilters()">
+                    Azzera filtri
+                </button>
+            `;
+        } else {
+            noReportsMessage.style.display = 'none';
+        }
     }
 }
 
-// Chiamare questa funzione nel documento onload o in initEventListeners
-// initEventListenersReports();
 
 // Aggiungi queste funzioni per la generazione di report di classificazione
 async function generateClassificationReport(classificationData = null) {
@@ -2025,4 +2124,396 @@ async function generateClassificationReport(classificationData = null) {
     }
 
 
+// Funzioni per gestire le note dei report
+function openNotes(reportName) {
+    try {
+        // Imposta il nome del report corrente
+        document.getElementById('currentReportName').value = reportName;
+        
+        // Recupera le note salvate per questo report
+        const reportNotes = localStorage.getItem(`notes_${reportName}`) || '';
+        
+        // Imposta il valore del textarea
+        document.getElementById('reportNotes').value = reportNotes;
+        
+        // Mostra il dialog
+        document.getElementById('notesDialog').style.display = 'flex';
+        
+        // Focus sul textarea
+        setTimeout(() => {
+            document.getElementById('reportNotes').focus();
+        }, 300);
+    } catch (error) {
+        console.error('Errore nell\'apertura delle note:', error);
+        showNotification('Errore nell\'apertura delle note: ' + error.message, 'error');
+    }
+}
 
+function saveNotes() {
+    try {
+        // Ottieni il nome del report e il testo delle note
+        const reportName = document.getElementById('currentReportName').value;
+        const notes = document.getElementById('reportNotes').value;
+        
+        if (!reportName) {
+            throw new Error('Nome report non valido');
+        }
+        
+        // Salva le note nel localStorage
+        localStorage.setItem(`notes_${reportName}`, notes);
+        
+        // Aggiorna l'UI per mostrare quali report hanno note
+        updateNotesIndicators();
+        
+        // Chiudi il dialog
+        document.getElementById('notesDialog').style.display = 'none';
+        
+        // Notifica all'utente
+        showNotification('Note salvate con successo', 'success');
+    } catch (error) {
+        console.error('Errore nel salvataggio delle note:', error);
+        showNotification('Errore nel salvataggio delle note: ' + error.message, 'error');
+    }
+}
+
+function updateNotesIndicators() {
+    // Aggiorna gli indicatori visivi per i report con note
+    document.querySelectorAll('.report-card').forEach(card => {
+        const reportName = card.getAttribute('data-name') + '.json';
+        const hasNotes = localStorage.getItem(`notes_${reportName}`) && 
+                         localStorage.getItem(`notes_${reportName}`).trim() !== '';
+        
+        if (hasNotes) {
+            card.classList.add('has-notes');
+        } else {
+            card.classList.remove('has-notes');
+        }
+    });
+}
+
+// Aggiungi all'evento di caricamento dei report
+function initNotesSystem() {
+    // Listener per il bottone salva note
+    document.getElementById('saveNotesBtn').addEventListener('click', saveNotes);
+    
+    // Listener per chiudere il dialog delle note
+    document.getElementById('closeNotesBtn').addEventListener('click', function() {
+        document.getElementById('notesDialog').style.display = 'none';
+    });
+    
+    document.getElementById('closeNotesDialog').addEventListener('click', function() {
+        document.getElementById('notesDialog').style.display = 'none';
+    });
+    
+    // Chiudi il dialog quando si clicca al di fuori
+    document.getElementById('notesDialog').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+    
+    // Salva con Ctrl+Enter nel textarea
+    document.getElementById('reportNotes').addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            saveNotes();
+        }
+    });
+}
+
+
+
+// Funzioni per gestire le note preimpostate
+let presetNotes = []; // Array per memorizzare le note preimpostate
+
+// Carica le note preimpostate dal localStorage
+function loadPresetNotes() {
+    try {
+        const savedPresets = localStorage.getItem('presetNotes');
+        if (savedPresets) {
+            presetNotes = JSON.parse(savedPresets);
+        } else {
+            presetNotes = [];
+        }
+        
+        updatePresetNotesUI();
+    } catch (error) {
+        console.error('Errore nel caricamento delle note preimpostate:', error);
+        presetNotes = [];
+    }
+}
+
+// Aggiorna l'interfaccia utente con le note preimpostate
+function updatePresetNotesUI() {
+    const container = document.getElementById('presetNotesContainer');
+    
+    if (!container) return;
+    
+    if (presetNotes.length === 0) {
+        container.innerHTML = `
+            <div class="no-presets-message">
+                <i class="fas fa-info-circle"></i>
+                <p>Nessuna nota preimpostata disponibile</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    presetNotes.forEach(preset => {
+        html += `
+            <div class="preset-note-card" data-id="${preset.id}" onclick="usePresetNote(${preset.id})">
+                <div class="preset-note-title">${preset.title}</div>
+                <div class="preset-note-preview">${preset.content}</div>
+                <div class="preset-actions">
+                    <button class="preset-btn" onclick="editPresetNote(${preset.id}, event)" title="Modifica">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="preset-btn delete-btn" onclick="deletePresetNote(${preset.id}, event)" title="Elimina">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// Usa una nota preimpostata nel textarea
+function usePresetNote(presetId) {
+    try {
+        const preset = presetNotes.find(p => p.id === presetId);
+        
+        if (!preset) {
+            throw new Error('Nota preimpostata non trovata');
+        }
+        
+        const textarea = document.getElementById('reportNotes');
+        const currentText = textarea.value.trim();
+        
+        // Aggiungi la nota preimpostata al testo esistente
+        if (currentText) {
+            textarea.value = currentText + '\n\n' + preset.content;
+        } else {
+            textarea.value = preset.content;
+        }
+        
+        // Focus sul textarea
+        textarea.focus();
+        
+        // Scorri il textarea alla fine
+        textarea.scrollTop = textarea.scrollHeight;
+        
+        showNotification('Nota preimpostata inserita', 'success');
+    } catch (error) {
+        console.error('Errore nell\'uso della nota preimpostata:', error);
+        showNotification('Errore nell\'uso della nota preimpostata', 'error');
+    }
+}
+
+// Apri il dialog per aggiungere una nuova nota preimpostata
+function openPresetDialog(presetId = null) {
+    try {
+        // Se presetId è fornito, stiamo modificando una nota esistente
+        if (presetId !== null) {
+            const preset = presetNotes.find(p => p.id === presetId);
+            
+            if (!preset) {
+                throw new Error('Nota preimpostata non trovata');
+            }
+            
+            document.getElementById('currentPresetId').value = preset.id;
+            document.getElementById('presetTitle').value = preset.title;
+            document.getElementById('presetContent').value = preset.content;
+        } else {
+            // Nuova nota preimpostata
+            document.getElementById('currentPresetId').value = '';
+            document.getElementById('presetTitle').value = '';
+            document.getElementById('presetContent').value = '';
+        }
+        
+        // Mostra il dialog
+        document.getElementById('presetDialog').style.display = 'flex';
+        
+        // Focus sul titolo
+        setTimeout(() => {
+            document.getElementById('presetTitle').focus();
+        }, 300);
+    } catch (error) {
+        console.error('Errore nell\'apertura del dialog per la nota preimpostata:', error);
+        showNotification('Errore nell\'apertura del dialog', 'error');
+    }
+}
+
+// Modifica una nota preimpostata esistente
+function editPresetNote(presetId, event) {
+    // Ferma la propagazione dell'evento click per evitare di attivare usePresetNote
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    openPresetDialog(presetId);
+}
+
+// Salva una nota preimpostata
+function savePresetNote() {
+    try {
+        const presetId = document.getElementById('currentPresetId').value;
+        const title = document.getElementById('presetTitle').value.trim();
+        const content = document.getElementById('presetContent').value.trim();
+        
+        if (!title) {
+            throw new Error('Il titolo è obbligatorio');
+        }
+        
+        if (!content) {
+            throw new Error('Il contenuto è obbligatorio');
+        }
+        
+        if (presetId) {
+            // Aggiorna una nota esistente
+            const index = presetNotes.findIndex(p => p.id === parseInt(presetId));
+            
+            if (index !== -1) {
+                presetNotes[index].title = title;
+                presetNotes[index].content = content;
+                presetNotes[index].updated = new Date().toISOString();
+            }
+        } else {
+            // Crea una nuova nota
+            const newId = presetNotes.length > 0 
+                ? Math.max(...presetNotes.map(p => p.id)) + 1 
+                : 1;
+                
+            presetNotes.push({
+                id: newId,
+                title: title,
+                content: content,
+                created: new Date().toISOString(),
+                updated: new Date().toISOString()
+            });
+        }
+        
+        // Salva in localStorage
+        localStorage.setItem('presetNotes', JSON.stringify(presetNotes));
+        
+        // Aggiorna l'UI
+        updatePresetNotesUI();
+        
+        // Chiudi il dialog
+        document.getElementById('presetDialog').style.display = 'none';
+        
+        showNotification('Nota preimpostata salvata con successo', 'success');
+    } catch (error) {
+        console.error('Errore nel salvataggio della nota preimpostata:', error);
+        showNotification('Errore: ' + error.message, 'error');
+    }
+}
+
+// Elimina una nota preimpostata
+function deletePresetNote(presetId, event) {
+    // Ferma la propagazione dell'evento click
+    if (event) {
+        event.stopPropagation();
+    }
+    
+    try {
+        // Conferma prima di eliminare
+        if (!confirm('Sei sicuro di voler eliminare questa nota preimpostata?')) {
+            return;
+        }
+        
+        // Rimuovi la nota dall'array
+        presetNotes = presetNotes.filter(p => p.id !== presetId);
+        
+        // Salva in localStorage
+        localStorage.setItem('presetNotes', JSON.stringify(presetNotes));
+        
+        // Aggiorna l'UI
+        updatePresetNotesUI();
+        
+        showNotification('Nota preimpostata eliminata', 'success');
+    } catch (error) {
+        console.error('Errore nell\'eliminazione della nota preimpostata:', error);
+        showNotification('Errore nell\'eliminazione della nota preimpostata', 'error');
+    }
+}
+
+// Estendi la funzione initNotesSystem esistente
+function initNotesSystem() {
+    // Listener già esistenti
+    document.getElementById('saveNotesBtn').addEventListener('click', saveNotes);
+    
+    document.getElementById('closeNotesBtn').addEventListener('click', function() {
+        document.getElementById('notesDialog').style.display = 'none';
+    });
+    
+    document.getElementById('closeNotesDialog').addEventListener('click', function() {
+        document.getElementById('notesDialog').style.display = 'none';
+    });
+    
+    document.getElementById('notesDialog').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('reportNotes').addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'Enter') {
+            saveNotes();
+        }
+    });
+    
+    // Nuovi listener per le note preimpostate
+    document.getElementById('addNewPresetBtn').addEventListener('click', function() {
+        openPresetDialog();
+    });
+    
+    document.getElementById('savePresetBtn').addEventListener('click', savePresetNote);
+    
+    document.getElementById('cancelPresetBtn').addEventListener('click', function() {
+        document.getElementById('presetDialog').style.display = 'none';
+    });
+    
+    document.getElementById('closePresetDialog').addEventListener('click', function() {
+        document.getElementById('presetDialog').style.display = 'none';
+    });
+    
+    document.getElementById('presetDialog').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+    
+    // Carica le note preimpostate all'inizializzazione
+    loadPresetNotes();
+}
+
+// Modifica la funzione openNotes esistente per caricare anche le note preimpostate
+function openNotes(reportName) {
+    try {
+        // Imposta il nome del report corrente
+        document.getElementById('currentReportName').value = reportName;
+        
+        // Recupera le note salvate per questo report
+        const reportNotes = localStorage.getItem(`notes_${reportName}`) || '';
+        
+        // Imposta il valore del textarea
+        document.getElementById('reportNotes').value = reportNotes;
+        
+        // Mostra il dialog
+        document.getElementById('notesDialog').style.display = 'flex';
+        
+        // Carica le note preimpostate
+        loadPresetNotes();
+        
+        // Focus sul textarea
+        setTimeout(() => {
+            document.getElementById('reportNotes').focus();
+        }, 300);
+    } catch (error) {
+        console.error('Errore nell\'apertura delle note:', error);
+        showNotification('Errore nell\'apertura delle note: ' + error.message, 'error');
+    }
+}

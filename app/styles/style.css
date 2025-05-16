@@ -1493,18 +1493,22 @@ select[disabled] {
 
 /* SEZIONE REPORTS STILI */
 /* Stili migliorati per la sezione Reports */
-/* Stili armonizzati per la sezione Reports */
 
 /* Reset di base per assicurare coerenza con le altre sezioni */
 #report {
+  padding: 2rem 0 !important;
     margin: 0 !important;
-    padding: 0 !important;
+    margin-left: -2rem !important;
+    margin-right: 2rem !important;
     width: 100% !important;
     max-width: 100% !important;
-    position: relative !important;
-    left: 0 !important;
+    box-sizing: border-box !important;
 }
 
+#report h2 {
+    margin-top: 0 !important;
+    margin-bottom: 1.5rem !important;
+}
 
 .reports-container, 
 .report-section-header, 
@@ -1529,6 +1533,10 @@ select[disabled] {
     float: none !important;
 }
 
+.report-section-info {
+    max-width: 60%;
+}
+
 /* Intestazione sezione con filtri */
 .report-section-header {
     display: flex;
@@ -1538,8 +1546,6 @@ select[disabled] {
     padding-bottom: 1rem;
     border-bottom: 1px solid var(--border-color);
     width: 100%;
-    padding-left: 0;
-    margin-left: 0;
     box-sizing: border-box;
 }
 
@@ -1557,14 +1563,27 @@ select[disabled] {
     align-items: center;
 }
 
-.report-filters .search-input {
+/* Aggiunto il wrapper per la search input con icona */
+.report-filters .search-wrapper {
+    position: relative;
     width: 250px;
+}
+
+.report-filters .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+}
+
+/* Modificato per allineare con l'icona */
+.report-filters .search-input {
+    width: 100%;
     padding: 0.5rem 1rem 0.5rem 2.5rem;
     border: 1px solid var(--border-color);
     border-radius: 20px;
     font-size: 0.9rem;
-    background-position: 12px center;
-    background-size: 14px;
 }
 
 .report-filters select {
@@ -1573,6 +1592,7 @@ select[disabled] {
     border: 1px solid var(--border-color);
     background-color: var(--bg-color);
     color: var(--text-color);
+    min-width: 150px;
 }
 
 /* Container per la lista dei report */
@@ -1590,12 +1610,12 @@ select[disabled] {
 /* Card del report */
 .report-card {
     display: flex;
-    background: var(--card-bg);
-    border-radius: 12px;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0.05)); /* Gradiente leggero */
+    border-radius: 16px;
     border: 1px solid var(--border-color);
-    padding: 1.5rem;
+    padding: 1.8rem;
     box-shadow: var(--card-shadow);
-    gap: 1.5rem;
+    gap: 2.5rem;
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     width: 100%;
     margin-left: 0;
@@ -1610,20 +1630,48 @@ select[disabled] {
 /* Icona del report */
 .report-icon {
     background: var(--primary);
-    min-width: 64px;
-    height: 64px;
-    border-radius: 12px;
+    min-width: 76px;
+    height: 76px;
+    background: linear-gradient(135deg, var(--primary), var(--secondary)); /* Gradiente per l'icona */
+    border-radius: 16px; /* Bordi più arrotondati */
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-left: 1.2rem; /* Aggiungi questo valore */
     color: white;
     font-size: 1.8rem;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1); /* Ombra migliorata */
     transition: transform 0.2s ease;
+    position: relative;
+    overflow: hidden;
 }
 
+/* Effetto decorativo per l'icona - AGGIUNGERE */
+.report-icon::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 30px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+}
+
+/* Hover dell'icona migliorato - AGGIUNGERE */
 .report-card:hover .report-icon {
-    transform: scale(1.1);
+    transform: scale(1.15) rotate(5deg);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+/* Animazione titolo - AGGIUNGERE */
+.report-card:hover .report-info h4 {
+    color: var(--primary); /* Cambia colore al titolo in hover */
+}
+
+/* Animazione icone bottoni - AGGIUNGERE */
+.action-btn:hover i {
+    transform: translateY(-2px); /* Piccola animazione per le icone */
 }
 
 /* Informazioni del report */
@@ -1669,14 +1717,16 @@ select[disabled] {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: 0.6rem 1.2rem;
     background: transparent;
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: 10px;
     color: var(--text-color);
     font-size: 0.9rem;
     cursor: pointer;
-    transition: all 0.2s ease;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    transition: all 0.25s ease;
 }
 
 .action-btn:hover {
@@ -1706,6 +1756,7 @@ select[disabled] {
     box-shadow: var(--card-shadow);
     color: var(--text-muted);
     border: 1px solid var(--border-color);
+    text-align: center;
 }
 
 .no-reports-message i {
@@ -1716,6 +1767,35 @@ select[disabled] {
 
 .no-reports-message button {
     margin-top: 1rem;
+}
+
+/* Aggiunto: Stile per i bottoni delle azioni */
+.reports-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+/* Aggiunto: Stile per il loader durante il caricamento */
+.loading-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.loading-indicator i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 
 /* Dialog di anteprima del report */
@@ -1807,6 +1887,10 @@ select[disabled] {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+[data-theme="dark"] .loading-indicator {
+    color: rgba(255, 255, 255, 0.7);
+}
+
 [data-theme="dark"] .preview-table tr:nth-child(even) {
     background: rgba(255, 255, 255, 0.03);
 }
@@ -1840,16 +1924,27 @@ select[disabled] {
         padding: 0.4rem 0.8rem;
         font-size: 0.8rem;
     }
+    
+    .reports-actions {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .reports-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
-
 
 /* Stili per il file info e bottone di eliminazione */
 .file-info {
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-color);
     border-radius: 8px;
     padding: 1rem;
     margin: 1rem 0;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
 }
 
 .file-info-header {
@@ -1873,7 +1968,7 @@ select[disabled] {
 }
 
 .btn-danger:hover {
-    background-color: var(--danger-hover);
+    background-color: #c0392b;
     transform: translateY(-1px);
 }
 
@@ -1900,7 +1995,7 @@ select[disabled] {
 /* Stili per il testo del file */
 .file-info p.text-lg {
     margin: 0;
-    color: var(--text-primary);
+    color: var(--text-color);
     font-weight: 600;
 }
 
@@ -1908,6 +2003,175 @@ select[disabled] {
     margin: 4px 0 0 0;
     color: var(--text-muted);
 }
+
+/* Animazione dialog anteprima - AGGIUNGERE */
+.support-dialog[style*="display: flex"] {
+    animation: dialogFadeIn 0.3s ease-out;
+}
+
+@keyframes dialogFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* Miglioramenti anteprima - AGGIUNGERE */
+#reportPreviewDialog .support-dialog {
+    width: 85%;
+    max-width: 1000px;
+    max-height: 90vh;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+#reportPreviewDialog .support-dialog-header {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    padding: 1.5rem 2rem;
+    position: relative;
+}
+
+#reportPreviewDialog .support-dialog-title {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+#reportPreviewDialog .support-dialog-title::before {
+    content: '\f15c';
+    font-family: 'Font Awesome 5 Free';
+    font-weight: 400;
+    font-size: 1.4rem;
+}
+
+/* Modifiche al bottone di chiusura anteprima */
+#reportPreviewDialog .support-dialog-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#reportPreviewDialog .support-dialog-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+/* Migliora il footer del dialog di anteprima */
+.support-dialog-footer {
+    background: var(--bg-color);
+    padding: 1.5rem 2rem; /* Aumentato da valori precedenti */
+    border-top: 1px solid var(--border-color);
+    margin-top: 1rem; /* Aggiunge spazio sopra */
+}
+
+/* Migliora il container dei bottoni */
+.report-preview-actions {
+    display: flex;
+    justify-content: flex-end; /* Allinea a destra */
+    gap: 1.5rem; /* Aumenta lo spazio tra i bottoni */
+}
+
+/* Migliora i bottoni stessi */
+.report-preview-actions .btn {
+    padding: 0.75rem 1.5rem; /* Bottoni più grandi */
+    border-radius: 10px; /* Bordi più arrotondati */
+    font-weight: 500;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); /* Ombra leggera */
+    transition: all 0.2s ease;
+    min-width: 120px; /* Larghezza minima per uniformità */
+    display: flex;
+    align-items: center;
+    justify-content: center; /* Centra il testo e l'icona */
+    gap: 0.5rem;
+}
+
+/* Effetto hover per i bottoni */
+.report-preview-actions .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Stile specifico per il bottone primario */
+.report-preview-actions .btn-primary {
+    background: var(--primary);
+    color: white;
+    border: 1px solid var(--primary);
+}
+
+.report-preview-actions .btn-primary:hover {
+    background: transparent;
+    color: var(--primary);
+}
+
+/* Stile specifico per il bottone secondario (chiudi) */
+.report-preview-actions .btn-secondary {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.report-preview-actions .btn-secondary:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+
+/* Tema scuro per i report - AGGIUNGERE alla sezione del tema scuro */
+[data-theme="dark"] .report-card {
+    background: linear-gradient(to right, rgba(30, 30, 30, 0.5), rgba(40, 40, 40, 0.5));
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .report-icon {
+    background: linear-gradient(135deg, var(--primary), #108a3f);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 214, 91, 0.2);
+}
+
+/* Tema scuro per l'anteprima */
+[data-theme="dark"] #reportPreviewDialog .support-dialog {
+    background: #181818;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] #reportPreviewDialog .support-dialog-header {
+    background: linear-gradient(135deg, var(--primary), #108a3f);
+}
+
+[data-theme="dark"] .support-dialog-footer {
+    background: #181818;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Tema scuro per i bottoni */
+[data-theme="dark"] .report-preview-actions .btn-secondary {
+    color: rgba(255, 255, 255, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .report-preview-actions .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -3032,4 +3296,205 @@ select[disabled] {
 
 .info-box:hover h3 i {
     transform: rotate(10deg);
+}
+
+
+
+
+
+/* Stili per textarea note */
+#reportNotes {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    resize: vertical;
+    min-height: 150px;
+    background: var(--card-bg);
+    color: var(--text-color);
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+
+#reportNotes:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.1);
+}
+
+[data-theme="dark"] #reportNotes {
+    background: rgba(30, 30, 30, 0.7);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] #reportNotes:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(0, 214, 91, 0.1);
+}
+
+/* Badge per indicare presenza note */
+.has-notes::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 10px;
+    height: 10px;
+    background-color: var(--primary);
+    border-radius: 50%;
+    box-shadow: 0 0 5px rgba(0, 214, 91, 0.7);
+}
+
+/* Stile icon note */
+.action-btn i.fa-sticky-note {
+    color: #f1c40f;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover i.fa-sticky-note {
+    color: white;
+}
+
+
+/* Stili per la sezione note preimpostate */
+.preset-notes-section {
+    margin-top: 2rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.5rem;
+}
+
+.preset-notes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.preset-notes-header h4 {
+    margin: 0;
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.preset-notes-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+/* Card per singola nota preimpostata */
+.preset-note-card {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    width: calc(50% - 0.75rem);
+    min-width: 200px;
+    position: relative;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.preset-note-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--card-shadow);
+    border-color: var(--primary);
+}
+
+.preset-note-title {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    font-size: 0.9rem;
+    padding-right: 1.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preset-note-preview {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    max-height: 3rem;
+    overflow: hidden;
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.preset-actions {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    gap: 0.25rem;
+}
+
+.preset-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.preset-btn.delete-btn:hover {
+    background: var(--danger);
+}
+
+/* Messaggio per nessuna nota preimpostata */
+.no-presets-message {
+    width: 100%;
+    text-align: center;
+    padding: 1rem;
+    color: var(--text-muted);
+}
+
+.no-presets-message i {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+}
+
+/* Scrollbar per il container delle note preimpostate */
+.preset-notes-container::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.preset-notes-container::-webkit-scrollbar-track {
+    background: var(--bg-color);
+    border-radius: 3px;
+}
+
+.preset-notes-container::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 3px;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] .preset-note-card {
+    background: rgba(30, 30, 30, 0.5);
+}
+
+[data-theme="dark"] .preset-notes-container::-webkit-scrollbar-track {
+    background: rgba(30, 30, 30, 0.5);
 }
