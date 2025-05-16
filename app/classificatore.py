@@ -151,6 +151,9 @@ class DatabaseSostanze:
             # HP13 - Sensibilizzante respiratorio
             "HP13": ["H317", "H334"],
 
+            # HP14 - Ecotossico 
+            "HP14": ["H400", "H410", "H411", "H412", "H413", "H420"],
+
             # HP15 - Potenziale sviluppo di caratteristiche di pericolo
             "HP15": ["H205", "EUH001", "EUH019", "EUH044"],
             
@@ -169,16 +172,22 @@ class DatabaseSostanze:
         # Questi valori fungono da filtro: se la concentrazione è < cut-off, 
         # la sostanza NON viene considerata nella classificazione
         self.valori_cut_off = {
+
             # HP1 non ha valori soglia cut-off
-            "HP1": 0,  
+            "HP1": 0,
+
             # HP2 non ha valori soglia cut-off
-            "HP2": 0,  
+            "HP2": 0,
+
             # HP3 non ha valori soglia cut-off
             "HP3": 0,
+
             # HP4 ha valore soglia dell'1%
-            "HP4": 1.0,  
+            "HP4": 1.0,
+
             # HP5 ha valore soglia dell'1% per H370, H372
-            "HP5": 1.0,  
+            "HP5": 1.0,
+
             # HP6 ha valori soglia differenziati per categoria
             "H300": 0.1,  # Tossicità acuta Cat. 1/2 orale (VS=0,1%)
             "H301": 0.1,  # Tossicità acuta Cat. 3 orale (VS=0,1%)
@@ -189,26 +198,41 @@ class DatabaseSostanze:
             "H330": 0.1,  # Tossicità acuta Cat. 1/2 inalazione (VS=0,1%)
             "H331": 0.1,  # Tossicità acuta Cat. 3 inalazione (VS=0,1%)
             "H332": 1.0,  # Tossicità acuta Cat. 4 inalazione (VS=1%)
+
             # HP7 - Cancerogeno
             "H350_1A": 0.1,   # Carc. 1A limite 0.1% 
             "H350_1B": 0.1,   # Carc. 1B limite 0.1%
             "H351": 1.0,      # Carc. 2 limite 1.0%
+
             # HP8 ha valore soglia dell'1%
             "HP8": 1.0,
+
             # HP10 - Tossico per la riproduzione
             "H360": 0.0,   # Non ha cut-off 
-            "H361": 0.0,   # Non ha cut-off 
+            "H361": 0.0,   # Non ha cut-off
+
             # HP11 - Mutageno
             "H340": 0,   #Non ha cut-off
             "H341": 0,   #Non ha cut-off
+
             # HP12 non ha valore di cut-off
             "HP12": 0,
             "EUH029": 0,
             "EUH031": 0,
             "EUH032": 0,
+
             # HP13 - Sensibilizzante
             "H317": 0.0,   # Non ha cut-off
             "H334": 0.0,   # Non ha cut-off
+
+            # HP14 - Ecotossico
+            "H400": 0.1,   # Tossicità acuta per l'ambiente acquatico
+            "H410": 0.1,   # Tossicità cronica per l'ambiente acquatico, categoria 1
+            "H411": 1.0,   # Tossicità cronica per l'ambiente acquatico, categoria 2
+            "H412": 1.0,   # Tossicità cronica per l'ambiente acquatico, categoria 3
+            "H413": 1.0,   # Tossicità cronica per l'ambiente acquatico, categoria 4
+            "H420": 0.1,   # Riduzione dello strato di ozono
+
             # HP15 - Potenziale sviluppo di caratteristiche di pericolo
             "HP15": 0,    # Non ha cut-off
             "H205": 0,    # Non ha cut-off
@@ -216,7 +240,6 @@ class DatabaseSostanze:
             "EUH019": 0,  # Non ha cut-off
             "EUH044": 0,  # Non ha cut-off
 
-            # Altri valori soglia verranno aggiunti in seguito
         }
 
         # Valori LIMITE per attribuzione effettiva delle caratteristiche di pericolo
@@ -299,6 +322,12 @@ class DatabaseSostanze:
             # HP13 - Sensibilizzante
             "H317": 10.0,   # Skin Sens. 1 limite 10%
             "H334": 10.0,   # Resp. Sens. 1 limite 10%
+
+            # HP14 - Ecotossico
+            "H420": 0.1,      # Riduzione dello strato di ozono - limite 0.1%
+            "H400_sum": 25.0, # Somma H400 - limite 25%
+            "H410_H412_weighted": 25.0, # Formula ponderata H410+H411+H412 - limite 25%
+            "H410_H413_sum": 25.0,      # Somma H410+H411+H412+H413 - limite 25%
 
             # HP15 - Potenziale sviluppo di caratteristiche di pericolo
             "H205": 0,    # Limite: presenza a qualsiasi livello
@@ -1051,6 +1080,20 @@ class ClassificatoreRifiuti:
                                     else:
                                         motivazioni_hp["HP3"] = hp3_sommatoria["motivo"]
 
+                    # Per HP14, verifica frasi H ecotossiche con cut-off specifici
+                    if frase_h_clean in self.database.hp_mapping["HP14"]:
+                        # Ottieni il cut-off specifico per questa frase H
+                        cutoff_frase = self.database.valori_cut_off.get(frase_h_clean, 1.0)
+                        
+                        # Aggiungi alla sommatoria solo se la concentrazione supera il cut-off
+                        if concentrazione_percentuale >= cutoff_frase:
+                            # Inizializza la sommatoria per questa frase se non esiste già
+                            if frase_h_clean not in sommatoria_per_frase:
+                                sommatoria_per_frase[frase_h_clean] = 0
+                            
+                            # Aggiungi alla sommatoria per categoria
+                            sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
+
                 # STEP 2.2 PROCESSARE EUH
                 # AGGIUNTO: Processa anche le frasi EUH (solo se la sostanza ne ha)
                 for frase_info in frasi_euh_con_class:
@@ -1163,6 +1206,12 @@ class ClassificatoreRifiuti:
             if hp15_individuale["assegnata"]:
                 hp_assegnate.add("HP15")
                 motivazioni_hp["HP15"] = hp15_individuale["motivo"]
+
+            # STEP 16: Verifica le sommatorie per HP14
+            hp14_sommatoria = self._verifica_hp14_sommatoria(sommatoria_per_frase)
+            if hp14_sommatoria["assegnata"]:
+                hp_assegnate.add("HP14")
+                motivazioni_hp["HP14"] = hp14_sommatoria["motivo"]
             
             # Prepara i risultati finali della classificazione
             risultati = {
@@ -2045,6 +2094,87 @@ class ClassificatoreRifiuti:
             risultato["assegnata"] = True
             risultato["motivo"] = f"HP15 assegnata per presenza di: {'; '.join(sostanze_hp15)}"
             print(f"HP15 assegnata: {risultato['motivo']}")
+        
+        return risultato
+    
+    def _verifica_hp14_sommatoria(self, sommatoria_per_frase):
+        """
+        Verifica i criteri di HP14 (Ecotossico) basati sulle sommatorie delle frasi H
+        
+        Args:
+            sommatoria_per_frase (dict): Sommatoria delle concentrazioni per ciascuna frase H
+                
+        Returns:
+            dict: Dizionario con il risultato della verifica
+        """
+        risultato = {
+            "assegnata": False,
+            "motivo": ""
+        }
+        
+        # Lista delle condizioni che portano ad assegnare HP14
+        condizioni_soddisfatte = []
+        
+        # Criterio 1: Sostanze singole che riducono lo strato di ozono (H420) >= 0.1%
+        if 'H420' in sommatoria_per_frase:
+            sommatoria_h420 = sommatoria_per_frase['H420']
+            limite_h420 = self.database.valori_limite.get('H420', 0.1)
+            
+            if sommatoria_h420 >= limite_h420:
+                condizioni_soddisfatte.append(f"Somma H420 = {sommatoria_h420:.4f}% >= {limite_h420}%")
+        
+        # Criterio 2: Somma delle sostanze con tossicità acuta (H400) >= 25%
+        if 'H400' in sommatoria_per_frase:
+            sommatoria_h400 = sommatoria_per_frase['H400']
+            limite_h400 = self.database.valori_limite.get('H400_sum', 25.0)
+            
+            if sommatoria_h400 >= limite_h400:
+                condizioni_soddisfatte.append(f"Somma H400 = {sommatoria_h400:.4f}% >= {limite_h400}%")
+        
+        # Criterio 3: Formula ponderata per H410, H411, H412
+        # 100 * somma(H410) + 10 * somma(H411) + somma(H412) >= 25%
+        somma_ponderata = 0
+        somma_descrizione = []
+        
+        if 'H410' in sommatoria_per_frase:
+            h410_ponderata = 100 * sommatoria_per_frase['H410']
+            somma_ponderata += h410_ponderata
+            somma_descrizione.append(f"100 × {sommatoria_per_frase['H410']:.4f}% (H410)")
+        
+        if 'H411' in sommatoria_per_frase:
+            h411_ponderata = 10 * sommatoria_per_frase['H411']
+            somma_ponderata += h411_ponderata
+            somma_descrizione.append(f"10 × {sommatoria_per_frase['H411']:.4f}% (H411)")
+        
+        if 'H412' in sommatoria_per_frase:
+            h412_ponderata = sommatoria_per_frase['H412']
+            somma_ponderata += h412_ponderata
+            somma_descrizione.append(f"{sommatoria_per_frase['H412']:.4f}% (H412)")
+        
+        limite_ponderata = self.database.valori_limite.get('H410_H412_weighted', 25.0)
+        
+        if somma_ponderata >= limite_ponderata and somma_descrizione:
+            condizioni_soddisfatte.append(f"Formula ponderata: {' + '.join(somma_descrizione)} = {somma_ponderata:.4f}% >= {limite_ponderata}%")
+        
+        # Criterio 4: Somma delle concentrazioni di H410, H411, H412, H413 >= 25%
+        somma_totale = 0
+        somma_descrizione = []
+        
+        for frase_h in ['H410', 'H411', 'H412', 'H413']:
+            if frase_h in sommatoria_per_frase:
+                somma_totale += sommatoria_per_frase[frase_h]
+                somma_descrizione.append(f"{sommatoria_per_frase[frase_h]:.4f}% ({frase_h})")
+        
+        limite_somma = self.database.valori_limite.get('H410_H413_sum', 25.0)
+        
+        if somma_totale >= limite_somma and somma_descrizione:
+            condizioni_soddisfatte.append(f"Somma H410-H413: {' + '.join(somma_descrizione)} = {somma_totale:.4f}% >= {limite_somma}%")
+        
+        # Se almeno una condizione è soddisfatta, assegna HP14
+        if condizioni_soddisfatte:
+            risultato["assegnata"] = True
+            risultato["motivo"] = f"HP14 assegnata per: {'; '.join(condizioni_soddisfatte)}"
+            print(f"HP14 assegnata: {risultato['motivo']}")
         
         return risultato
 
