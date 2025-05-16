@@ -4,7 +4,7 @@
     "concentrazione_percentuale": 0.016104000000000004
   },
   "test": {
-    "concentrazione_ppm": 1500,
-    "concentrazione_percentuale": 0.15
+    "concentrazione_ppm": 1,
+    "concentrazione_percentuale": 0.0001
   }
 }

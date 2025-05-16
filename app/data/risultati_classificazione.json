@@ -12,13 +12,13 @@
       "frasi_euh": []
     },
     "test": {
-      "concentrazione_ppm": 1500,
-      "concentrazione_percentuale": 0.15,
+      "concentrazione_ppm": 1,
+      "concentrazione_percentuale": 0.0001,
       "frasi_h": [
         "H400"
       ],
       "frasi_euh": [
-        "EUH029"
+        "EUH001"
       ]
     }
   },
@@ -27,13 +27,13 @@
     "H301": 0,
     "H400": 0,
     "H410": 0,
-    "EUH029": 0.15
+    "EUH001": 0
   },
   "caratteristiche_pericolo": [
-    "HP12"
+    "HP15"
   ],
   "motivazioni_hp": {
-    "HP12": "HP12 assegnata per: EUH029 (0.1500% >= 0.1%)"
+    "HP15": "HP15 assegnata per presenza di: Sostanza 'test' con EUH001"
   },
   "valori_limite": {
     "H200": 0.1,
@@ -87,7 +87,11 @@
     "EUH031": 0.1,
     "EUH032": 0.1,
     "H317": 10.0,
-    "H334": 10.0
+    "H334": 10.0,
+    "H205": 0,
+    "EUH001": 0,
+    "EUH019": 0,
+    "EUH044": 0
   },
   "valori_cut_off": {
     "HP1": 0,
@@ -117,7 +121,12 @@
     "EUH031": 0,
     "EUH032": 0,
     "H317": 0.0,
-    "H334": 0.0
+    "H334": 0.0,
+    "HP15": 0,
+    "H205": 0,
+    "EUH001": 0,
+    "EUH019": 0,
+    "EUH044": 0
   },
   "stato_fisico": "Liquido",
   "punto_infiammabilita": 70.0,
