@@ -6,3 +6,4 @@ build/
 app/DB/*.db
 app/echa/data/*.db
 app/echa/data/*.xlsx
+app/data
