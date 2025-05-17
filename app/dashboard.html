@@ -290,17 +290,17 @@
             <h3>Inserimento Nuova Sostanza</h3>
             
             <div class="form-group">
-                <label for="nomeSostanza">Nome Sostanza <span class="text-danger">*</span></label>
+                <label for="nomeSostanza">Nome Sostanza <span class="text-danger" style="color: red;">*</span></label>
                 <input type="text" id="nomeSostanza" class="form-control" placeholder="Inserisci il nome della sostanza" required>
             </div>
             
             <div class="form-group">
-                <label for="codCAS">Codice CAS</label>
+                <label for="codCAS">Codice CAS <span class="text-danger" style="color: red;">*</span></label>
                 <input type="text" id="codCAS" class="form-control" placeholder="Inserisci il codice CAS">
             </div>
             
             <div class="form-group">
-                <label for="categoriaSostanza">Categoria</label>
+                <label for="categoriaSostanza">Categoria <span class="text-danger" style="color: red;">*</span></label>
                 <select id="categoriaSostanza" class="form-control">
                     <option value="">Seleziona una categoria</option>
                     <option value="Metallo">Metallo</option>
@@ -321,11 +321,11 @@
                     <!-- Qui verranno aggiunti dinamicamente i campi per le frasi H -->
                     <div class="frase-h-row">
                         <div class="form-group">
-                            <label>Frase H</label>
+                            <label>Frase H <span class="text-danger" style="color: red;">*</span></label>
                             <input type="text" class="form-control frase-h-input" placeholder="Frase H (es. H400)">
                         </div>
                         <div class="form-group">
-                            <label>Hazard Class and Category</label>
+                            <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
                             <input type="text" class="form-control hazard-class-input" placeholder="Hazard Class (es. Aquatic Acute 1)">
                         </div>
                         <button type="button" class="btn btn-sm btn-danger remove-frase-btn">

@@ -2776,7 +2776,7 @@ function aggiungiCampoFraseEUH() {
     container.appendChild(row);
 }
 
-// Funzione per inserire una nuova sostanza (corretta)
+// Funzione per inserire una nuova sostanza con controlli semplici
 async function inserisciNuovaSostanza() {
     try {
         // Ottieni i valori dal form
@@ -2784,17 +2784,104 @@ async function inserisciNuovaSostanza() {
         const codCAS = document.getElementById('codCAS').value.trim();
         const categoria = document.getElementById('categoriaSostanza').value.trim();
         
-        // Validazione
+        // Rimuovi eventuali evidenziazioni di errore precedenti
+        document.querySelectorAll('.input-error').forEach(el => {
+            el.classList.remove('input-error');
+        });
+        
+        // Tieni traccia se ci sono errori
+        let hasErrors = false;
+        let campiConErrore = [];
+        
+        // Validazione di tutti i campi obbligatori contemporaneamente
         if (!nomeSostanza) {
-            showNotification('Il nome della sostanza è obbligatorio', 'warning');
-            return;
+            document.getElementById('nomeSostanza').classList.add('input-error');
+            campiConErrore.push('Nome Sostanza');
+            hasErrors = true;
         }
         
-        // Prepara i dati per l'inserimento della sostanza
+        if (!codCAS) {
+            document.getElementById('codCAS').classList.add('input-error');
+            campiConErrore.push('Codice CAS');
+            hasErrors = true;
+        }
+        
+        if (!categoria) {
+            document.getElementById('categoriaSostanza').classList.add('input-error');
+            campiConErrore.push('Categoria');
+            hasErrors = true;
+        }
+        
+        // Validazione frasi H (deve esserci almeno una frase H con relativa classe)
+        let fraseHValida = false;
+        const frasiHContainer = document.getElementById('frasiHContainer');
+        
+        if (frasiHContainer) {
+            const rows = frasiHContainer.querySelectorAll('.frase-h-row');
+            
+            if (rows.length > 0) {
+                for (const row of rows) {
+                    const fraseHInput = row.querySelector('.frase-h-input');
+                    const hazardClassInput = row.querySelector('.hazard-class-input');
+                    
+                    if (fraseHInput && fraseHInput.value.trim() && 
+                        hazardClassInput && hazardClassInput.value.trim()) {
+                        fraseHValida = true;
+                        break;
+                    }
+                }
+            }
+            
+            if (!fraseHValida) {
+                // Evidenzia i campi in tutte le righe di frasi H
+                frasiHContainer.querySelectorAll('.frase-h-input, .hazard-class-input').forEach(input => {
+                    if (!input.value.trim()) {
+                        input.classList.add('input-error');
+                    }
+                });
+                
+                campiConErrore.push('Frasi H');
+                hasErrors = true;
+            }
+        }
+        
+        // Se ci sono errori di validazione, mostra una notifica e interrompi
+        if (hasErrors) {
+            const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
+            showNotification(messaggioErrore, 'warning');
+            
+            // Rimuovi automaticamente gli errori dopo 2 secondi
+            setTimeout(() => {
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+            }, 2000);
+            
+            return false;
+        }
+        
+        // Verifica CAS duplicato
+        const checkResult = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM sostanze WHERE CAS = ?',
+            [codCAS]
+        );
+        
+        if (checkResult.success && checkResult.data && checkResult.data[0].count > 0) {
+            document.getElementById('codCAS').classList.add('input-error');
+            showNotification('La sostanza è già presente nel Database, controlla il codice CAS', 'error');
+            
+            // Rimuovi automaticamente l'errore dopo 2 secondi
+            setTimeout(() => {
+                document.getElementById('codCAS').classList.remove('input-error');
+            }, 2000);
+            
+            return false;
+        }
+        
+        // Se tutti i controlli sono passati, procedi con l'inserimento
         console.log('Preparazione inserimento nuova sostanza:', nomeSostanza);
         
         // Usa l'API per inserire la sostanza nel database
-        // Non includiamo l'ID perché vogliamo che corrisponda al ROWID automatico
         const sostanzaResult = await window.electronAPI.executeSQLite(
             'INSERT INTO sostanze (Nome, CAS, Categoria) VALUES (?, ?, ?)',
             [nomeSostanza, codCAS, categoria]
@@ -2902,6 +2989,60 @@ async function inserisciNuovaSostanza() {
         showNotification('Errore nell\'inserimento della sostanza: ' + error.message, 'error');
         return false;
     }
+}
+
+// Aggiungi stile CSS semplice per evidenziare i campi con errore
+function aggiungiStileBase() {
+    // Verifica se lo stile esiste già
+    if (!document.getElementById('stileBaseValidazione')) {
+        const style = document.createElement('style');
+        style.id = 'stileBaseValidazione';
+        style.textContent = `
+            .input-error {
+                border: 2px solid #e74c3c !important;
+                background-color: rgba(231, 76, 60, 0.05) !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Inizializza lo stile quando il documento è pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', aggiungiStileBase);
+} else {
+    aggiungiStileBase();
+}
+
+
+// Aggiungi stile CSS per evidenziare il campo CAS con errore
+function aggiungiStileErroreCAS() {
+    // Verifica se lo stile esiste già
+    if (!document.getElementById('stileErroreCAS')) {
+        const style = document.createElement('style');
+        style.id = 'stileErroreCAS';
+        style.textContent = `
+            .input-error {
+                border: 2px solid #e74c3c !important;
+                background-color: rgba(231, 76, 60, 0.1) !important;
+                animation: pulsaErrore 1.5s ease-in-out;
+            }
+            
+            @keyframes pulsaErrore {
+                0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4); }
+                70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Inizializza lo stile quando il documento è pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', aggiungiStileErroreCAS);
+} else {
+    aggiungiStileErroreCAS();
 }
 
 // Reset del form nuova sostanza
