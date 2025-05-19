@@ -1441,6 +1441,48 @@ input[disabled] {
     cursor: pointer;
 }
 
+/* CSS mirato per correggere il posizionamento della checkbox */
+.special-checkbox .checkbox-container {
+    display: flex !important;
+    align-items: center !important;
+    flex-direction: row !important;
+}
+
+.special-checkbox input[type="checkbox"] {
+    position: static !important;
+    opacity: 1 !important;
+    margin-right: 8px !important;
+    width: 18px !important;
+    height: 18px !important;
+    appearance: auto !important;
+    -webkit-appearance: checkbox !important;
+    order: 1 !important;
+}
+
+.special-checkbox .checkmark {
+    display: none !important;
+}
+
+.special-checkbox .checkbox-label {
+    position: static !important;
+    margin-left: 0 !important;
+    order: 2 !important;
+}
+
+/* Evidenzia l'area (opzionale) */
+.special-checkbox {
+    background-color: rgba(46, 125, 50, 0.05);
+    border-left: 3px solid var(--primary);
+    border-radius: 4px;
+    padding: 5px;
+    margin: o.5rem 0;
+}
+
+/* Tema scuro */
+[data-theme="dark"] .special-checkbox {
+    background-color: rgba(0, 214, 91, 0.05);
+}
+
 /* Campo personalizzato quando attivo */
 input.custom-field-active {
     border-color: var(--primary);

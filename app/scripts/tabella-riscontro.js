@@ -98,6 +98,200 @@ let frasiEUHInEditMode = false;
 //------------ FUNZIONI ------------//
 //-----------------------------------//
 
+// Mappatura tra frasi H e Hazard Class corrispondenti
+const frasiHToHazardClass = {
+    // HP1
+    "H200": ["Unst. Expl."],
+    "H201": ["Expl. 1.1"],
+    "H202": ["Expl. 1.2"],
+    "H203": ["Expl. 1.3"],
+    "H204": ["Expl. 1.4"],
+    "H240": ["Self-react. A", "Org. Perox. A"],
+    "H241": ["Self-react. B", "Org. Perox. B"],
+    
+    // HP2
+    "H270": ["Ox. Gas 1"],
+    "H271": ["Ox. Liq. 1", "Ox. Sol. 1"],
+    "H272": ["Ox. Liq. 2", "Ox. Liq. 3", "Ox. Sol. 2", "Ox. Sol. 3"],
+    
+    // HP3
+    "H220": ["Flam. Gas 1"],
+    "H221": ["Flam. Gas 2"],
+    "H222": ["Aerosol 1"],
+    "H223": ["Aerosol 2"],
+    "H224": ["Flam. Liq. 1"],
+    "H225": ["Flam. Liq.2"],
+    "H226": ["Flam. Liq. 3"],
+    "H228": ["Flam. Sol. 1", "Flam. Sol. 2"],
+    "H242": ["Self-react. CD", "Self-react. EF", "Org. Perox. CD", "Org. Perox. EF"],
+    "H250": ["Pyr. Liq. 1", "Pyr. Sol. 1"],
+    "H251": ["Self-heat.1"],
+    "H252": ["Self-heat. 2"],
+    "H260": ["Water-react. 1"],
+    "H261": ["Water-react. 2", "Water-react. 3"],
+    
+    // HP4
+    "H314": ["Skin corr. 1A", "SkinCorr. 1B", "SkinCorr. 1C"],
+    "H315": ["Skin irrit. 2"],
+    "H318": ["Eye dam. 1"],
+    "H319": ["Eye irrit. 2"],
+    
+    // HP5
+    "H370": ["STOT SE 1"],
+    "H371": ["STOT SE 2"],
+    "H335": ["STOT SE 3"],
+    "H372": ["STOT RE 1"],
+    "H373": ["STOT RE 2"],
+    "H304": ["Asp. Tox. 1"],
+    
+    // HP6
+    "H300": ["Acute Tox.1", "Acute Tox. 2"],
+    "H301": ["Acute Tox. 3"],
+    "H302": ["Acute Tox 4"],
+    "H310": ["Acute Tox.1", "Acute Tox.2"],
+    "H311": ["Acute Tox. 3"],
+    "H312": ["Acute Tox 4"],
+    "H330": ["Acute Tox 1", "Acute Tox.2"],
+    "H331": ["Acute Tox. 3"],
+    "H332": ["Acute Tox. 4"],
+    
+    // HP7
+    "H350": ["Carc. 1A", "Carc. 1B"],
+    "H351": ["Carc. 2"],
+    
+    // HP8 (già incluso in HP4)
+    
+    // HP10
+    "H360": ["Repr. 1A", "Repr. 1B"],
+    "H361": ["Repr. 2"],
+    
+    // HP11
+    "H340": ["Muta. 1A", "Muta. 1B"],
+    "H341": ["Muta. 2"],
+    
+    // HP13
+    "H317": ["SkinSens. 1"],
+    "H334": ["Resp. Sens. 1"],
+    
+    // HP14
+    "H420": ["Ozone 1"],
+    "H400": ["Aquatic Acute 1"],
+    "H410": ["Aquatic Chronic 1"],
+    "H411": ["Aquatic Chronic 2"],
+    "H412": ["Aquatic Chronic 3"],
+    "H413": ["Aquatic Chronic 4"]
+};
+
+// Lista di frasi H valide (quelle supportate dal classificatore)
+const frasiHValide = Object.keys(frasiHToHazardClass);
+
+// Funzione per aggiornare le opzioni del menu a tendina dell'Hazard Class
+// MODIFICATO: ora non mostra errori durante l'input
+function updateHazardClassOptions(fraseHInput, showErrors = false) {
+    const fraseH = fraseHInput.value.trim();
+    const row = fraseHInput.closest('.frase-h-row');
+    if (!row) return;
+    
+    const hazardClassSelect = row.querySelector('.hazard-class-select');
+    if (!hazardClassSelect) return;
+    
+    // Rimuovi eventuali errori precedenti se non stiamo mostrando errori
+    if (!showErrors) {
+        fraseHInput.classList.remove('input-error');
+        const errorMsg = row.querySelector('.error-message');
+        if (errorMsg) errorMsg.remove();
+    }
+    
+    // Abilita/disabilita il select di Hazard Class in base alla presenza di una frase H valida
+    hazardClassSelect.disabled = !fraseH || !frasiHValide.includes(fraseH);
+    
+    // Reset delle opzioni
+    hazardClassSelect.innerHTML = '';
+    
+    // Opzione vuota predefinita
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    
+    if (!fraseH) {
+        defaultOption.textContent = 'Seleziona prima una frase H';
+    } else if (!frasiHValide.includes(fraseH)) {
+        defaultOption.textContent = 'Frase H non valida';
+        
+        // Mostra l'errore solo se richiesto (durante la validazione)
+        if (showErrors) {
+            // Evidenzia l'errore nella frase H
+            fraseHInput.classList.add('input-error');
+            
+            // Aggiungi messaggio di errore se non esiste già
+            if (!row.querySelector('.error-message')) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = 'Errore frase H non gestita nel classificatore. Contattare il supporto.';
+                fraseHInput.parentNode.appendChild(errorDiv);
+            }
+        }
+    } else {
+        // Frase H valida
+        defaultOption.textContent = 'Seleziona un Hazard Class';
+    }
+    
+    hazardClassSelect.appendChild(defaultOption);
+    
+    // Se c'è una frase H valida, popola le opzioni di Hazard Class
+    if (fraseH && frasiHToHazardClass[fraseH]) {
+        frasiHToHazardClass[fraseH].forEach(hazardClass => {
+            const option = document.createElement('option');
+            option.value = hazardClass;
+            option.textContent = hazardClass;
+            hazardClassSelect.appendChild(option);
+        });
+    }
+    
+    return frasiHValide.includes(fraseH);
+}
+
+// Funzione per validare tutte le frasi H e mostrare errori
+function validaFrasiH() {
+    let tutteValide = true;
+    let fraseHSenzaHazardClass = false;
+    
+    // Controlla tutte le frasi H
+    document.querySelectorAll('.frase-h-row').forEach(row => {
+        const fraseHInput = row.querySelector('.frase-h-input');
+        const hazardClassSelect = row.querySelector('.hazard-class-select');
+        
+        if (!fraseHInput || !hazardClassSelect) return;
+        
+        const fraseH = fraseHInput.value.trim();
+        const hazardClass = hazardClassSelect.value.trim();
+        
+        // Se la frase H è compilata ma non è valida, segna come errore
+        if (fraseH && !frasiHValide.includes(fraseH)) {
+            tutteValide = false;
+            // Aggiorna le opzioni mostrando gli errori
+            updateHazardClassOptions(fraseHInput, true);
+        } 
+        // Se la frase H è valida ma manca l'Hazard Class
+        else if (fraseH && frasiHValide.includes(fraseH) && !hazardClass) {
+            fraseHSenzaHazardClass = true;
+            hazardClassSelect.classList.add('input-error');
+            
+            // Aggiungi messaggio di errore sotto il select se non esiste già
+            if (!row.querySelector('.hazard-error-message')) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message hazard-error-message';
+                errorDiv.textContent = 'Seleziona un Hazard Class per questa frase H';
+                hazardClassSelect.parentNode.appendChild(errorDiv);
+            }
+        }
+    });
+    
+    return { tutteValide, fraseHSenzaHazardClass };
+}
+
+
+
+
 // Carica i risultati del confronto ECHA nella sezione Aggiornamenti
 function loadEchaComparisonResults() {
     console.log("Tentativo di caricamento risultati confronto ECHA...");
@@ -1045,7 +1239,7 @@ function renderTabellaRiscontroSali(data) {
                 <button class="btn btn-sm btn-success save-btn" onclick="salvaSaleSingolo(${item.ID || item.id})" style="display:none;">
                     <i class="fas fa-save"></i>
                 </button>
-                <button class="btn btn-sm btn-danger delete-btn" onclick="eliminaSale(${item.ID || item.id})">
+                <button class="btn btn-sm btn-danger delete-btn">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -1867,41 +2061,41 @@ async function eliminaSostanza(id) {
             throw new Error(`ID non valido: ${id}`);
         }
         
-        // Conferma eliminazione
-        const conferma = confirm(`Sei sicuro di voler eliminare questa sostanza? Questa azione non può essere annullata.`);
-        if (!conferma) return;
-        
-        console.log('Eliminazione sostanza con ID:', id);
-        
-        // Usa l'API per eliminare dal database
-        const result = await window.electronAPI.executeSQLite(
-            'DELETE FROM sostanze WHERE ROWID = ?',
-            [id]
+        // Usa showCustomAlert invece di confirm
+        showCustomAlert(`Sei sicuro di voler eliminare questa sostanza? Questa azione non può essere annullata.`, 
+            async () => {
+                console.log('Eliminazione sostanza con ID:', id);
+                
+                // Usa l'API per eliminare dal database
+                const result = await window.electronAPI.executeSQLite(
+                    'DELETE FROM sostanze WHERE ROWID = ?',
+                    [id]
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Errore nell'eliminazione: ${result.message}`);
+                }
+                
+                // Verifica quante righe sono state modificate
+                console.log(`Righe eliminate: ${result.changes}`);
+                
+                if (result.changes === 0) {
+                    throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
+                }
+                
+                // Rimuovi la riga dalla tabella
+                const row = document.querySelector(`#sostanzeTableBody tr[data-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                // Notifica utente
+                showNotification('Sostanza eliminata con successo');
+                
+                // Aggiungi attività
+                addActivity('Sostanza eliminata', `Eliminata sostanza ID: ${id}`, 'fas fa-trash');
+            }
         );
-        
-        if (!result.success) {
-            throw new Error(`Errore nell'eliminazione: ${result.message}`);
-        }
-        
-        // Verifica quante righe sono state modificate
-        console.log(`Righe eliminate: ${result.changes}`);
-        
-        if (result.changes === 0) {
-            throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
-        }
-        
-        // Rimuovi la riga dalla tabella
-        const row = document.querySelector(`#sostanzeTableBody tr[data-id="${id}"]`);
-        if (row) {
-            row.remove();
-        }
-        
-        // Notifica utente
-        showNotification('Sostanza eliminata con successo');
-        
-        // Aggiungi attività
-        addActivity('Sostanza eliminata', `Eliminata sostanza ID: ${id}`, 'fas fa-trash');
-        
     } catch (error) {
         console.error('Errore nell\'eliminazione della sostanza:', error);
         showNotification('Errore nell\'eliminazione: ' + error.message, 'error');
@@ -2037,7 +2231,7 @@ function renderTabellaRiscontroFrasiH(data) {
                 <button class="btn btn-sm btn-success save-btn" onclick="salvaFraseHSingola(${ID})" style="display:none;">
                     <i class="fas fa-save"></i>
                 </button>
-                <button class="btn btn-sm btn-danger delete-btn" onclick="eliminaFraseH(${ID})">
+                <button class="btn btn-sm btn-danger delete-btn">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -2385,41 +2579,41 @@ async function eliminaFraseH(id) {
             throw new Error(`ID non valido: ${id}`);
         }
         
-        // Conferma eliminazione
-        const conferma = confirm(`Sei sicuro di voler eliminare questa frase H? Questa azione non può essere annullata.`);
-        if (!conferma) return;
-        
-        console.log('Eliminazione frase H con ID:', id);
-        
-        // Usa l'API per eliminare dal database - Nota le virgolette per gestire lo spazio nel nome della tabella
-        const result = await window.electronAPI.executeSQLite(
-            'DELETE FROM "frasi H" WHERE ROWID = ?',
-            [id]
+        // Usa showCustomAlert invece di confirm
+        showCustomAlert(`Sei sicuro di voler eliminare questa frase H? Questa azione non può essere annullata.`, 
+            async () => {
+                console.log('Eliminazione frase H con ID:', id);
+                
+                // Usa l'API per eliminare dal database - Nota le virgolette per gestire lo spazio nel nome della tabella
+                const result = await window.electronAPI.executeSQLite(
+                    'DELETE FROM "frasi H" WHERE ROWID = ?',
+                    [id]
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Errore nell'eliminazione: ${result.message}`);
+                }
+                
+                // Verifica quante righe sono state modificate
+                console.log(`Righe eliminate: ${result.changes}`);
+                
+                if (result.changes === 0) {
+                    throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
+                }
+                
+                // Rimuovi la riga dalla tabella
+                const row = document.querySelector(`#frasiHTableBody tr[data-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                // Notifica utente
+                showNotification('Frase H eliminata con successo');
+                
+                // Aggiungi attività
+                addActivity('Frase H eliminata', `Eliminata frase H ID: ${id}`, 'fas fa-trash');
+            }
         );
-        
-        if (!result.success) {
-            throw new Error(`Errore nell'eliminazione: ${result.message}`);
-        }
-        
-        // Verifica quante righe sono state modificate
-        console.log(`Righe eliminate: ${result.changes}`);
-        
-        if (result.changes === 0) {
-            throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
-        }
-        
-        // Rimuovi la riga dalla tabella
-        const row = document.querySelector(`#frasiHTableBody tr[data-id="${id}"]`);
-        if (row) {
-            row.remove();
-        }
-        
-        // Notifica utente
-        showNotification('Frase H eliminata con successo');
-        
-        // Aggiungi attività
-        addActivity('Frase H eliminata', `Eliminata frase H ID: ${id}`, 'fas fa-trash');
-        
     } catch (error) {
         console.error('Errore nell\'eliminazione della frase H:', error);
         showNotification('Errore nell\'eliminazione: ' + error.message, 'error');
@@ -2745,19 +2939,250 @@ function aggiungiCampoFraseH() {
     row.className = 'frase-h-row';
     row.innerHTML = `
         <div class="form-group">
-            <label>Frase H</label>
+            <label>Frase H <span class="text-danger" style="color: red;">*</span></label>
             <input type="text" class="form-control frase-h-input" placeholder="Frase H">
         </div>
         <div class="form-group">
-            <label>Hazard Class and Category</label>
-            <input type="text" class="form-control hazard-class-input" placeholder="Hazard Class">
+            <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
+            <select class="form-control hazard-class-select" disabled>
+                <option value="">Seleziona prima una frase H</option>
+            </select>
         </div>
-        <button class="btn btn-sm btn-danger remove-frase-btn">
+        <button type="button" class="btn btn-sm btn-danger remove-frase-btn">
             <i class="fas fa-times"></i>
         </button>
     `;
     container.appendChild(row);
+    
+    // Aggiungi event listener alla frase H input
+    const fraseHInput = row.querySelector('.frase-h-input');
+    fraseHInput.addEventListener('input', function() {
+        updateHazardClassOptions(this);
+    });
+    
+    // Aggiungi event listener per il bottone di rimozione
+    const removeBtn = row.querySelector('.remove-frase-btn');
+    removeBtn.addEventListener('click', function() {
+        row.remove();
+    });
 }
+
+
+
+
+// Funzione per convertire le righe esistenti sostituendo solo l'input hazard-class-input con un select
+function sostituisciHazardClassInputConSelect() {
+    const container = document.getElementById('frasiHContainer');
+    if (!container) return;
+    
+    // Sostituisci la funzione originale per garantire che le nuove righe usino il select
+    window.aggiungiCampoFraseH = aggiungiCampoFraseH;
+    
+    // Converti le righe esistenti
+    const rows = container.querySelectorAll('.frase-h-row');
+    rows.forEach(row => {
+        const fraseHInput = row.querySelector('.frase-h-input');
+        const hazardClassInput = row.querySelector('.hazard-class-input');
+        
+        if (hazardClassInput) {
+            // Conserva il valore originale
+            const hazardClassValue = hazardClassInput.value.trim();
+            
+            // Crea il container per il select (sostituisce il form-group del vecchio input)
+            const hazardClassFormGroup = hazardClassInput.parentNode;
+            
+            // Crea il nuovo select
+            const selectHTML = `
+                <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
+                <select class="form-control hazard-class-select" disabled>
+                    <option value="">Seleziona prima una frase H</option>
+                </select>
+            `;
+            
+            hazardClassFormGroup.innerHTML = selectHTML;
+            
+            // Se c'è un campo fraseH con un valore, aggiorna le opzioni
+            if (fraseHInput) {
+                const fraseHValue = fraseHInput.value.trim();
+                
+                if (fraseHValue && frasiHValide.includes(fraseHValue)) {
+                    const hazardClassSelect = hazardClassFormGroup.querySelector('.hazard-class-select');
+                    
+                    // Popola le opzioni di Hazard Class
+                    hazardClassSelect.disabled = false;
+                    
+                    // Rimuovi l'opzione predefinita
+                    hazardClassSelect.innerHTML = '';
+                    
+                    // Aggiungi opzione vuota predefinita
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Seleziona un Hazard Class';
+                    hazardClassSelect.appendChild(defaultOption);
+                    
+                    // Aggiungi opzioni in base alla frase H
+                    if (frasiHToHazardClass[fraseHValue]) {
+                        frasiHToHazardClass[fraseHValue].forEach(hazardClass => {
+                            const option = document.createElement('option');
+                            option.value = hazardClass;
+                            option.textContent = hazardClass;
+                            
+                            // Seleziona automaticamente l'opzione che corrisponde al valore precedente
+                            if (hazardClass === hazardClassValue) {
+                                option.selected = true;
+                            }
+                            
+                            hazardClassSelect.appendChild(option);
+                        });
+                    }
+                }
+                
+                // Aggiungi event listener all'input della frase H
+                fraseHInput.addEventListener('input', function() {
+                    updateHazardClassOptions(this);
+                });
+            }
+        }
+    });
+}
+
+// Modifica la funzione di reset del form
+function patchResetFormFunction() {
+    // Salva il riferimento alla funzione originale
+    const originalResetFormNuovaSostanza = window.resetFormNuovaSostanza;
+    
+    // Sostituisci la funzione originale
+    window.resetFormNuovaSostanza = function() {
+        // Esegui il reset originale
+        if (typeof originalResetFormNuovaSostanza === 'function') {
+            originalResetFormNuovaSostanza();
+        } else {
+            // Reset di base se la funzione originale non è disponibile
+            document.getElementById('nomeSostanza').value = '';
+            document.getElementById('codCAS').value = '';
+            document.getElementById('categoriaSostanza').value = '';
+            
+            // Reset frasi H - mantieni solo una riga vuota con le nuove componenti
+            document.getElementById('frasiHContainer').innerHTML = '';
+            aggiungiCampoFraseH();
+        }
+        
+        // Rimuovi eventuali errori residui
+        document.querySelectorAll('.input-error').forEach(el => {
+            el.classList.remove('input-error');
+        });
+        document.querySelectorAll('.error-message').forEach(el => {
+            el.remove();
+        });
+    };
+}
+
+// Modifica la funzione di inserimento nuova sostanza
+function patchInserisciNuovaSostanzaFunction() {
+    // Salva il riferimento alla funzione originale
+    const originalInserisciNuovaSostanza = window.inserisciNuovaSostanza;
+    
+    // Sostituisci la funzione originale
+    window.inserisciNuovaSostanza = async function() {
+        // Prima valida le frasi H e mostra gli errori
+        const { tutteValide, fraseHSenzaHazardClass } = validaFrasiH();
+        
+        // Se ci sono frasi H non valide, interrompi l'inserimento
+        if (!tutteValide) {
+            showNotification('Ci sono frasi H non valide. Correggi gli errori evidenziati.', 'warning');
+            
+            // Rimuovi automaticamente gli errori dopo 2 secondi
+            setTimeout(() => {
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 2000);
+            
+            return false;
+        }
+        
+        // Se ci sono frasi H valide ma senza Hazard Class, interrompi l'inserimento
+        if (fraseHSenzaHazardClass) {
+            showNotification('Seleziona un Hazard Class per ogni frase H inserita', 'warning');
+            
+            // Rimuovi automaticamente gli errori dopo 2 secondi
+            setTimeout(() => {
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 2000);
+            
+            return false;
+        }
+        
+        // Raccogli i valori dai select prima di eseguire la funzione originale
+        document.querySelectorAll('.hazard-class-select:not([disabled])').forEach(select => {
+            const value = select.value;
+            // Crea un campo nascosto con il valore del select per il salvataggio
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.className = 'hazard-class-input';
+            hiddenInput.value = value;
+            select.parentNode.appendChild(hiddenInput);
+        });
+        
+        // Chiama la funzione originale
+        return await originalInserisciNuovaSostanza();
+    };
+}
+
+
+
+
+// Funzione principale di inizializzazione
+function inizializzaFormFrasiH() {
+    // Aggiungi stile CSS per i messaggi di errore
+    aggiungiStilePerErrori();
+    
+    // Modifica la funzione aggiungiCampoFraseH
+    window.aggiungiCampoFraseH = aggiungiCampoFraseH;
+    
+    // Converti le righe esistenti
+    sostituisciHazardClassInputConSelect();
+    
+    // Modifica le funzioni di reset e inserimento
+    patchResetFormFunction();
+    patchInserisciNuovaSostanzaFunction();
+}
+
+// Aggiungi stile CSS per i messaggi di errore
+function aggiungiStilePerErrori() {
+    // Verifica se lo stile esiste già
+    if (!document.getElementById('stileErroriHazard')) {
+        const style = document.createElement('style');
+        style.id = 'stileErroriHazard';
+        style.textContent = `
+            .error-message {
+                color: #e74c3c;
+                font-size: 0.8rem;
+                margin-top: 3px;
+                font-weight: 500;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Inizializza il form quando il documento è pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inizializzaFormFrasiH);
+} else {
+    inizializzaFormFrasiH();
+}
+
+
+
 
 // Aggiungi un campo per la frase EUH
 function aggiungiCampoFraseEUH() {
@@ -2776,7 +3201,7 @@ function aggiungiCampoFraseEUH() {
     container.appendChild(row);
 }
 
-// Funzione per inserire una nuova sostanza con controlli semplici
+// Funzione per inserire una nuova sostanza con controlli migliorati per le frasi H
 async function inserisciNuovaSostanza() {
     try {
         // Ottieni i valori dal form
@@ -2787,6 +3212,11 @@ async function inserisciNuovaSostanza() {
         // Rimuovi eventuali evidenziazioni di errore precedenti
         document.querySelectorAll('.input-error').forEach(el => {
             el.classList.remove('input-error');
+        });
+        
+        // Rimuovi messaggi di errore precedenti
+        document.querySelectorAll('.error-message').forEach(el => {
+            el.remove();
         });
         
         // Tieni traccia se ci sono errori
@@ -2812,8 +3242,40 @@ async function inserisciNuovaSostanza() {
             hasErrors = true;
         }
         
+        // Lista di frasi H valide (quelle supportate dal classificatore)
+        const frasiHValide = [
+            // HP1 - Esplosivo
+            "H200", "H201", "H202", "H203", "H204", "H240", "H241",
+            // HP2 - Comburente
+            "H270", "H271", "H272",
+            // HP3 - Infiammabile
+            "H224", "H225", "H226", "H228", "H242", "H250", "H251", "H252", "H260", "H261",
+            // HP4 - Irritante
+            "H314", "H315", "H318", "H319",
+            // HP5 - Tossicità specifica per organi bersaglio (STOT)/Tossicità in caso di aspirazione
+            "H370", "H371", "H335", "H372", "H373", "H304",
+            // HP6 - Tossicità acuta
+            "H300", "H301", "H302", "H310", "H311", "H312", "H330", "H331", "H332",
+            // HP7 - cancerogeno
+            "H350", "H351",
+            // HP8 - Corrosivo (già presente in HP4)
+            // "H314",
+            // HP10 - Tossico per la riproduzione
+            "H360", "H361",
+            // HP11 - Mutageno
+            "H340", "H341",
+            // HP12 - Liberazione di gas a tossicità acuta (EUH codes, controllati separatamente)
+            // "EUH029", "EUH031", "EUH032",
+            // HP13 - Sensibilizzante respiratorio
+            "H317", "H334",
+            // HP14 - Ecotossico 
+            "H400", "H410", "H411", "H412", "H413", "H420",
+            // HP15 - Potenziale sviluppo di caratteristiche di pericolo
+            "H205"
+        ];
+        
         // Validazione frasi H (deve esserci almeno una frase H con relativa classe)
-        let fraseHValida = false;
+        let fraseHValidaTrovata = false;
         const frasiHContainer = document.getElementById('frasiHContainer');
         
         if (frasiHContainer) {
@@ -2824,36 +3286,77 @@ async function inserisciNuovaSostanza() {
                     const fraseHInput = row.querySelector('.frase-h-input');
                     const hazardClassInput = row.querySelector('.hazard-class-input');
                     
-                    if (fraseHInput && fraseHInput.value.trim() && 
-                        hazardClassInput && hazardClassInput.value.trim()) {
-                        fraseHValida = true;
-                        break;
+                    if (fraseHInput && hazardClassInput) {
+                        const fraseHValue = fraseHInput.value.trim();
+                        const hazardClassValue = hazardClassInput.value.trim();
+                        
+                        // Verifica se il campo frase H è compilato
+                        if (fraseHValue) {
+                            // Verifica se la frase H è valida
+                            if (!frasiHValide.includes(fraseHValue)) {
+                                // Frase H non valida
+                                fraseHInput.classList.add('input-error');
+                                
+                                // Aggiungi messaggio di errore sotto il campo
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'error-message';
+                                errorDiv.textContent = 'Errore frase H non gestita nel classificatore. Contattare il supporto.';
+                                fraseHInput.parentNode.appendChild(errorDiv);
+                                
+                                hasErrors = true;
+                            } else if (!hazardClassValue) {
+                                // Frase H valida ma hazard class mancante
+                                hazardClassInput.classList.add('input-error');
+                                hasErrors = true;
+                            } else {
+                                // Entrambi i campi sono validi
+                                fraseHValidaTrovata = true;
+                            }
+                        } else if (hazardClassValue) {
+                            // Hazard Class compilato ma frase H mancante
+                            fraseHInput.classList.add('input-error');
+                            hasErrors = true;
+                        }
                     }
                 }
             }
             
-            if (!fraseHValida) {
-                // Evidenzia i campi in tutte le righe di frasi H
-                frasiHContainer.querySelectorAll('.frase-h-input, .hazard-class-input').forEach(input => {
-                    if (!input.value.trim()) {
-                        input.classList.add('input-error');
-                    }
-                });
-                
+            if (!fraseHValidaTrovata) {
+                // Se non abbiamo trovato nessuna frase H valida, aggiungiamo la categoria all'elenco
                 campiConErrore.push('Frasi H');
+                
+                // Se non c'è nessun altro errore di frase H già evidenziato, evidenziamo il primo campo
+                if (!document.querySelector('.frase-h-input.input-error')) {
+                    const primaRiga = frasiHContainer.querySelector('.frase-h-row');
+                    if (primaRiga) {
+                        const fraseHInput = primaRiga.querySelector('.frase-h-input');
+                        const hazardClassInput = primaRiga.querySelector('.hazard-class-input');
+                        
+                        if (fraseHInput) fraseHInput.classList.add('input-error');
+                        if (hazardClassInput) hazardClassInput.classList.add('input-error');
+                    }
+                }
+                
                 hasErrors = true;
             }
         }
         
         // Se ci sono errori di validazione, mostra una notifica e interrompi
         if (hasErrors) {
-            const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
-            showNotification(messaggioErrore, 'warning');
+            if (campiConErrore.length > 0) {
+                const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
+                showNotification(messaggioErrore, 'warning');
+            } else {
+                showNotification('Correggi gli errori nei campi evidenziati', 'warning');
+            }
             
-            // Rimuovi automaticamente gli errori dopo 2 secondi
+            // Rimuovi automaticamente gli errori e i messaggi dopo 2 secondi
             setTimeout(() => {
                 document.querySelectorAll('.input-error').forEach(el => {
                     el.classList.remove('input-error');
+                });
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
                 });
             }, 2000);
             
@@ -2991,7 +3494,7 @@ async function inserisciNuovaSostanza() {
     }
 }
 
-// Aggiungi stile CSS semplice per evidenziare i campi con errore
+// Aggiungi stile CSS per evidenziare i campi con errore e i messaggi
 function aggiungiStileBase() {
     // Verifica se lo stile esiste già
     if (!document.getElementById('stileBaseValidazione')) {
@@ -3001,6 +3504,13 @@ function aggiungiStileBase() {
             .input-error {
                 border: 2px solid #e74c3c !important;
                 background-color: rgba(231, 76, 60, 0.05) !important;
+            }
+            
+            .error-message {
+                color: #e74c3c;
+                font-size: 0.8rem;
+                margin-top: 3px;
+                font-weight: 500;
             }
         `;
         document.head.appendChild(style);
@@ -3055,11 +3565,11 @@ function resetFormNuovaSostanza() {
     document.getElementById('frasiHContainer').innerHTML = `
         <div class="frase-h-row">
             <div class="form-group">
-                <label>Frase H</label>
+                <label>Frase H <span class="text-danger" style="color: red;">*</span></label>
                 <input type="text" class="form-control frase-h-input" placeholder="Frase H">
             </div>
             <div class="form-group">
-                <label>Hazard Class and Category</label>
+                <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
                 <input type="text" class="form-control hazard-class-input" placeholder="Hazard Class">
             </div>
             <button class="btn btn-sm btn-danger remove-frase-btn">
@@ -3248,41 +3758,42 @@ async function eliminaSale(id) {
             throw new Error(`ID non valido: ${id}`);
         }
         
-        // Conferma eliminazione
-        const conferma = confirm(`Sei sicuro di voler eliminare questo sale? Questa azione non può essere annullata.`);
-        if (!conferma) return;
-        
-        console.log('Eliminazione sale con ID:', id);
-        
-        // Usa l'API per eliminare dal database
-        const result = await window.electronAPI.executeSQLite(
-            'DELETE FROM sali WHERE ROWID = ?',
-            [id]
+        // Usa showCustomAlert invece di confirm
+        showCustomAlert(`Sei sicuro di voler eliminare questo sale? Questa azione non può essere annullata.`, 
+            async () => {
+                // Questo codice viene eseguito solo quando l'utente conferma
+                console.log('Eliminazione sale con ID:', id);
+                
+                // Usa l'API per eliminare dal database
+                const result = await window.electronAPI.executeSQLite(
+                    'DELETE FROM sali WHERE ROWID = ?',
+                    [id]
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Errore nell'eliminazione: ${result.message}`);
+                }
+                
+                // Verifica quante righe sono state modificate
+                console.log(`Righe eliminate: ${result.changes}`);
+                
+                if (result.changes === 0) {
+                    throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
+                }
+                
+                // Rimuovi la riga dalla tabella
+                const row = document.querySelector(`#saliTableBody tr[data-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                // Notifica utente
+                showNotification('Sale eliminato con successo');
+                
+                // Aggiungi attività
+                addActivity('Sale eliminato', `Eliminato sale ID: ${id}`, 'fas fa-flask');
+            }
         );
-        
-        if (!result.success) {
-            throw new Error(`Errore nell'eliminazione: ${result.message}`);
-        }
-        
-        // Verifica quante righe sono state modificate
-        console.log(`Righe eliminate: ${result.changes}`);
-        
-        if (result.changes === 0) {
-            throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
-        }
-        
-        // Rimuovi la riga dalla tabella
-        const row = document.querySelector(`#saliTableBody tr[data-id="${id}"]`);
-        if (row) {
-            row.remove();
-        }
-        
-        // Notifica utente
-        showNotification('Sale eliminato con successo');
-        
-        // Aggiungi attività
-        addActivity('Sale eliminato', `Eliminato sale ID: ${id}`, 'fas fa-flask');
-        
     } catch (error) {
         console.error('Errore nell\'eliminazione del sale:', error);
         showNotification('Errore nell\'eliminazione: ' + error.message, 'error');
@@ -3387,7 +3898,7 @@ function renderTabellaRiscontroFrasiEUH(data) {
                 <button class="btn btn-sm btn-success save-btn" onclick="salvaFraseEUHSingola(${ID})" style="display:none;">
                     <i class="fas fa-save"></i>
                 </button>
-                <button class="btn btn-sm btn-danger delete-btn" onclick="eliminaFraseEUH(${ID})">
+                <button class="btn btn-sm btn-danger delete-btn">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -3691,41 +4202,41 @@ async function eliminaFraseEUH(id) {
             throw new Error(`ID non valido: ${id}`);
         }
         
-        // Conferma eliminazione
-        const conferma = confirm(`Sei sicuro di voler eliminare questa frase EUH? Questa azione non può essere annullata.`);
-        if (!conferma) return;
-        
-        console.log('Eliminazione frase EUH con ID:', id);
-        
-        // Usa l'API per eliminare dal database - Nota le virgolette per gestire lo spazio nel nome della tabella
-        const result = await window.electronAPI.executeSQLite(
-            'DELETE FROM "EUH" WHERE ROWID = ?',
-            [id]
+        // Usa showCustomAlert invece di confirm
+        showCustomAlert(`Sei sicuro di voler eliminare questa frase EUH? Questa azione non può essere annullata.`, 
+            async () => {
+                console.log('Eliminazione frase EUH con ID:', id);
+                
+                // Usa l'API per eliminare dal database - Nota le virgolette per gestire lo spazio nel nome della tabella
+                const result = await window.electronAPI.executeSQLite(
+                    'DELETE FROM "EUH" WHERE ROWID = ?',
+                    [id]
+                );
+                
+                if (!result.success) {
+                    throw new Error(`Errore nell'eliminazione: ${result.message}`);
+                }
+                
+                // Verifica quante righe sono state modificate
+                console.log(`Righe eliminate: ${result.changes}`);
+                
+                if (result.changes === 0) {
+                    throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
+                }
+                
+                // Rimuovi la riga dalla tabella
+                const row = document.querySelector(`#frasiEUHTableBody tr[data-id="${id}"]`);
+                if (row) {
+                    row.remove();
+                }
+                
+                // Notifica utente
+                showNotification('Frase EUH eliminata con successo');
+                
+                // Aggiungi attività
+                addActivity('Frase EUH eliminata', `Eliminata frase EUH ID: ${id}`, 'fas fa-trash');
+            }
         );
-        
-        if (!result.success) {
-            throw new Error(`Errore nell'eliminazione: ${result.message}`);
-        }
-        
-        // Verifica quante righe sono state modificate
-        console.log(`Righe eliminate: ${result.changes}`);
-        
-        if (result.changes === 0) {
-            throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
-        }
-        
-        // Rimuovi la riga dalla tabella
-        const row = document.querySelector(`#frasiEUHTableBody tr[data-id="${id}"]`);
-        if (row) {
-            row.remove();
-        }
-        
-        // Notifica utente
-        showNotification('Frase EUH eliminata con successo');
-        
-        // Aggiungi attività
-        addActivity('Frase EUH eliminata', `Eliminata frase EUH ID: ${id}`, 'fas fa-trash');
-        
     } catch (error) {
         console.error('Errore nell\'eliminazione della frase EUH:', error);
         showNotification('Errore nell\'eliminazione: ' + error.message, 'error');
@@ -4023,3 +4534,9 @@ window.inserisciNuovaFraseEUH = inserisciNuovaFraseEUH;
 // Esponi le funzioni utilizzate da altri moduli
 window.loadEchaComparisonResults = loadEchaComparisonResults;
 window.handleEchaUpdateAction = handleEchaUpdateAction;
+
+// Esponi le funzioni globalmente
+window.frasiHToHazardClass = frasiHToHazardClass;
+window.frasiHValide = frasiHValide;
+window.updateHazardClassOptions = updateHazardClassOptions;
+window.inizializzaFormFrasiH = inizializzaFormFrasiH;
