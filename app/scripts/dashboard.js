@@ -19,6 +19,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Inizializza sezione sali-metalli
     await initSaliMetalli();
 
+    // Inizializza check raccolta
+    addSostanzeMissingDialogCSS();
+
     // Inizializza sezione classificazione
     initClassificazione();          // Questa chiama la funzione dal modulo classificazione.js
     updateClassificationUI();       // Assicura che l'UI sia aggiornata all'avvio
@@ -617,7 +620,7 @@ function updateSavedFiles() {
 // ==== Funzioni di utilità ====
 
 // Mostra notifica
-function showNotification(message, type = 'success') {
+function showNotification(message, type = 'success', duration = 5000) {
     const notification = document.getElementById('notification');
     const notificationText = document.getElementById('notificationText');
     
@@ -630,7 +633,7 @@ function showNotification(message, type = 'success') {
     // Auto-hide after 3 seconds
     setTimeout(() => {
         notification.style.display = 'none';
-    }, 3000);
+    }, duration);
 }
 
 // Formatta il tempo passato
@@ -824,6 +827,7 @@ function validateAndDisplayExcel(worksheet) {
 
 //questa funzione è il ponte tra il file Excel caricato dall'utente e i dati strutturati che 
 // l'applicazione può elaborare per le successive fasi di analisi e classificazione dei rifiuti.
+// Modifiche alla funzione handleFileSelection() per gestire l'errore di sostanze mancanti
 async function handleFileSelection(filePath) {
     try {
         showNotification('Caricamento file in corso...', 'info');
@@ -861,6 +865,21 @@ async function handleFileSelection(filePath) {
                     value.toString().trim() !== ''
                 );
             });
+            
+            // NUOVO CODICE: Verifica immediata delle sostanze nel database
+            try {
+                // Invia i dati a Python per verifica (ma senza salvarli permanentemente)
+                const verifyResult = await window.electronAPI.verifyExcelData(filteredData, 'raccolta');
+                
+                // Se la verifica fallisce a causa di sostanze mancanti
+                if (!verifyResult.success && verifyResult.sostanze_mancanti && verifyResult.sostanze_mancanti.length > 0) {
+                    showSostanzeMissingDialog(verifyResult.sostanze_mancanti);
+                    return; // Interrompi il caricamento
+                }
+            } catch (verifyError) {
+                console.error("Errore nella verifica delle sostanze:", verifyError);
+                // Continua comunque, il controllo verrà fatto durante il salvataggio
+            }
             
             // Salva i dati filtrati in sessionStorage
             sessionStorage.setItem('raccoltaExcelData', JSON.stringify(filteredData));
@@ -907,6 +926,126 @@ async function handleFileSelection(filePath) {
     }
 }
 
+// Aggiungere questa nuova funzione per mostrare un dialog con le sostanze mancanti
+// Modifica della funzione showSostanzeMissingDialog per mostrare solo un messaggio di errore semplice
+function showSostanzeMissingDialog(sostanzeMancanti) {
+    // Mostra un messaggio di errore semplificato che menziona solo le sostanze mancanti
+    let errorMessage = '';
+    
+    // Se c'è solo una sostanza mancante
+    if (sostanzeMancanti.length === 1) {
+        errorMessage = `Errore: La sostanza "${sostanzeMancanti[0]}" non è presente nel database`;
+    } else {
+        // Per più sostanze, menziona solo la prima e indica che ci sono altre
+        errorMessage = `Errore: La sostanza "${sostanzeMancanti[0]}" e altre ${sostanzeMancanti.length - 1} non sono presenti nel database`;
+    }
+    
+    // Mostra la notifica di errore
+    showNotification(errorMessage, 'error', 5000);
+    
+    // Riporta l'interfaccia allo stato iniziale
+    const dropZone = document.getElementById('dropZone');
+    if (dropZone) {
+        dropZone.style.display = 'block';
+    }
+    
+    // Nascondi la tabella Excel se visibile
+    const excelTable = document.getElementById('excelDataTable');
+    if (excelTable) {
+        excelTable.style.display = 'none';
+    }
+    
+    // Nascondi il pulsante salva
+    document.getElementById('salvaInfoRaccoltaBtn').style.display = 'none';
+}
+
+
+// CSS per il dialog di sostanze mancanti
+const sostanzeMissingDialogCSS = `
+.alert-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.custom-alert {
+    background-color: var(--bg-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.sostanze-missing-dialog h3 {
+    color: var(--warning-color);
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.sostanze-missing-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 15px 0;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: rgba(var(--warning-rgb), 0.1);
+}
+
+.sostanze-missing-list ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.sostanze-missing-list li {
+    margin-bottom: 6px;
+    color: var(--text-color);
+}
+
+.custom-alert-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.custom-alert-buttons .btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+.notification-warning {
+    background-color: var(--warning-light);
+    border-left: 4px solid var(--warning-color);
+    color: var(--warning-dark);
+}
+`;
+
+// Aggiungi il CSS al documento
+function addSostanzeMissingDialogCSS() {
+    const styleElement = document.createElement('style');
+    styleElement.textContent = sostanzeMissingDialogCSS;
+    document.head.appendChild(styleElement);
+}
+
+
+
 // Funzione per salvare i dati excell presi da Raccolta in python
 async function saveExcelDataToPython() {
     try {
@@ -945,7 +1084,8 @@ async function saveExcelDataToPython() {
     }
 }
 
-// In dashboard.js - Funzione saveChanges migliorata per salvare i dati di raccolta
+
+// Modifica alla funzione saveChanges() per gestire l'errore di sostanze mancanti
 async function saveChanges() {
     console.log("Funzione saveChanges avviata per dati RACCOLTA");
     
@@ -1015,11 +1155,20 @@ async function saveChanges() {
                 // Aggiungi attività
                 addActivity('Modifiche salvate', 'Dati Excel aggiornati', 'fas fa-save');
             } else {
-                throw new Error(pythonResult.message || 'Errore nel salvataggio in Python');
+                // Gestione dell'errore di sostanze mancanti
+                if (pythonResult.sostanze_mancanti && pythonResult.sostanze_mancanti.length > 0) {
+                    console.error("Sostanze mancanti rilevate:", pythonResult.sostanze_mancanti);
+                    // MODIFICATA: rimuovi "Errore nel salvataggio dei dati in Python:" e imposta durata a 4 secondi
+                    showNotification(pythonResult.message, 'error', 4000);
+                } else {
+                    // Altri tipi di errori
+                    throw new Error(pythonResult.message || 'Errore nel salvataggio in Python');
+                }
             }
         } catch (pythonError) {
             console.error("Errore nell'elaborazione Python:", pythonError);
-            showNotification('Errore nel salvataggio dei dati in Python: ' + pythonError.message, 'error');
+            // MODIFICATA: rimuovi "Errore nel salvataggio dei dati in Python:" e imposta durata a 4 secondi
+            showNotification(pythonError.message, 'error', 4000);
         }
         
     } catch (error) {

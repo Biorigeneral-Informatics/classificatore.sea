@@ -103,7 +103,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // API per cancellare i dati dei form
   clearInfoRaccolta: () => ipcRenderer.invoke('clear-info-raccolta'),
 
+  
+
 });
+
+
+
+
 
 // Esposizione di alcune variabili di Node per utilizzo nel renderer
 contextBridge.exposeInMainWorld('appInfo', {
