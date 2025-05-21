@@ -332,11 +332,12 @@ async function assegnaSaliMetalli() {
         //Prepara e salva i dati completi del campione per il classificatore
         const datiCampione = {};
         
-        // Includi i risultati calcolati (metalli con fattori di conversione applicati)
-        for (const [metalloNome, metalloDati] of Object.entries(risultatiCalcolati)) {
-            datiCampione[metalloNome] = {
-                concentrazione_ppm: metalloDati.concentrazione_ppm,
-                concentrazione_percentuale: metalloDati.concentrazione_percentuale
+        // Includi i risultati calcolati (sali con fattori di conversione applicati)
+        for (const [saleNome, saleDati] of Object.entries(risultatiCalcolati)) {
+            datiCampione[saleNome] = {
+                concentrazione_ppm: saleDati.concentrazione_ppm,
+                concentrazione_percentuale: saleDati.concentrazione_percentuale,
+                nome_originale: saleDati.nome_originale // Manteniamo il riferimento al nome originale
             };
         }
         
@@ -349,26 +350,28 @@ async function assegnaSaliMetalli() {
                 // Cerca altre sostanze nei dati Excel che non sono metalli
                 if (Array.isArray(excelData)) {
                     excelData.forEach(row => {
-                        // Estrai il nome della sostanza e il valore (assumendo che ci siano campi Descriz e Valore_Txt)
+                        // Estrai il nome della sostanza e il valore
                         const sostanzaNome = row.Descriz || '';
                         const valoreStr = row.Valore_Txt || '';
 
                         // Normalizza il nome della sostanza rimuovendo spazi multipli
                         const sostanzaNomeNormalizzato = sostanzaNome.replace(/\s+/g, ' ').trim();
                         
-                        //------------------------------------------------------------------------//
-                        // Controlla se la sostanza (normalizzata) è già presente in datiCampione
+                        // Controlla se la sostanza è già presente nei dati dei sali
                         let sostanzaGiaPresente = false;
                         for (const chiave in datiCampione) {
                             const chiaveNormalizzata = chiave.replace(/\s+/g, ' ').trim();
-                            if (chiaveNormalizzata === sostanzaNomeNormalizzato) {
+                            // Verifica anche se corrisponde a un nome_originale
+                            if (chiaveNormalizzata === sostanzaNomeNormalizzato || 
+                                (datiCampione[chiave].nome_originale && 
+                                datiCampione[chiave].nome_originale.replace(/\s+/g, ' ').trim() === sostanzaNomeNormalizzato)) {
                                 sostanzaGiaPresente = true;
                                 break;
                             }
                         }
+                        
                         // Salta sostanze già presenti nei metalli calcolati
                         if (sostanzaGiaPresente) return;
-                        //------------------------------------------------------------------------//
                         
                         // Salta valori sotto il limite di rilevabilità (che iniziano con "<")
                         if (valoreStr.trim().startsWith('<')) return;

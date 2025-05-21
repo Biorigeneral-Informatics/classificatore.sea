@@ -42,13 +42,14 @@ def calcola_concentrazioni_aggiustate(metalli_campione, selezioni_sali):
                     concentrazione_ppm = metallo_dati["concentrazione_ppm"]
                     concentrazione_aggiustata = concentrazione_ppm * fattore
                     
-                    # Memorizza il risultato
-                    risultati[metallo_nome] = {
+                    # MODIFICA: Utilizziamo il nome del sale come chiave principale
+                    # e memorizziamo il nome originale del metallo
+                    risultati[nome_sale] = {
                         "concentrazione_ppm": concentrazione_aggiustata,
                         "concentrazione_percentuale": concentrazione_aggiustata / 10000,
                         "fattore_conversione": fattore,
                         "sale_id": sale_id,
-                        "sale_nome": nome_sale
+                        "nome_originale": metallo_nome  # Aggiungiamo il riferimento al nome originale
                     }
         
         conn.close()

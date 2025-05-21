@@ -814,11 +814,24 @@ class ClassificatoreRifiuti:
                 concentrazione_ppm = dati["concentrazione_ppm"]
                 concentrazione_percentuale = dati["concentrazione_percentuale"]
                 
+                # Salva il nome originale se presente nei dati
+                nome_originale = dati.get("nome_originale", None)
+                
                 # Cerca la sostanza nel database per ottenere le frasi H associate con le hazard class
                 frasi_h_con_class = self.database.get_frasi_h_con_class(nome_sostanza)
-
-                # AGGIUNTO: Cerca anche le frasi EUH associate (se esistono per questa sostanza)
                 frasi_euh_con_class = self.database.get_frasi_euh_con_class(nome_sostanza)
+                
+                # Se non trova frasi H e c'è un nome originale, prova a usare quello
+                if (not frasi_h_con_class or len(frasi_h_con_class) == 0) and nome_originale:
+                    print(f"Nessuna frase H trovata per '{nome_sostanza}', provo con il nome originale '{nome_originale}'")
+                    frasi_h_con_class_orig = self.database.get_frasi_h_con_class(nome_originale)
+                    frasi_euh_con_class_orig = self.database.get_frasi_euh_con_class(nome_originale)
+                    
+                    # Se trova frasi H con il nome originale, usale
+                    if frasi_h_con_class_orig and len(frasi_h_con_class_orig) > 0:
+                        print(f"Trovate frasi H usando il nome originale '{nome_originale}' invece di '{nome_sostanza}'")
+                        frasi_h_con_class = frasi_h_con_class_orig
+                        frasi_euh_con_class = frasi_euh_con_class_orig
                 
                 # Estrai solo le frasi H per retrocompatibilità
                 frasi_h_associate = [info["frase_h"] for info in frasi_h_con_class]
@@ -837,6 +850,9 @@ class ClassificatoreRifiuti:
                     "frasi_h": frasi_h_associate,
                     "frasi_euh": frasi_euh_associate  # AGGIUNTO: Memorizza anche le frasi EUH
                 }
+                # Aggiungi il nome originale se esiste
+                if nome_originale:
+                    campione[nome_sostanza]["nome_originale"] = nome_originale
                 
                 # Inizializza un insieme per tenere traccia delle caratteristiche di pericolo della sostanza
                 hp_sostanza = set()
