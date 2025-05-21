@@ -3247,6 +3247,142 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
     }
 }
 
+
+// Function to check if a substance already exists by both CAS and Name
+async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
+    try {
+        // Normalizza gli input per il confronto
+        const nomeNormalizzato = nomeSostanza.trim();
+        const casNormalizzato = codCAS.trim();
+        
+        console.log(`Verifica sostanza: Nome='${nomeNormalizzato}', CAS='${casNormalizzato}'`);
+        
+        // Prima controlla se esiste una sostanza con lo stesso CAS
+        const checkCASResult = await window.electronAPI.querySQLite(
+            'SELECT ID, Nome FROM sostanze WHERE CAS = ?',
+            [casNormalizzato]
+        );
+        
+        if (checkCASResult.success && checkCASResult.data && checkCASResult.data.length > 0) {
+            return {
+                esistente: true,
+                tipo: 'CAS',
+                messaggio: `Una sostanza con il codice CAS "${codCAS}" è già presente nel database (${checkCASResult.data[0].Nome})`,
+                data: checkCASResult.data[0]
+            };
+        }
+        
+        // Ottieni tutte le sostanze dal database per fare un controllo più flessibile sul nome
+        const allSubstancesResult = await window.electronAPI.querySQLite(
+            'SELECT ID, Nome, CAS FROM sostanze',
+            []
+        );
+        
+        if (allSubstancesResult.success && allSubstancesResult.data) {
+            // Prepara il nome per il confronto: rimuovi spazi extra, converti in minuscolo
+            const nomeComparazione = nomeNormalizzato.toLowerCase().replace(/\s+/g, ' ');
+            
+            // Cerca corrispondenze simili nel nome
+            for (const sostanza of allSubstancesResult.data) {
+                if (!sostanza.Nome) continue;
+                
+                const sostanzaComparazione = sostanza.Nome.toLowerCase().replace(/\s+/g, ' ');
+                
+                // Confronto esatto (case-insensitive)
+                if (sostanzaComparazione === nomeComparazione) {
+                    return {
+                        esistente: true,
+                        tipo: 'Nome',
+                        messaggio: `Una sostanza con il nome "${sostanza.Nome}" è già presente nel database (CAS: ${sostanza.CAS})`,
+                        data: sostanza
+                    };
+                }
+                
+                // Verifica se è molto simile (es. tolleranza piccoli errori di battitura)
+                // Opzione 1: una sostanza contiene l'altra (gestisce abbreviazioni/forme alternative)
+                if (sostanzaComparazione.includes(nomeComparazione) || nomeComparazione.includes(sostanzaComparazione)) {
+                    // Se una è contenuta nell'altra e la più corta è almeno 5 caratteri
+                    // (per evitare falsi positivi con nomi molto corti)
+                    if (Math.min(sostanzaComparazione.length, nomeComparazione.length) >= 5) {
+                        return {
+                            esistente: true,
+                            tipo: 'NomeSimilare',
+                            messaggio: `Una sostanza con un nome simile "${sostanza.Nome}" è già presente nel database (CAS: ${sostanza.CAS})`,
+                            data: sostanza
+                        };
+                    }
+                }
+                
+                // Opzione 2: distanza di Levenshtein (misura differenze a livello di carattere)
+                const distanza = calcolaDistanzaLevenshtein(nomeComparazione, sostanzaComparazione);
+                const lunghezzaMassima = Math.max(nomeComparazione.length, sostanzaComparazione.length);
+                const sogliaSimilarità = Math.min(3, Math.floor(lunghezzaMassima * 0.2)); // max 3 caratteri o 20% della lunghezza
+                
+                if (distanza <= sogliaSimilarità && lunghezzaMassima > 4) {
+                    return {
+                        esistente: true,
+                        tipo: 'NomeSimilare',
+                        messaggio: `Una sostanza con un nome simile "${sostanza.Nome}" è già presente nel database (CAS: ${sostanza.CAS})`,
+                        data: sostanza
+                    };
+                }
+            }
+        }
+        
+        // Se arriviamo qui, la sostanza non esiste nel database
+        return {
+            esistente: false,
+            tipo: null,
+            messaggio: '',
+            data: null
+        };
+    } catch (error) {
+        console.error('Errore nella verifica della sostanza esistente:', error);
+        // In caso di errore, restituisci un risultato sicuro che non blocchi l'inserimento
+        return {
+            esistente: false,
+            tipo: null,
+            messaggio: 'Errore durante la verifica: ' + error.message,
+            data: null
+        };
+    }
+}
+
+// Funzione per calcolare la distanza di Levenshtein (misura la differenza tra due stringhe)
+function calcolaDistanzaLevenshtein(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+
+    const matrix = [];
+
+    // Inizializza la matrice
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+
+    // Riempi la matrice
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // sostituzione
+                    matrix[i][j - 1] + 1,     // inserimento
+                    matrix[i - 1][j] + 1      // eliminazione
+                );
+            }
+        }
+    }
+
+    return matrix[b.length][a.length];
+}
+
+
+
 // Funzione per inserire una nuova sostanza con controlli migliorati per le frasi H
 async function inserisciNuovaSostanza() {
     try {
@@ -3335,20 +3471,40 @@ async function inserisciNuovaSostanza() {
             return false;
         }
         
-        // Verifica CAS duplicato
-        const checkResult = await window.electronAPI.querySQLite(
-            'SELECT COUNT(*) as count FROM sostanze WHERE CAS = ?',
-            [codCAS]
-        );
-        
-        if (checkResult.success && checkResult.data && checkResult.data[0].count > 0) {
-            document.getElementById('codCAS').classList.add('input-error');
-            showNotification('La sostanza è già presente nel Database, controlla il codice CAS', 'error');
+        // NUOVO: Verifica sia CAS che Nome duplicati usando la nuova funzione
+        const verificaEsistente = await verificaSostanzaEsistente(nomeSostanza, codCAS);
+
+        if (verificaEsistente.esistente) {
+            // Evidenzia il campo appropriato con errore
+            if (verificaEsistente.tipo === 'CAS') {
+                document.getElementById('codCAS').classList.add('input-error');
+            } else if (verificaEsistente.tipo === 'Nome' || verificaEsistente.tipo === 'NomeSimilare') {
+                document.getElementById('nomeSostanza').classList.add('input-error');
+            }
             
-            // Rimuovi automaticamente l'errore dopo 2 secondi
+            // Aggiungi messaggio di errore sotto il campo
+            const campoTarget = verificaEsistente.tipo === 'CAS' ? 
+                document.getElementById('codCAS') : 
+                document.getElementById('nomeSostanza');
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = verificaEsistente.messaggio;
+            campoTarget.parentNode.appendChild(errorDiv);
+            
+
+            
+            showNotification(verificaEsistente.messaggio, 'warning', 4000);
+            
+            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
             setTimeout(() => {
-                document.getElementById('codCAS').classList.remove('input-error');
-            }, 2000);
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 4000);
             
             return false;
         }
