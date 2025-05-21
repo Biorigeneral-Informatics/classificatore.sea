@@ -3201,6 +3201,52 @@ function aggiungiCampoFraseEUH() {
     container.appendChild(row);
 }
 
+
+// Funzione per verificare che il nome sostanza non sia già presente nella tabella sali
+async function verificaNomeSostanzaVsSali(nomeSostanza) {
+    try {
+        if (!nomeSostanza || nomeSostanza.trim() === '') {
+            return {
+                valido: false,
+                messaggio: 'Il nome della sostanza non può essere vuoto'
+            };
+        }
+
+        // Normalizza il nome per la ricerca (trim e converti a lowercase)
+        const nomeNormalizzato = nomeSostanza.trim().toLowerCase();
+        
+        // Esegui query per verificare se esiste un record nella tabella 'sali' con lo stesso nome
+        const result = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM sali WHERE LOWER(Sali) = ?',
+            [nomeNormalizzato]
+        );
+        
+        if (!result.success) {
+            throw new Error(`Errore nel controllo del database: ${result.message}`);
+        }
+        
+        const count = result.data[0].count;
+        
+        if (count > 0) {
+            return {
+                valido: false,
+                messaggio: `La sostanza "${nomeSostanza}" esiste già nella tabella sali. Non può essere inserita come sostanza.`
+            };
+        }
+        
+        return {
+            valido: true,
+            messaggio: ''
+        };
+    } catch (error) {
+        console.error('Errore nella verifica nome sostanza vs sali:', error);
+        return {
+            valido: false,
+            messaggio: `Errore nella verifica: ${error.message}`
+        };
+    }
+}
+
 // Funzione per inserire una nuova sostanza con controlli migliorati per le frasi H
 async function inserisciNuovaSostanza() {
     try {
@@ -3240,6 +3286,71 @@ async function inserisciNuovaSostanza() {
             document.getElementById('categoriaSostanza').classList.add('input-error');
             campiConErrore.push('Categoria');
             hasErrors = true;
+        }
+        
+        // Se ci sono errori di validazione, mostra una notifica e interrompi
+        if (hasErrors) {
+            if (campiConErrore.length > 0) {
+                const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
+                showNotification(messaggioErrore, 'warning');
+            } else {
+                showNotification('Correggi gli errori nei campi evidenziati', 'warning');
+            }
+            
+            // Rimuovi automaticamente gli errori e i messaggi dopo 2 secondi
+            setTimeout(() => {
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 2000);
+            
+            return false;
+        }
+        
+        // NUOVO: Verifica se il nome è presente nella tabella sali
+        const verificaSali = await verificaNomeSostanzaVsSali(nomeSostanza);
+        if (!verificaSali.valido) {
+            // Evidenzia il campo nome con errore
+            document.getElementById('nomeSostanza').classList.add('input-error');
+            
+            // Aggiungi messaggio di errore sotto il campo
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = verificaSali.messaggio;
+            document.getElementById('nomeSostanza').parentNode.appendChild(errorDiv);
+            
+            showNotification(verificaSali.messaggio, 'error', 4000);
+            
+            // Rimuovi automaticamente l'errore e il messaggio dopo 3 secondi
+            setTimeout(() => {
+                document.getElementById('nomeSostanza').classList.remove('input-error');
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 4000);
+            
+            return false;
+        }
+        
+        // Verifica CAS duplicato
+        const checkResult = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM sostanze WHERE CAS = ?',
+            [codCAS]
+        );
+        
+        if (checkResult.success && checkResult.data && checkResult.data[0].count > 0) {
+            document.getElementById('codCAS').classList.add('input-error');
+            showNotification('La sostanza è già presente nel Database, controlla il codice CAS', 'error');
+            
+            // Rimuovi automaticamente l'errore dopo 2 secondi
+            setTimeout(() => {
+                document.getElementById('codCAS').classList.remove('input-error');
+            }, 2000);
+            
+            return false;
         }
         
         // Lista di frasi H valide (quelle supportate dal classificatore)
@@ -3285,10 +3396,10 @@ async function inserisciNuovaSostanza() {
                 for (const row of rows) {
                     const fraseHInput = row.querySelector('.frase-h-input');
                     const hazardClassInput = row.querySelector('.hazard-class-input');
+                    const hazardClassSelect = row.querySelector('.hazard-class-select:not([disabled])');
                     
-                    if (fraseHInput && hazardClassInput) {
+                    if (fraseHInput) {
                         const fraseHValue = fraseHInput.value.trim();
-                        const hazardClassValue = hazardClassInput.value.trim();
                         
                         // Verifica se il campo frase H è compilato
                         if (fraseHValue) {
@@ -3304,15 +3415,31 @@ async function inserisciNuovaSostanza() {
                                 fraseHInput.parentNode.appendChild(errorDiv);
                                 
                                 hasErrors = true;
-                            } else if (!hazardClassValue) {
-                                // Frase H valida ma hazard class mancante
-                                hazardClassInput.classList.add('input-error');
-                                hasErrors = true;
                             } else {
-                                // Entrambi i campi sono validi
-                                fraseHValidaTrovata = true;
+                                // Controlla se c'è un valore Hazard Class valido
+                                let hazardClassValue = '';
+                                
+                                // Prova a ottenere il valore dalla select o dall'input
+                                if (hazardClassSelect && !hazardClassSelect.disabled) {
+                                    hazardClassValue = hazardClassSelect.value.trim();
+                                } else if (hazardClassInput) {
+                                    hazardClassValue = hazardClassInput.value.trim();
+                                }
+                                
+                                if (!hazardClassValue) {
+                                    // Hazard class mancante
+                                    if (hazardClassSelect) hazardClassSelect.classList.add('input-error');
+                                    if (hazardClassInput) hazardClassInput.classList.add('input-error');
+                                    hasErrors = true;
+                                } else {
+                                    // Entrambi i campi sono validi
+                                    fraseHValidaTrovata = true;
+                                }
                             }
-                        } else if (hazardClassValue) {
+                        } else if (
+                            (hazardClassInput && hazardClassInput.value.trim()) || 
+                            (hazardClassSelect && hazardClassSelect.value.trim())
+                        ) {
                             // Hazard Class compilato ma frase H mancante
                             fraseHInput.classList.add('input-error');
                             hasErrors = true;
@@ -3331,9 +3458,11 @@ async function inserisciNuovaSostanza() {
                     if (primaRiga) {
                         const fraseHInput = primaRiga.querySelector('.frase-h-input');
                         const hazardClassInput = primaRiga.querySelector('.hazard-class-input');
+                        const hazardClassSelect = primaRiga.querySelector('.hazard-class-select');
                         
                         if (fraseHInput) fraseHInput.classList.add('input-error');
                         if (hazardClassInput) hazardClassInput.classList.add('input-error');
+                        if (hazardClassSelect) hazardClassSelect.classList.add('input-error');
                     }
                 }
                 
@@ -3358,24 +3487,6 @@ async function inserisciNuovaSostanza() {
                 document.querySelectorAll('.error-message').forEach(el => {
                     el.remove();
                 });
-            }, 2000);
-            
-            return false;
-        }
-        
-        // Verifica CAS duplicato
-        const checkResult = await window.electronAPI.querySQLite(
-            'SELECT COUNT(*) as count FROM sostanze WHERE CAS = ?',
-            [codCAS]
-        );
-        
-        if (checkResult.success && checkResult.data && checkResult.data[0].count > 0) {
-            document.getElementById('codCAS').classList.add('input-error');
-            showNotification('La sostanza è già presente nel Database, controlla il codice CAS', 'error');
-            
-            // Rimuovi automaticamente l'errore dopo 2 secondi
-            setTimeout(() => {
-                document.getElementById('codCAS').classList.remove('input-error');
             }, 2000);
             
             return false;
@@ -3409,12 +3520,24 @@ async function inserisciNuovaSostanza() {
         document.querySelectorAll('.frase-h-row').forEach(row => {
             const fraseHInput = row.querySelector('.frase-h-input');
             const hazardClassInput = row.querySelector('.hazard-class-input');
+            const hazardClassSelect = row.querySelector('.hazard-class-select:not([disabled])');
             
-            if (fraseHInput && fraseHInput.value.trim() && hazardClassInput && hazardClassInput.value.trim()) {
-                frasiH.push({
-                    fraseH: fraseHInput.value.trim(),
-                    hazardClass: hazardClassInput.value.trim()
-                });
+            if (fraseHInput && fraseHInput.value.trim()) {
+                let hazardClass = '';
+                
+                // Cerca il valore hazard class sia nell'input che nella select
+                if (hazardClassSelect && hazardClassSelect.value.trim()) {
+                    hazardClass = hazardClassSelect.value.trim();
+                } else if (hazardClassInput && hazardClassInput.value.trim()) {
+                    hazardClass = hazardClassInput.value.trim();
+                }
+                
+                if (hazardClass) {
+                    frasiH.push({
+                        fraseH: fraseHInput.value.trim(),
+                        hazardClass: hazardClass
+                    });
+                }
             }
         });
         
@@ -3561,7 +3684,7 @@ function resetFormNuovaSostanza() {
     document.getElementById('codCAS').value = '';
     document.getElementById('categoriaSostanza').value = '';
     
-    // Reset frasi H - mantieni solo una riga vuota
+    // Reset frasi H - mantieni solo una riga vuota con i menu a tendina
     document.getElementById('frasiHContainer').innerHTML = `
         <div class="frase-h-row">
             <div class="form-group">
@@ -3570,9 +3693,11 @@ function resetFormNuovaSostanza() {
             </div>
             <div class="form-group">
                 <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
-                <input type="text" class="form-control hazard-class-input" placeholder="Hazard Class">
+                <select class="form-control hazard-class-select" disabled>
+                    <option value="">Seleziona prima una frase H</option>
+                </select>
             </div>
-            <button class="btn btn-sm btn-danger remove-frase-btn">
+            <button type="button" class="btn btn-sm btn-danger remove-frase-btn">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -3580,6 +3705,22 @@ function resetFormNuovaSostanza() {
     
     // Reset frasi EUH
     document.getElementById('frasiEUHContainer').innerHTML = '';
+    
+    // Aggiungi event listener alla frase H input
+    const fraseHInput = document.querySelector('.frase-h-input');
+    if (fraseHInput) {
+        fraseHInput.addEventListener('input', function() {
+            updateHazardClassOptions(this);
+        });
+    }
+    
+    // Rimuovi eventuali errori residui
+    document.querySelectorAll('.input-error').forEach(el => {
+        el.classList.remove('input-error');
+    });
+    document.querySelectorAll('.error-message').forEach(el => {
+        el.remove();
+    });
 }
 
 
