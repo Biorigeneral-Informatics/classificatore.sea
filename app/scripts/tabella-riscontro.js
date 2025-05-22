@@ -2312,7 +2312,7 @@ function renderTabellaRiscontroFrasiH(data) {
             <td class="cas-cell">${CAS}</td>
             <td class="hazard-statement-cell">${HazardStatement}</td>
             <td class="hazard-class-cell">${HazardClass}</td>
-            <td class="actions-cell">
+             <!-- <td class="actions-cell">
                 <button class="btn btn-sm btn-primary edit-btn" onclick="attivaModeModificaFraseH(${ID})">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -2323,6 +2323,7 @@ function renderTabellaRiscontroFrasiH(data) {
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
+              -->
         `;
         tbody.appendChild(row);
     });
@@ -3303,34 +3304,97 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
         // Normalizza il nome per la ricerca (trim e converti a lowercase)
         const nomeNormalizzato = nomeSostanza.trim().toLowerCase();
         
-        // Esegui query per verificare se esiste un record nella tabella 'sali' con lo stesso nome
+        console.log(`Verifica nome sostanza vs sali: Nome='${nomeNormalizzato}'`);
+        
+        // Ottieni tutti i sali dal database per fare un controllo flessibile
         const result = await window.electronAPI.querySQLite(
-            'SELECT COUNT(*) as count FROM sali WHERE LOWER(Sali) = ?',
-            [nomeNormalizzato]
+            'SELECT ID, Sali, Sinonimi_Col_B_file_ECHA, CAS FROM sali',
+            []
         );
         
         if (!result.success) {
             throw new Error(`Errore nel controllo del database: ${result.message}`);
         }
         
-        const count = result.data[0].count;
-        
-        if (count > 0) {
-            return {
-                valido: false,
-                messaggio: `La sostanza "${nomeSostanza}" esiste già nella tabella sali. Non può essere inserita come sostanza.`
-            };
+        if (result.data && result.data.length > 0) {
+            // Prepara il nome per il confronto: rimuovi spazi extra, converti in minuscolo
+            const nomeComparazione = nomeNormalizzato.replace(/\s+/g, ' ');
+            
+            // Cerca corrispondenze nei sali
+            for (const sale of result.data) {
+                // Controlla sia il nome del sale che i sinonimi
+                const campiDaControllare = [
+                    { campo: 'Sali', valore: sale.Sali },
+                    { campo: 'Sinonimi_Col_B_file_ECHA', valore: sale.Sinonimi_Col_B_file_ECHA }
+                ];
+                
+                for (const campoInfo of campiDaControllare) {
+                    if (!campoInfo.valore) continue;
+                    
+                    const saleComparazione = campoInfo.valore.toLowerCase().replace(/\s+/g, ' ');
+                    
+                    // 1. Confronto esatto (case-insensitive)
+                    if (saleComparazione === nomeComparazione) {
+                        return {
+                            valido: false,
+                            messaggio: `La sostanza "${nomeSostanza}" corrisponde esattamente al sale "${campoInfo.valore}" (CAS: ${sale.CAS || 'N/A'}). Non può essere inserita come sostanza.`,
+                            saleCorrispondente: sale,
+                            tipoCorrispondenza: 'esatta'
+                        };
+                    }
+                    
+                    // 2. Verifica se una è contenuta nell'altra (gestisce abbreviazioni/forme alternative)
+                    if (saleComparazione.includes(nomeComparazione) || nomeComparazione.includes(saleComparazione)) {
+                        // Se una è contenuta nell'altra e la più corta è almeno 4 caratteri
+                        // (per evitare falsi positivi con nomi molto corti come "As", "Pb", etc.)
+                        const lunghezzaMinima = Math.min(saleComparazione.length, nomeComparazione.length);
+                        
+                        if (lunghezzaMinima >= 4) {
+                            return {
+                                valido: false,
+                                messaggio: `La sostanza "${nomeSostanza}" è molto simile al sale "${campoInfo.valore}" (CAS: ${sale.CAS || 'N/A'}). Non può essere inserita come sostanza.`,
+                                saleCorrispondente: sale,
+                                tipoCorrispondenza: 'contenimento'
+                            };
+                        }
+                    }
+                    
+                    // 3. Distanza di Levenshtein (misura differenze a livello di carattere)
+                    const distanza = calcolaDistanzaLevenshtein(nomeComparazione, saleComparazione);
+                    const lunghezzaMassima = Math.max(nomeComparazione.length, saleComparazione.length);
+                    
+                    // Soglia di similarità: massimo 3 caratteri o 20% della lunghezza, ma solo per nomi abbastanza lunghi
+                    const sogliaSimilarità = Math.min(3, Math.floor(lunghezzaMassima * 0.2));
+                    
+                    if (distanza <= sogliaSimilarità && lunghezzaMassima > 4) {
+                        return {
+                            valido: false,
+                            messaggio: `La sostanza "${nomeSostanza}" è molto simile al sale "${campoInfo.valore}" (CAS: ${sale.CAS || 'N/A'}). Non può essere inserita come sostanza.`,
+                            saleCorrispondente: sale,
+                            tipoCorrispondenza: 'similarità',
+                            distanza: distanza
+                        };
+                    }
+                }
+            }
         }
         
+        // Se arriviamo qui, il nome non corrisponde a nessun sale
         return {
             valido: true,
-            messaggio: ''
+            messaggio: '',
+            saleCorrispondente: null,
+            tipoCorrispondenza: null
         };
+        
     } catch (error) {
         console.error('Errore nella verifica nome sostanza vs sali:', error);
+        // In caso di errore, restituisci un risultato sicuro che non blocchi l'inserimento
+        // ma segnali il problema
         return {
-            valido: false,
-            messaggio: `Errore nella verifica: ${error.message}`
+            valido: true, // Permetti l'inserimento in caso di errore di sistema
+            messaggio: 'Avviso: Impossibile verificare la corrispondenza con i sali a causa di un errore tecnico: ' + error.message,
+            errore: true
         };
     }
 }
@@ -3891,6 +3955,317 @@ if (document.readyState === 'loading') {
     aggiungiStileBase();
 }
 
+
+// Funzione per validare il formato del codice CAS
+function validaCodCAS(codCAS) {
+    try {
+        // Rimuovi spazi e converti a stringa
+        const cas = codCAS.toString().trim();
+        
+        // Verifica che non sia vuoto
+        if (!cas) {
+            return {
+                valido: false,
+                messaggio: 'Il codice CAS non può essere vuoto'
+            };
+        }
+        
+        // Verifica che contenga solo numeri e trattini
+        const soloNumeriETrattini = /^[0-9\-]+$/.test(cas);
+        if (!soloNumeriETrattini) {
+            return {
+                valido: false,
+                messaggio: 'Il codice CAS può contenere solo numeri e trattini'
+            };
+        }
+        
+        // Conta i trattini
+        const numeroTrattini = (cas.match(/\-/g) || []).length;
+        
+        // Deve avere esattamente 2 trattini
+        if (numeroTrattini !== 2) {
+            return {
+                valido: false,
+                messaggio: 'Il codice CAS deve contenere esattamente 2 trattini (formato: XXXX-XX-X)'
+            };
+        }
+        
+        // Verifica che non inizi o finisca con un trattino
+        if (cas.startsWith('-') || cas.endsWith('-')) {
+            return {
+                valido: false,
+                messaggio: 'Il codice CAS non può iniziare o finire con un trattino'
+            };
+        }
+        
+        // Verifica che non ci siano trattini consecutivi
+        if (cas.includes('--')) {
+            return {
+                valido: false,
+                messaggio: 'Il codice CAS non può avere trattini consecutivi'
+            };
+        }
+        
+        // Dividi per trattini e verifica che ogni parte contenga solo numeri
+        const parti = cas.split('-');
+        
+        // Verifica che ci siano esattamente 3 parti
+        if (parti.length !== 3) {
+            return {
+                valido: false,
+                messaggio: 'Il codice CAS deve avere il formato XXXX-XX-X'
+            };
+        }
+        
+        // Verifica che ogni parte non sia vuota e contenga solo numeri
+        for (let i = 0; i < parti.length; i++) {
+            const parte = parti[i];
+            
+            if (!parte) {
+                return {
+                    valido: false,
+                    messaggio: 'Ogni sezione del codice CAS deve contenere almeno un numero'
+                };
+            }
+            
+            if (!/^\d+$/.test(parte)) {
+                return {
+                    valido: false,
+                    messaggio: 'Ogni sezione del codice CAS deve contenere solo numeri'
+                };
+            }
+        }
+        
+        // Se arriviamo qui, il formato è valido
+        return {
+            valido: true,
+            messaggio: '',
+            casFormattato: cas
+        };
+        
+    } catch (error) {
+        console.error('Errore nella validazione del codice CAS:', error);
+        return {
+            valido: false,
+            messaggio: 'Errore nella validazione del codice CAS: ' + error.message
+        };
+    }
+}
+
+// Funzione per aggiungere la validazione in tempo reale al campo CAS
+function aggiungiValidazioneCAS() {
+    // Trova tutti i campi CAS nella pagina
+    const campiCAS = document.querySelectorAll('#codCAS, #codCasSale, .cas-input');
+    
+    campiCAS.forEach(campo => {
+        // Rimuovi eventuali listener esistenti per evitare duplicati
+        campo.removeEventListener('input', validazioneCASInput);
+        campo.removeEventListener('blur', validazioneCASBlur);
+        
+        // Aggiungi listener per validazione in tempo reale
+        campo.addEventListener('input', validazioneCASInput);
+        campo.addEventListener('blur', validazioneCASBlur);
+    });
+}
+
+// Funzione per validazione durante la digitazione (meno invasiva)
+function validazioneCASInput(event) {
+    const campo = event.target;
+    const valore = campo.value.trim();
+    
+    // Rimuovi eventuali classi di errore e messaggi precedenti
+    campo.classList.remove('input-error');
+    const messaggioErrore = campo.parentNode.querySelector('.cas-error-message');
+    if (messaggioErrore) {
+        messaggioErrore.remove();
+    }
+    
+    // Se il campo è vuoto, non mostrare errori durante la digitazione
+    if (!valore) {
+        return;
+    }
+    
+    // Controllo base durante la digitazione: solo numeri e trattini
+    const caratteriValidi = /^[0-9\-]*$/.test(valore);
+    if (!caratteriValidi) {
+        campo.classList.add('input-error');
+        mostraErroreCAS(campo, 'Solo numeri e trattini sono consentiti');
+    }
+}
+
+// Funzione per validazione completa quando l'utente esce dal campo
+function validazioneCASBlur(event) {
+    const campo = event.target;
+    const valore = campo.value.trim();
+    
+    // Rimuovi eventuali messaggi di errore precedenti
+    const messaggioErrore = campo.parentNode.querySelector('.cas-error-message');
+    if (messaggioErrore) {
+        messaggioErrore.remove();
+    }
+    
+    // Se il campo è vuoto, non validare (sarà gestito dalla validazione generale del form)
+    if (!valore) {
+        campo.classList.remove('input-error');
+        return;
+    }
+    
+    // Esegui validazione completa
+    const risultato = validaCodCAS(valore);
+    
+    if (!risultato.valido) {
+        campo.classList.add('input-error');
+        mostraErroreCAS(campo, risultato.messaggio);
+    } else {
+        campo.classList.remove('input-error');
+        // Opzionalmente, formatta il CAS se necessario
+        if (risultato.casFormattato && risultato.casFormattato !== valore) {
+            campo.value = risultato.casFormattato;
+        }
+    }
+}
+
+// Funzione per mostrare messaggi di errore specifici per CAS
+function mostraErroreCAS(campo, messaggio) {
+    // Verifica se esiste già un messaggio di errore
+    let messaggioErrore = campo.parentNode.querySelector('.cas-error-message');
+    
+    if (!messaggioErrore) {
+        messaggioErrore = document.createElement('div');
+        messaggioErrore.className = 'cas-error-message error-message';
+        campo.parentNode.appendChild(messaggioErrore);
+    }
+    
+    messaggioErrore.textContent = messaggio;
+}
+
+// Integrazione con la funzione inserisciNuovaSostanza esistente
+function integraValidazioneCASInInserimento() {
+    // Salva il riferimento alla funzione originale
+    const originalInserisciNuovaSostanza = window.inserisciNuovaSostanza;
+    
+    // Sostituisci la funzione originale per includere la validazione CAS
+    window.inserisciNuovaSostanza = async function() {
+        // Validazione CAS prima dell'inserimento
+        const campoCAS = document.getElementById('codCAS');
+        if (campoCAS) {
+            const risultatoCAS = validaCodCAS(campoCAS.value);
+            
+            if (!risultatoCAS.valido) {
+                // Evidenzia l'errore
+                campoCAS.classList.add('input-error');
+                mostraErroreCAS(campoCAS, risultatoCAS.messaggio);
+                
+                showNotification('Correggi il formato del codice CAS', 'warning');
+                
+                // Rimuovi automaticamente l'errore dopo 3 secondi
+                setTimeout(() => {
+                    campoCAS.classList.remove('input-error');
+                    const messaggioErrore = campoCAS.parentNode.querySelector('.cas-error-message');
+                    if (messaggioErrore) {
+                        messaggioErrore.remove();
+                    }
+                }, 3000);
+                
+                return false;
+            }
+        }
+        
+        // Se la validazione CAS è passata, chiama la funzione originale
+        return await originalInserisciNuovaSostanza();
+    };
+}
+
+// Integrazione con inserisciNuovoSale
+function integraValidazioneCASInSale() {
+    const originalInserisciNuovoSale = window.inserisciNuovoSale;
+    
+    window.inserisciNuovoSale = async function() {
+        // Validazione CAS prima dell'inserimento
+        const campoCAS = document.getElementById('codCasSale');
+        if (campoCAS && campoCAS.value.trim()) { // CAS opzionale per i sali
+            const risultatoCAS = validaCodCAS(campoCAS.value);
+            
+            if (!risultatoCAS.valido) {
+                campoCAS.classList.add('input-error');
+                mostraErroreCAS(campoCAS, risultatoCAS.messaggio);
+                
+                showNotification('Correggi il formato del codice CAS', 'warning');
+                
+                setTimeout(() => {
+                    campoCAS.classList.remove('input-error');
+                    const messaggioErrore = campoCAS.parentNode.querySelector('.cas-error-message');
+                    if (messaggioErrore) {
+                        messaggioErrore.remove();
+                    }
+                }, 3000);
+                
+                return false;
+            }
+        }
+        
+        return await originalInserisciNuovoSale();
+    };
+}
+
+// Aggiungi CSS per gli errori CAS se non esiste già
+function aggiungiStileCAS() {
+    if (!document.getElementById('stileCASValidazione')) {
+        const style = document.createElement('style');
+        style.id = 'stileCASValidazione';
+        style.textContent = `
+            .cas-error-message {
+                color: #e74c3c;
+                font-size: 0.8rem;
+                margin-top: 3px;
+                font-weight: 500;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+}
+
+// Inizializzazione
+function inizializzaValidazioneCAS() {
+    aggiungiStileCAS();
+    aggiungiValidazioneCAS();
+    integraValidazioneCASInInserimento();
+    integraValidazioneCASInSale();
+    
+    // Osserva le modifiche al DOM per campi CAS aggiunti dinamicamente
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.addedNodes.length) {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) {
+                        const nuoviCampiCAS = node.querySelectorAll ? 
+                            node.querySelectorAll('#codCAS, #codCasSale, .cas-input') : [];
+                        
+                        nuoviCampiCAS.forEach(campo => {
+                            campo.addEventListener('input', validazioneCASInput);
+                            campo.addEventListener('blur', validazioneCASBlur);
+                        });
+                    }
+                });
+            }
+        });
+    });
+    
+    // Osserva i form container
+    const formContainers = document.querySelectorAll('#sostanzeForm, #saliForm');
+    formContainers.forEach(container => {
+        if (container) {
+            observer.observe(container, { childList: true, subtree: true });
+        }
+    });
+}
+
+// Avvia l'inizializzazione quando il documento è pronto
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inizializzaValidazioneCAS);
+} else {
+    inizializzaValidazioneCAS();
+}
 
 // Aggiungi stile CSS per evidenziare il campo CAS con errore
 function aggiungiStileErroreCAS() {
@@ -4524,7 +4899,7 @@ function renderTabellaRiscontroFrasiEUH(data) {
         row.innerHTML = `
             <td class="euh-cell">${EUH}</td>
             <td class="cas-cell">${CAS}</td>
-            <td class="actions-cell">
+           <!-- <td class="actions-cell">
                 <button class="btn btn-sm btn-primary edit-btn" onclick="attivaModeModificaFraseEUH(${ID})">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -4535,6 +4910,7 @@ function renderTabellaRiscontroFrasiEUH(data) {
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
+            -->
         `;
         tbody.appendChild(row);
     });
@@ -5173,3 +5549,7 @@ window.frasiHToHazardClass = frasiHToHazardClass;
 window.frasiHValide = frasiHValide;
 window.updateHazardClassOptions = updateHazardClassOptions;
 window.inizializzaFormFrasiH = inizializzaFormFrasiH;
+
+// Esponi le funzioni globalmente per uso esterno
+window.validaCodCAS = validaCodCAS;
+window.aggiungiValidazioneCAS = aggiungiValidazioneCAS;
