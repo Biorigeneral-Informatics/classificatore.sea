@@ -2061,39 +2061,127 @@ async function eliminaSostanza(id) {
             throw new Error(`ID non valido: ${id}`);
         }
         
+        // Prima ottieni i dettagli della sostanza per i messaggi informativi
+        const sostanzaResult = await window.electronAPI.querySQLite(
+            'SELECT Nome, CAS FROM sostanze WHERE ID = ?',
+            [id]
+        );
+        
+        if (!sostanzaResult.success || sostanzaResult.data.length === 0) {
+            throw new Error("Sostanza non trovata nel database");
+        }
+        
+        const sostanza = sostanzaResult.data[0];
+        const nomeSostanza = sostanza.Nome;
+        const casSostanza = sostanza.CAS;
+        
+        // Verifica quanti record correlati verranno eliminati
+        const verificaFrasiH = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM "frasi H" WHERE Nome_sostanza = ? OR CAS = ?',
+            [nomeSostanza, casSostanza]
+        );
+        
+        const verificaFrasiEUH = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM "EUH" WHERE CAS_EK = ?',
+            [casSostanza]
+        );
+        
+        const countFrasiH = verificaFrasiH.success ? verificaFrasiH.data[0].count : 0;
+        const countFrasiEUH = verificaFrasiEUH.success ? verificaFrasiEUH.data[0].count : 0;
+        
+        // Costruisci il messaggio di conferma con informazioni sui record correlati
+        let messaggioConferma = `Sei sicuro di voler eliminare la sostanza "${nomeSostanza}"?`;
+        
+        if (countFrasiH > 0 || countFrasiEUH > 0) {
+            messaggioConferma += `\n\nQuesta azione eliminerà anche:`;
+            if (countFrasiH > 0) {
+                messaggioConferma += `\n• ${countFrasiH} frase/i H correlate`;
+            }
+            if (countFrasiEUH > 0) {
+                messaggioConferma += `\n• ${countFrasiEUH} frase/i EUH correlate`;
+            }
+            messaggioConferma += `\n\nQuesta azione non può essere annullata.`;
+        }
+        
         // Usa showCustomAlert invece di confirm
-        showCustomAlert(`Sei sicuro di voler eliminare questa sostanza? Questa azione non può essere annullata.`, 
+        showCustomAlert(messaggioConferma, 
             async () => {
-                console.log('Eliminazione sostanza con ID:', id);
-                
-                // Usa l'API per eliminare dal database
-                const result = await window.electronAPI.executeSQLite(
-                    'DELETE FROM sostanze WHERE ROWID = ?',
-                    [id]
-                );
-                
-                if (!result.success) {
-                    throw new Error(`Errore nell'eliminazione: ${result.message}`);
+                try {
+                    console.log('Eliminazione a cascata per sostanza:', nomeSostanza);
+                    
+                    // Array per tracciare le operazioni completate
+                    const operazioniCompletate = [];
+                    
+                    // 1. Elimina le frasi H correlate (per Nome_sostanza e CAS)
+                    if (countFrasiH > 0) {
+                        const deleteFrasiH = await window.electronAPI.executeSQLite(
+                            'DELETE FROM "frasi H" WHERE Nome_sostanza = ? OR CAS = ?',
+                            [nomeSostanza, casSostanza]
+                        );
+                        
+                        if (deleteFrasiH.success) {
+                            operazioniCompletate.push(`${deleteFrasiH.changes} frasi H eliminate`);
+                        } else {
+                            console.warn('Errore nell\'eliminazione delle frasi H:', deleteFrasiH.message);
+                        }
+                    }
+                    
+                    // 2. Elimina le frasi EUH correlate (per CAS)
+                    if (countFrasiEUH > 0) {
+                        const deleteFrasiEUH = await window.electronAPI.executeSQLite(
+                            'DELETE FROM "EUH" WHERE CAS_EK = ?',
+                            [casSostanza]
+                        );
+                        
+                        if (deleteFrasiEUH.success) {
+                            operazioniCompletate.push(`${deleteFrasiEUH.changes} frasi EUH eliminate`);
+                        } else {
+                            console.warn('Errore nell\'eliminazione delle frasi EUH:', deleteFrasiEUH.message);
+                        }
+                    }
+                    
+                    // 3. Elimina la sostanza principale
+                    const result = await window.electronAPI.executeSQLite(
+                        'DELETE FROM sostanze WHERE ID = ?',
+                        [id]
+                    );
+                    
+                    if (!result.success) {
+                        throw new Error(`Errore nell'eliminazione della sostanza: ${result.message}`);
+                    }
+                    
+                    if (result.changes === 0) {
+                        throw new Error("Nessuna sostanza eliminata. L'ID potrebbe non esistere.");
+                    }
+                    
+                    // Rimuovi la riga dalla tabella sostanze
+                    const row = document.querySelector(`#sostanzeTableBody tr[data-id="${id}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+                    
+                    // Ricarica le tabelle correlate per riflettere le eliminazioni
+                    await Promise.all([
+                        loadTabellaRiscontroFrasiH(),
+                        loadTabellaRiscontroFrasiEUH()
+                    ]);
+                    
+                    // Costruisci il messaggio di successo
+                    let messaggioSuccesso = `Sostanza "${nomeSostanza}" eliminata con successo`;
+                    if (operazioniCompletate.length > 0) {
+                        messaggioSuccesso += ` (${operazioniCompletate.join(', ')})`;
+                    }
+                    
+                    // Notifica utente
+                    showNotification(messaggioSuccesso);
+                    
+                    // Aggiungi attività
+                    addActivity('Sostanza eliminata', `${nomeSostanza} e riferimenti correlati eliminati`, 'fas fa-trash');
+                    
+                } catch (error) {
+                    console.error('Errore nell\'eliminazione a cascata della sostanza:', error);
+                    showNotification('Errore nell\'eliminazione: ' + error.message, 'error');
                 }
-                
-                // Verifica quante righe sono state modificate
-                console.log(`Righe eliminate: ${result.changes}`);
-                
-                if (result.changes === 0) {
-                    throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
-                }
-                
-                // Rimuovi la riga dalla tabella
-                const row = document.querySelector(`#sostanzeTableBody tr[data-id="${id}"]`);
-                if (row) {
-                    row.remove();
-                }
-                
-                // Notifica utente
-                showNotification('Sostanza eliminata con successo');
-                
-                // Aggiungi attività
-                addActivity('Sostanza eliminata', `Eliminata sostanza ID: ${id}`, 'fas fa-trash');
             }
         );
     } catch (error) {
@@ -4055,40 +4143,149 @@ async function eliminaSale(id) {
             throw new Error(`ID non valido: ${id}`);
         }
         
+        // Prima ottieni i dettagli del sale per i messaggi informativi
+        const saleResult = await window.electronAPI.querySQLite(
+            'SELECT Sali, CAS, Metallo FROM sali WHERE ID = ?',
+            [id]
+        );
+        
+        if (!saleResult.success || saleResult.data.length === 0) {
+            throw new Error("Sale non trovato nel database");
+        }
+        
+        const sale = saleResult.data[0];
+        const nomeSale = sale.Sali;
+        const casSale = sale.CAS;
+        const metalloSale = sale.Metallo;
+        
+        // Verifica quanti record correlati verranno eliminati
+        // Cerca nelle frasi H per nome del sale e CAS
+        const verificaFrasiH = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM "frasi H" WHERE Nome_sostanza = ? OR CAS = ?',
+            [nomeSale, casSale]
+        );
+        
+        // Cerca nelle frasi EUH per CAS
+        const verificaFrasiEUH = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM "EUH" WHERE CAS_EK = ?',
+            [casSale]
+        );
+        
+        // Cerca nelle sostanze se il sale è stato erroneamente inserito anche lì
+        const verificaSostanze = await window.electronAPI.querySQLite(
+            'SELECT COUNT(*) as count FROM sostanze WHERE Nome = ? OR CAS = ?',
+            [nomeSale, casSale]
+        );
+        
+        const countFrasiH = verificaFrasiH.success ? verificaFrasiH.data[0].count : 0;
+        const countFrasiEUH = verificaFrasiEUH.success ? verificaFrasiEUH.data[0].count : 0;
+        const countSostanze = verificaSostanze.success ? verificaSostanze.data[0].count : 0;
+        
+        // Costruisci il messaggio di conferma con informazioni sui record correlati
+        let messaggioConferma = `Sei sicuro di voler eliminare il sale "${nomeSale}"?`;
+        
+        if (countFrasiH > 0 || countFrasiEUH > 0 || countSostanze > 0) {
+            messaggioConferma += `\n\nQuesta azione eliminerà anche:`;
+            if (countSostanze > 0) {
+                messaggioConferma += `\n• ${countSostanze} record/i nella tabella sostanze`;
+            }
+            if (countFrasiH > 0) {
+                messaggioConferma += `\n• ${countFrasiH} frase/i H correlate`;
+            }
+            if (countFrasiEUH > 0) {
+                messaggioConferma += `\n• ${countFrasiEUH} frase/i EUH correlate`;
+            }
+            messaggioConferma += `\n\nQuesta azione non può essere annullata.`;
+        }
+        
         // Usa showCustomAlert invece di confirm
-        showCustomAlert(`Sei sicuro di voler eliminare questo sale? Questa azione non può essere annullata.`, 
+        showCustomAlert(messaggioConferma, 
             async () => {
-                // Questo codice viene eseguito solo quando l'utente conferma
-                console.log('Eliminazione sale con ID:', id);
-                
-                // Usa l'API per eliminare dal database
-                const result = await window.electronAPI.executeSQLite(
-                    'DELETE FROM sali WHERE ROWID = ?',
-                    [id]
-                );
-                
-                if (!result.success) {
-                    throw new Error(`Errore nell'eliminazione: ${result.message}`);
+                try {
+                    console.log('Eliminazione a cascata per sale:', nomeSale);
+                    
+                    // Array per tracciare le operazioni completate
+                    const operazioniCompletate = [];
+                    
+                    // 1. Elimina dalle sostanze se presente (nel caso sia stato erroneamente inserito)
+                    if (countSostanze > 0) {
+                        const deleteSostanze = await window.electronAPI.executeSQLite(
+                            'DELETE FROM sostanze WHERE Nome = ? OR CAS = ?',
+                            [nomeSale, casSale]
+                        );
+                        
+                        if (deleteSostanze.success && deleteSostanze.changes > 0) {
+                            operazioniCompletate.push(`${deleteSostanze.changes} record/i sostanze eliminate`);
+                        }
+                    }
+                    
+                    // 2. Elimina le frasi H correlate (per nome e CAS)
+                    if (countFrasiH > 0) {
+                        const deleteFrasiH = await window.electronAPI.executeSQLite(
+                            'DELETE FROM "frasi H" WHERE Nome_sostanza = ? OR CAS = ?',
+                            [nomeSale, casSale]
+                        );
+                        
+                        if (deleteFrasiH.success && deleteFrasiH.changes > 0) {
+                            operazioniCompletate.push(`${deleteFrasiH.changes} frasi H eliminate`);
+                        }
+                    }
+                    
+                    // 3. Elimina le frasi EUH correlate (per CAS)
+                    if (countFrasiEUH > 0) {
+                        const deleteFrasiEUH = await window.electronAPI.executeSQLite(
+                            'DELETE FROM "EUH" WHERE CAS_EK = ?',
+                            [casSale]
+                        );
+                        
+                        if (deleteFrasiEUH.success && deleteFrasiEUH.changes > 0) {
+                            operazioniCompletate.push(`${deleteFrasiEUH.changes} frasi EUH eliminate`);
+                        }
+                    }
+                    
+                    // 4. Elimina il sale principale
+                    const result = await window.electronAPI.executeSQLite(
+                        'DELETE FROM sali WHERE ID = ?',
+                        [id]
+                    );
+                    
+                    if (!result.success) {
+                        throw new Error(`Errore nell'eliminazione del sale: ${result.message}`);
+                    }
+                    
+                    if (result.changes === 0) {
+                        throw new Error("Nessun sale eliminato. L'ID potrebbe non esistere.");
+                    }
+                    
+                    // Rimuovi la riga dalla tabella sali
+                    const row = document.querySelector(`#saliTableBody tr[data-id="${id}"]`);
+                    if (row) {
+                        row.remove();
+                    }
+                    
+                    // Ricarica le tabelle correlate per riflettere le eliminazioni
+                    await Promise.all([
+                        loadTabellaRiscontroSostanze(),
+                        loadTabellaRiscontroFrasiH(),
+                        loadTabellaRiscontroFrasiEUH()
+                    ]);
+                    
+                    // Costruisci il messaggio di successo
+                    let messaggioSuccesso = `Sale "${nomeSale}" eliminato con successo`;
+                    if (operazioniCompletate.length > 0) {
+                        messaggioSuccesso += ` (${operazioniCompletate.join(', ')})`;
+                    }
+                    
+                    // Notifica utente
+                    showNotification(messaggioSuccesso);
+                    
+                    // Aggiungi attività
+                    addActivity('Sale eliminato', `${nomeSale} e riferimenti correlati eliminati`, 'fas fa-trash');
+                    
+                } catch (error) {
+                    console.error('Errore nell\'eliminazione a cascata del sale:', error);
+                    showNotification('Errore nell\'eliminazione: ' + error.message, 'error');
                 }
-                
-                // Verifica quante righe sono state modificate
-                console.log(`Righe eliminate: ${result.changes}`);
-                
-                if (result.changes === 0) {
-                    throw new Error("Nessuna riga eliminata. L'ID potrebbe non esistere.");
-                }
-                
-                // Rimuovi la riga dalla tabella
-                const row = document.querySelector(`#saliTableBody tr[data-id="${id}"]`);
-                if (row) {
-                    row.remove();
-                }
-                
-                // Notifica utente
-                showNotification('Sale eliminato con successo');
-                
-                // Aggiungi attività
-                addActivity('Sale eliminato', `Eliminato sale ID: ${id}`, 'fas fa-flask');
             }
         );
     } catch (error) {
@@ -4105,6 +4302,145 @@ function modificaSostanza(id) {
 function modificaFraseH(id) {
     // Implementazione reale: aprirebbe un modal/dialog per la modifica
     showNotification(`Modifica frase H con ID: ${id}`);
+}
+
+
+// Funzione di utilità per verificare l'integrità referenziale
+async function verificaIntegritaReferenziale() {
+    try {
+        console.log('Verifica integrità referenziale in corso...');
+        
+        // Trova frasi H orfane (senza sostanza corrispondente)
+        const frasiHOrfane = await window.electronAPI.querySQLite(`
+            SELECT fh.ID_PK, fh.Nome_sostanza, fh.CAS, fh.Hazard_Statement
+            FROM "frasi H" fh
+            LEFT JOIN sostanze s ON (fh.Nome_sostanza = s.Nome OR fh.CAS = s.CAS)
+            LEFT JOIN sali sa ON (fh.Nome_sostanza = sa.Sali OR fh.CAS = sa.CAS)
+            WHERE s.ID IS NULL AND sa.ID IS NULL
+        `, []);
+        
+        // Trova frasi EUH orfane
+        const frasiEUHOrfane = await window.electronAPI.querySQLite(`
+            SELECT euh.ID_PK, euh.EUH, euh.CAS_EK
+            FROM "EUH" euh
+            LEFT JOIN sostanze s ON euh.CAS_EK = s.CAS
+            LEFT JOIN sali sa ON euh.CAS_EK = sa.CAS
+            WHERE s.ID IS NULL AND sa.ID IS NULL
+        `, []);
+        
+        const numFrasiHOrfane = frasiHOrfane.success ? frasiHOrfane.data.length : 0;
+        const numFrasiEUHOrfane = frasiEUHOrfane.success ? frasiEUHOrfane.data.length : 0;
+        
+        if (numFrasiHOrfane > 0 || numFrasiEUHOrfane > 0) {
+            console.warn(`Trovati record orfani: ${numFrasiHOrfane} frasi H, ${numFrasiEUHOrfane} frasi EUH`);
+            
+            // Opzionalmente, potresti voler pulire automaticamente i record orfani
+            // o semplicemente segnalare il problema
+            return {
+                integra: false,
+                frasiHOrfane: numFrasiHOrfane,
+                frasiEUHOrfane: numFrasiEUHOrfane
+            };
+        }
+        
+        console.log('Integrità referenziale verificata: nessun record orfano trovato');
+        return {
+            integra: true,
+            frasiHOrfane: 0,
+            frasiEUHOrfane: 0
+        };
+        
+    } catch (error) {
+        console.error('Errore nella verifica dell\'integrità referenziale:', error);
+        return {
+            integra: false,
+            errore: error.message
+        };
+    }
+}
+
+// Funzione per pulire i record orfani (da chiamare manualmente se necessario)
+async function pulisciRecordOrfani() {
+    try {
+        const verifica = await verificaIntegritaReferenziale();
+        
+        if (verifica.integra) {
+            showNotification('Nessun record orfano da pulire', 'info');
+            return;
+        }
+        
+        if (verifica.errore) {
+            throw new Error(verifica.errore);
+        }
+        
+        let messaggioConferma = 'Sono stati trovati record orfani nel database:\n';
+        if (verifica.frasiHOrfane > 0) {
+            messaggioConferma += `\n• ${verifica.frasiHOrfane} frasi H senza sostanza/sale corrispondente`;
+        }
+        if (verifica.frasiEUHOrfane > 0) {
+            messaggioConferma += `\n• ${verifica.frasiEUHOrfane} frasi EUH senza sostanza/sale corrispondente`;
+        }
+        messaggioConferma += '\n\nVuoi eliminarli?';
+        
+        showCustomAlert(messaggioConferma, async () => {
+            try {
+                let recordEliminati = 0;
+                
+                // Elimina frasi H orfane
+                if (verifica.frasiHOrfane > 0) {
+                    const deleteFrasiH = await window.electronAPI.executeSQLite(`
+                        DELETE FROM "frasi H" 
+                        WHERE ID_PK IN (
+                            SELECT fh.ID_PK
+                            FROM "frasi H" fh
+                            LEFT JOIN sostanze s ON (fh.Nome_sostanza = s.Nome OR fh.CAS = s.CAS)
+                            LEFT JOIN sali sa ON (fh.Nome_sostanza = sa.Sali OR fh.CAS = sa.CAS)
+                            WHERE s.ID IS NULL AND sa.ID IS NULL
+                        )
+                    `, []);
+                    
+                    if (deleteFrasiH.success) {
+                        recordEliminati += deleteFrasiH.changes;
+                    }
+                }
+                
+                // Elimina frasi EUH orfane
+                if (verifica.frasiEUHOrfane > 0) {
+                    const deleteFrasiEUH = await window.electronAPI.executeSQLite(`
+                        DELETE FROM "EUH" 
+                        WHERE ID_PK IN (
+                            SELECT euh.ID_PK
+                            FROM "EUH" euh
+                            LEFT JOIN sostanze s ON euh.CAS_EK = s.CAS
+                            LEFT JOIN sali sa ON euh.CAS_EK = sa.CAS
+                            WHERE s.ID IS NULL AND sa.ID IS NULL
+                        )
+                    `, []);
+                    
+                    if (deleteFrasiEUH.success) {
+                        recordEliminati += deleteFrasiEUH.changes;
+                    }
+                }
+                
+                // Ricarica le tabelle
+                await Promise.all([
+                    loadTabellaRiscontroFrasiH(),
+                    loadTabellaRiscontroFrasiEUH()
+                ]);
+                
+                showNotification(`${recordEliminati} record orfani eliminati con successo`);
+                addActivity('Pulizia database', `${recordEliminati} record orfani eliminati`, 'fas fa-broom');
+                
+            } catch (error) {
+                console.error('Errore nella pulizia dei record orfani:', error);
+                showNotification('Errore nella pulizia: ' + error.message, 'error');
+            }
+        });
+        
+    } catch (error) {
+        console.error('Errore nella pulizia dei record orfani:', error);
+        showNotification('Errore nella pulizia: ' + error.message, 'error');
+    }
 }
 
 // Funzione per caricare la tabella frasi EUH dal database
