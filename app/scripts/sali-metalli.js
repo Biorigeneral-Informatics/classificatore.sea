@@ -331,7 +331,7 @@ async function assegnaSaliMetalli() {
         
         //Prepara e salva i dati completi del campione per il classificatore
         const datiCampione = {};
-        
+
         // Includi i risultati calcolati (sali con fattori di conversione applicati)
         for (const [saleNome, saleDati] of Object.entries(risultatiCalcolati)) {
             datiCampione[saleNome] = {

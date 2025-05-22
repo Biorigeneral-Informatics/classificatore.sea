@@ -10,6 +10,7 @@ import json
 import re
 import sqlite3
 import pandas as pd
+import sys
 from datetime import datetime
 
 #---------CARICAMENTO DATI CAMPIONE-----------#
@@ -711,11 +712,26 @@ class ClassificatoreRifiuti:
     #-----------METODI DI CLASSIFICAZIONE E NORMALIZZAZIONE-----------#
     def normalize_name(self, nome):
         """
-        Normalizza il nome della sostanza rimuovendo spazi extra e convertendo in minuscolo
-        per un confronto più robusto.
+        Normalizza il nome della sostanza rimuovendo spazi extra, convertendo in minuscolo,
+        e normalizzando caratteri speciali per un confronto più robusto.
         """
-        # Rimuove spazi multipli e converte in minuscolo
-        return re.sub(r'\s+', ' ', nome).lower().strip()
+        if not nome:
+            return ""
+        
+        # Converti in stringa se non lo è già
+        nome = str(nome)
+        
+        # Rimuovi spazi multipli e converti in minuscolo
+        nome = re.sub(r'\s+', ' ', nome).lower().strip()
+        
+        # Normalizza i caratteri speciali comuni (opzionale, espandi se necessario)
+        nome = nome.replace('-', ' ').replace('_', ' ')
+        
+        # Normalizza "di" e "tri" che potrebbero essere scritti in vari modi
+        nome = re.sub(r'\bdi\s+', 'di', nome)
+        nome = re.sub(r'\btri\s+', 'tri', nome)
+        
+        return nome
 
     def classifica_dati(self, campione_dati):
         """
@@ -734,12 +750,22 @@ class ClassificatoreRifiuti:
             
             # Prima ottieni tutte le sostanze dal database con i loro nomi normalizzati
             cursor = self.database.conn.cursor()
+            
+            # 1. Ottieni tutte le sostanze dalla tabella "sostanze"
             cursor.execute('SELECT Nome FROM "sostanze"')
             sostanze_db = [row[0] for row in cursor.fetchall()]
-            cursor.close()
-
+            
+            # 2. Aggiungi anche tutti i sali dalla tabella "sali"
+            cursor.execute('SELECT Sali FROM "sali"')
+            sali_db = [row[0] for row in cursor.fetchall()]
+            
+            # Combina i risultati delle due tabelle
+            tutti_i_nomi = sostanze_db + sali_db
+            
+            print(f"Trovate {len(sostanze_db)} sostanze e {len(sali_db)} sali nel database", file=sys.stderr)
+            
             # Crea un dizionario di nomi normalizzati per il confronto
-            sostanze_db_normalize = {self.normalize_name(nome): nome for nome in sostanze_db}
+            sostanze_db_normalize = {self.normalize_name(nome): nome for nome in tutti_i_nomi}
 
             for nome_sostanza in campione_dati.keys():
                 # Normalizza il nome della sostanza dall'input
@@ -748,7 +774,8 @@ class ClassificatoreRifiuti:
                 # Controlla se il nome normalizzato esiste nel database
                 if nome_normalizzato not in sostanze_db_normalize:
                     sostanze_mancanti.append(nome_sostanza)
-
+                    print(f"Sostanza mancante: '{nome_sostanza}' (normalizzata: '{nome_normalizzato}')", file=sys.stderr)
+            
             # Se ci sono sostanze mancanti, interrompi la classificazione
             if sostanze_mancanti:
                 print("\nERRORE: Impossibile avviare la classificazione.")
@@ -758,19 +785,44 @@ class ClassificatoreRifiuti:
                 print("\nPotrebbe trattarsi di errori di battitura nei file di input.")
                 print("Verificare i nomi delle sostanze e assicurarsi che corrispondano esattamente a quelli nella Tabella di Riscontro.")
                 return None
-            
+                
             # VERIFICA AGGIUNTIVA: controlla se tutte le sostanze hanno le hazard class necessarie
             sostanze_senza_hazard_class = []
             
             for nome_sostanza in campione_dati.keys():
-                verifica = self.database.verifica_hazard_class_required(nome_sostanza)
-                if not verifica["success"]:
-                    sostanze_senza_hazard_class.append({
-                        "sostanza": nome_sostanza,
-                        "errore": verifica["message"],
-                        "frasi_mancanti": verifica["missing_hazard_class"]
-                    })
-            # Se ci sono sostanze senza le hazard class richieste, interrompi la classificazione
+                # Se è un sale (cioè è presente nella tabella sali)
+                if nome_sostanza in sali_db:
+                    # Per i sali, dobbiamo cercare le frasi H direttamente nel database
+                    cursor = self.database.conn.cursor()
+                    cursor.execute('SELECT Hazard_Statement, Hazard_Class_and_Category FROM "frasi H" WHERE Nome_sostanza = ?', (nome_sostanza,))
+                    frasi_h_rows = cursor.fetchall()
+                    
+                    # Verifica se le frasi che richiedono hazard class ce l'hanno
+                    for row in frasi_h_rows:
+                        frase_h = row[0]
+                        hazard_class = row[1]
+                        
+                        if frase_h in self.database.frasi_h_require_class and (not hazard_class or hazard_class.strip() == ""):
+                            if nome_sostanza not in sostanze_senza_hazard_class:
+                                sostanze_senza_hazard_class.append({
+                                    "sostanza": nome_sostanza,
+                                    "errore": f"Manca hazard class per {frase_h}",
+                                    "frasi_mancanti": [frase_h]
+                                })
+                            else:
+                                # Aggiungi la frase alla lista di frasi mancanti per questa sostanza
+                                next(item for item in sostanze_senza_hazard_class if item["sostanza"] == nome_sostanza)["frasi_mancanti"].append(frase_h)
+                else:
+                    # Per le sostanze normali, usa il metodo esistente
+                    verifica = self.database.verifica_hazard_class_required(nome_sostanza)
+                    if not verifica["success"]:
+                        sostanze_senza_hazard_class.append({
+                            "sostanza": nome_sostanza,
+                            "errore": verifica["message"],
+                            "frasi_mancanti": verifica["missing_hazard_class"]
+                        })
+            
+            # Se ci sono sostanze senza le hazard class richieste, interrompi
             if sostanze_senza_hazard_class:
                 print("\nERRORE: Impossibile avviare la classificazione.")
                 print("Le seguenti sostanze hanno frasi H che richiedono hazard class ma questa informazione è mancante:")
@@ -780,33 +832,18 @@ class ClassificatoreRifiuti:
                 print("Si consiglia di aggiornare il database con le hazard class corrette per queste sostanze.")
                 return None
             
-            
-            #DEFINIZIONE DIZIONARI E VARIABILI
             # Dizionario per memorizzare le informazioni complete del campione
             campione = {}
-            
+                
             # Dizionari per tenere traccia delle sommatorie
             # Sommatoria per ciascuna frase H specifica
             sommatoria_per_frase = {}
-            
+                
             # Insieme per tenere traccia delle caratteristiche di pericolo assegnate
             hp_assegnate = set()
-            
+                
             # Dizionario per memorizzare le motivazioni delle assegnazioni HP
             motivazioni_hp = {}
-            
-            # STEP 1: Verifica preliminare per HP3 - Controllo punto di infiammabilità
-            # Questa verifica viene fatta prima di processare le sostanze
-            hp3_infiammabilita = self._verifica_hp3_infiammabilita()
-            if hp3_infiammabilita["assegnata"]:
-                hp_assegnate.add("HP3")
-                motivazioni_hp["HP3"] = hp3_infiammabilita["motivo"]
-            
-            # STEP 1.1: Verifica preliminare per HP8 - Controllo pH
-            hp8_ph = self._verifica_hp8_ph()
-            if hp8_ph["assegnata"]:
-                hp_assegnate.add("HP8")
-                motivazioni_hp["HP8"] = hp8_ph["motivo"]
             
             # STEP 2.1: PROCESSARE FRASI H E HAZARD CLASS
             for nome_sostanza, dati in campione_dati.items():
@@ -818,30 +855,61 @@ class ClassificatoreRifiuti:
                 nome_originale = dati.get("nome_originale", None)
                 
                 # Cerca la sostanza nel database per ottenere le frasi H associate con le hazard class
-                frasi_h_con_class = self.database.get_frasi_h_con_class(nome_sostanza)
-                frasi_euh_con_class = self.database.get_frasi_euh_con_class(nome_sostanza)
+                frasi_h_con_class = []
+                frasi_euh_con_class = []
+                
+                if nome_sostanza in sali_db:
+                    # Per i sali, ottieni le frasi H direttamente dal database
+                    cursor = self.database.conn.cursor()
+                    cursor.execute('SELECT Hazard_Statement, Hazard_Class_and_Category FROM "frasi H" WHERE Nome_sostanza = ?', (nome_sostanza,))
+                    
+                    for row in cursor.fetchall():
+                        frase_h = row[0]
+                        hazard_class = row[1]
+                        
+                        if frase_h:  # Verifica che frase_h non sia None
+                            frasi_h_con_class.append({
+                                "frase_h": frase_h,
+                                "hazard_class": hazard_class
+                            })
+                    
+                    # Ottieni le frasi EUH se necessario
+                    cursor.execute('SELECT EUH FROM "EUH" JOIN "sostanze" ON EUH.CAS_EK = sostanze.CAS WHERE sostanze.Nome = ?', (nome_sostanza,))
+                    
+                    for row in cursor.fetchall():
+                        frase_euh = row[0]
+                        
+                        if frase_euh:  # Verifica che frase_euh non sia None
+                            frasi_euh_con_class.append({
+                                "frase_euh": frase_euh,
+                                "hazard_class": None
+                            })
+                else:
+                    # Per le sostanze normali, usa i metodi esistenti
+                    frasi_h_con_class = self.database.get_frasi_h_con_class(nome_sostanza)
+                    frasi_euh_con_class = self.database.get_frasi_euh_con_class(nome_sostanza)
                 
                 # Se non trova frasi H e c'è un nome originale, prova a usare quello
                 if (not frasi_h_con_class or len(frasi_h_con_class) == 0) and nome_originale:
-                    print(f"Nessuna frase H trovata per '{nome_sostanza}', provo con il nome originale '{nome_originale}'")
+                    print(f"Nessuna frase H trovata per '{nome_sostanza}', provo con il nome originale '{nome_originale}'", file=sys.stderr)
                     frasi_h_con_class_orig = self.database.get_frasi_h_con_class(nome_originale)
                     frasi_euh_con_class_orig = self.database.get_frasi_euh_con_class(nome_originale)
                     
                     # Se trova frasi H con il nome originale, usale
                     if frasi_h_con_class_orig and len(frasi_h_con_class_orig) > 0:
-                        print(f"Trovate frasi H usando il nome originale '{nome_originale}' invece di '{nome_sostanza}'")
+                        print(f"Trovate frasi H usando il nome originale '{nome_originale}' invece di '{nome_sostanza}'", file=sys.stderr)
                         frasi_h_con_class = frasi_h_con_class_orig
                         frasi_euh_con_class = frasi_euh_con_class_orig
                 
                 # Estrai solo le frasi H per retrocompatibilità
                 frasi_h_associate = [info["frase_h"] for info in frasi_h_con_class]
-
+                
                 # AGGIUNTO: Estrai solo le frasi EUH
                 frasi_euh_associate = [info["frase_euh"] for info in frasi_euh_con_class]
                 
                 # Se la sostanza non è trovata, avvisa ma continua
                 if not frasi_h_associate:
-                    print(f"Avviso: Sostanza '{nome_sostanza}' non trovata nel database.")
+                    print(f"Avviso: Sostanza '{nome_sostanza}' non ha frasi H associate nel database.")
                 
                 # Aggiungi la sostanza al dizionario del campione
                 campione[nome_sostanza] = {
