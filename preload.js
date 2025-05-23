@@ -70,8 +70,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   runPythonScript: (scriptName, args) => ipcRenderer.invoke('run-python-script', scriptName, args),
 
-  //API per salvataggio campione reale in classificatore
-  saveCampioneData: (data) => ipcRenderer.invoke('save-campione-data', data),
+  // ✅ CORRETTO: Una sola definizione di saveCampioneData con parametro opzionale
+  saveCampioneData: (data, fileName = null) => ipcRenderer.invoke('save-campione-data', data, fileName),
+  
+  // Ottiene la lista dei file campione salvati
+  getCampioneFiles: () => ipcRenderer.invoke('get-campione-files'),
+  
+  // Elimina un file campione specifico
+  deleteCampioneFile: (fileName) => ipcRenderer.invoke('delete-campione-file', fileName),
 
   // API per gestire i file ECHA
   fileExists: (filePath) => ipcRenderer.invoke('file-exists', filePath),

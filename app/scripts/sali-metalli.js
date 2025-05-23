@@ -398,21 +398,38 @@ async function assegnaSaliMetalli() {
         
         // Salva i dati completi per il classificatore
         try {
-            // Controlla se API esiste
-            if (window.electronAPI.saveCampioneData) {
-                const saveResult = await window.electronAPI.saveCampioneData(datiCampione);
-                if (saveResult.success) {
-                    console.log("Dati campione salvati per il classificatore:", Object.keys(datiCampione).length, "sostanze");
-                } else {
-                    console.warn("Errore nel salvataggio dei dati campione:", saveResult.message);
+            // Genera timestamp per il nome del file
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
+            const fileName = `dati_campione_${timestamp}.json`;
+            
+            // Verifica quanti file ci sono già nella cartella
+            const fileList = await window.electronAPI.getCampioneFiles();
+            
+            if (fileList.length >= 8) {
+                showNotification('Limite massimo di 8 file raggiunto. Elimina alcuni file dalla sezione Classificazione prima di continuare.', 'warning');
+                return {};
+            }
+            
+            // Salva il file con il nuovo nome
+            const saveResult = await window.electronAPI.saveCampioneData(datiCampione, fileName);
+            
+            if (saveResult.success) {
+                console.log(`✅ File ${fileName} salvato con successo in: ${saveResult.filePath}`);
+                showNotification(`File ${fileName} salvato con successo`);
+                
+                // Aggiorna la UI della classificazione
+                if (typeof updateClassificationUI === 'function') {
+                    updateClassificationUI();
                 }
             } else {
-                console.warn("API saveCampioneData non disponibile. Aggiungi questa API in preload.js e main.js");
+                throw new Error(saveResult.message || 'Errore nel salvataggio del file');
             }
         } catch (e) {
-            console.warn("Errore nel tentativo di salvare i dati campione:", e);
+            console.error("Errore nel salvataggio dei dati campione:", e);
+            showNotification('Errore nel salvataggio del file: ' + e.message, 'error');
         }
-        
+                
         // Mostra notifica
         showNotification('Sali assegnati e concentrazioni calcolate con successo!');
         
@@ -607,3 +624,47 @@ async function initSaliMetalli() {
         `;
     }
 }
+
+
+// Funzione per salvare il file con timestamp dopo l'assegnazione dei sali
+async function salvaFileConTimestamp(datiCampione) {
+    try {
+        // Genera timestamp per il nome del file
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
+        const fileName = `dati_campione_${timestamp}.json`;
+        
+        // Verifica quanti file ci sono già nella cartella
+        const fileList = await window.electronAPI.getCampioneFiles();
+        
+        if (fileList.length >= 8) {
+            showNotification('Limite massimo di 8 file raggiunto. Elimina alcuni file dalla sezione Classificazione prima di continuare.', 'warning');
+            return false;
+        }
+        
+        // Salva il file nella cartella dedicata
+        const saveResult = await window.electronAPI.saveCampioneData(datiCampione, fileName);
+        
+        if (saveResult.success) {
+            console.log(`File ${fileName} salvato con successo`);
+            showNotification(`File ${fileName} salvato con successo`);
+            return fileName;
+        } else {
+            throw new Error(saveResult.message || 'Errore nel salvataggio del file');
+        }
+        
+    } catch (error) {
+        console.error('Errore nel salvataggio del file con timestamp:', error);
+        showNotification('Errore nel salvataggio del file: ' + error.message, 'error');
+        return false;
+    }
+}
+
+
+
+
+
+
+
+// Esportazioni
+window.salvaFileConTimestamp = salvaFileConTimestamp;

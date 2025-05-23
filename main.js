@@ -958,15 +958,53 @@ ipcMain.handle('open-external', async (event, path) => {
 });
 
     //Handle aggiunto appena messo "calcolo_metalli.py"
-    ipcMain.handle('run-python-script', async (event, scriptName, args) => {
+    ipcMain.handle('run-python-script', async (event, scriptName, args = []) => {
       try {
-          return await runPythonScript(scriptName, args);
-      } catch (error) {
-          console.error('Error running Python script:', error);
-          return {
+        console.log(`🐍 Richiesta esecuzione script Python: ${scriptName} con args:`, args);
+        
+        // 🔧 NUOVO: Se il primo argomento è un nome file di campione, converti in percorso completo
+        if (args.length > 0 && typeof args[0] === 'string' && args[0].startsWith('dati_campione_')) {
+          const campioneDir = path.join(app.getPath('userData'), 'campione_data');
+          const fullPath = path.join(campioneDir, args[0]);
+          
+          console.log(`📁 Verifico esistenza file campione: ${fullPath}`);
+          
+          // Verifica che il file esista
+          if (fs.existsSync(fullPath)) {
+            console.log(`✅ File campione trovato, conversione: ${args[0]} -> ${fullPath}`);
+            args[0] = fullPath; // Sostituisci con il percorso completo
+          } else {
+            console.error(`❌ File campione non trovato: ${fullPath}`);
+            
+            // Log debug per vedere cosa c'è nella directory
+            if (fs.existsSync(campioneDir)) {
+              const filesInDir = fs.readdirSync(campioneDir);
+              console.log(`📋 File presenti in ${campioneDir}:`, filesInDir);
+            } else {
+              console.log(`📁 Directory campione non esiste: ${campioneDir}`);
+            }
+            
+            return {
               success: false,
-              message: error.message
-          };
+              message: `File campione '${args[0]}' non trovato in ${campioneDir}`
+            };
+          }
+        }
+        
+        console.log(`🐍 Esecuzione con args finali:`, args);
+        
+        // Chiama la funzione runPythonScript esistente
+        const result = await runPythonScript(scriptName, args);
+        
+        console.log(`✅ Risultato script Python:`, result);
+        return result;
+        
+      } catch (error) {
+        console.error('❌ Errore nell\'esecuzione dello script Python:', error);
+        return {
+          success: false,
+          message: error.message
+        };
       }
     });
   
@@ -1147,25 +1185,58 @@ ipcMain.handle('get-app-path', async () => {
 
 //========== CLASSIFICATORE e sezione CLASSIFICAZIONE ===========//
 // Gestione salvataggio dati campione per classificazione
-ipcMain.handle('save-campione-data', async (event, data) => {
+ipcMain.handle('save-campione-data', async (event, data, fileName = null) => {
   try {
-    // Assicurati che la cartella data esista
-    const appDir = path.join(__dirname, 'app');
-    const dataDir = path.join(appDir, 'data');
+    let targetPath;
     
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
+    if (fileName) {
+      // Nuovo sistema: salva con timestamp nella cartella dedicata
+      const campioneDir = path.join(app.getPath('userData'), 'campione_data');
+      
+      if (!fs.existsSync(campioneDir)) {
+        fs.mkdirSync(campioneDir, { recursive: true });
+        console.log(`📁 Creata directory campione: ${campioneDir}`);
+      }
+      
+      targetPath = path.join(campioneDir, fileName);
+      console.log(`💾 Salvando file campione: ${targetPath}`);
+    } else {
+      // Sistema esistente: salva in app/data/dati_campione.json
+      const appDir = path.join(__dirname, 'app');
+      const dataDir = path.join(appDir, 'data');
+      
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+        console.log(`📁 Creata directory data: ${dataDir}`);
+      }
+      
+      targetPath = path.join(dataDir, 'dati_campione.json');
+      console.log(`💾 Salvando file campione classico: ${targetPath}`);
     }
     
-    // Percorso del file JSON
-    const jsonPath = path.join(dataDir, 'dati_campione.json');
-    
     // Salva i dati come JSON
-    fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2));
+    fs.writeFileSync(targetPath, JSON.stringify(data, null, 2));
+    console.log(`✅ File campione salvato con successo: ${targetPath}`);
     
-    return { success: true, message: "Dati campione salvati con successo" };
+    // 🔧 NUOVO: Verifica e log del contenuto della directory
+    if (fileName) {
+      const campioneDir = path.join(app.getPath('userData'), 'campione_data');
+      try {
+        const files = fs.readdirSync(campioneDir);
+        console.log(`📋 File nella directory campione dopo salvataggio:`, files);
+      } catch (e) {
+        console.warn(`⚠️ Impossibile leggere directory campione:`, e.message);
+      }
+    }
+    
+    return { 
+      success: true, 
+      message: "Dati campione salvati con successo",
+      fileName: fileName || 'dati_campione.json',
+      filePath: targetPath  // 🔧 NUOVO: Restituisce anche il percorso completo
+    };
   } catch (error) {
-    console.error('Errore nel salvataggio dei dati campione:', error);
+    console.error('❌ Errore nel salvataggio dei dati campione:', error);
     return { success: false, message: `Errore: ${error.message}` };
   }
 });
@@ -1211,6 +1282,57 @@ ipcMain.handle('ensureDir', async (event, dirPath) => {
     throw error;
   }
 });
+
+// Handler per ottenere la lista dei file campione
+ipcMain.handle('get-campione-files', async () => {
+    try {
+        const campioneDir = path.join(app.getPath('userData'), 'campione_data');
+        
+        // Crea la directory se non esiste
+        if (!fs.existsSync(campioneDir)) {
+            fs.mkdirSync(campioneDir, { recursive: true });
+            return [];
+        }
+        
+        // Leggi tutti i file .json nella directory
+        const files = fs.readdirSync(campioneDir)
+            .filter(file => file.endsWith('.json'))
+            .sort((a, b) => {
+                // Ordina per timestamp (più recente per primo)
+                const timestampA = a.match(/dati_campione_(\d{14})/)?.[1] || '0';
+                const timestampB = b.match(/dati_campione_(\d{14})/)?.[1] || '0';
+                return timestampB.localeCompare(timestampA);
+            });
+        
+        return files;
+    } catch (error) {
+        console.error('Errore nel recupero dei file campione:', error);
+        return [];
+    }
+});
+
+// Handler per eliminare un file campione
+ipcMain.handle('delete-campione-file', async (event, fileName) => {
+    try {
+        const campioneDir = path.join(app.getPath('userData'), 'campione_data');
+        const filePath = path.join(campioneDir, fileName);
+        
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            return { success: true };
+        } else {
+            return { success: false, message: 'File non trovato' };
+        }
+    } catch (error) {
+        console.error('Errore nell\'eliminazione del file campione:', error);
+        return { success: false, message: error.message };
+    }
+});
+
+
+
+
+
 
 
 

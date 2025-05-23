@@ -14,9 +14,13 @@ import sys
 from datetime import datetime
 
 #---------CARICAMENTO DATI CAMPIONE-----------#
-def carica_dati_campione():
+def carica_dati_campione(nome_file=None):
     """
     Carica i dati reali del campione dal file JSON creato nella sezione sali-metalli
+    
+    Args:
+        nome_file (str, optional): Nome specifico del file da caricare. 
+                                  Se None, usa il file di default
     
     Returns:
         dict: Dizionario con le sostanze e le loro concentrazioni
@@ -25,29 +29,145 @@ def carica_dati_campione():
     try:
         # Percorso del file JSON con i dati reali
         script_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(script_dir, "data")
-        json_path = os.path.join(data_dir, "dati_campione.json")
         
-        # Controlla se il file esiste
+        if nome_file:
+            # 🔧 NUOVO: Gestione migliorata dei percorsi
+            if os.path.isabs(nome_file):
+                # Se è un percorso assoluto, usalo direttamente
+                json_path = nome_file
+                print(f"🔧 Usando percorso assoluto: {json_path}")
+            elif '/' in nome_file or '\\' in nome_file:
+                # Se contiene separatori di percorso, è un percorso relativo
+                json_path = os.path.join(script_dir, nome_file)
+                print(f"🔧 Usando percorso relativo: {json_path}")
+            else:
+                # Altrimenti, cerca nelle cartelle standard
+                print(f"🔍 Cercando file '{nome_file}' nelle cartelle standard...")
+                
+                # Prima prova nella cartella userData (Electron)
+                try:
+                    from pathlib import Path
+                    
+                    # Prova a determinare la cartella userData di Electron
+                    if os.name == 'nt':  # Windows
+                        appdata = os.getenv('APPDATA')
+                        if appdata:
+                            electron_dir = os.path.join(appdata, 'WasteGuard', 'campione_data')
+                        else:
+                            electron_dir = None
+                    else:  # Linux/Mac
+                        home_dir = str(Path.home())
+                        electron_dir = os.path.join(home_dir, '.config', 'WasteGuard', 'campione_data')
+                    
+                    # Verifica se il file esiste nella cartella userData
+                    if electron_dir and os.path.exists(electron_dir):
+                        potential_path = os.path.join(electron_dir, nome_file)
+                        if os.path.exists(potential_path):
+                            json_path = potential_path
+                            print(f"✅ File trovato in userData: {json_path}")
+                        else:
+                            print(f"❌ File non trovato in userData: {potential_path}")
+                            # Fallback alla cartella data classica
+                            data_dir = os.path.join(script_dir, "data")
+                            json_path = os.path.join(data_dir, nome_file)
+                            print(f"🔄 Usando percorso fallback: {json_path}")
+                    else:
+                        print(f"❌ Directory userData non esiste: {electron_dir}")
+                        # Fallback alla cartella data classica
+                        data_dir = os.path.join(script_dir, "data")
+                        json_path = os.path.join(data_dir, nome_file)
+                        print(f"🔄 Usando percorso fallback: {json_path}")
+                        
+                except Exception as e:
+                    print(f"⚠️ Errore nella determinazione del percorso userData: {e}")
+                    # Fallback alla cartella data classica
+                    data_dir = os.path.join(script_dir, "data")
+                    json_path = os.path.join(data_dir, nome_file)
+                    print(f"🔄 Usando percorso fallback dopo errore: {json_path}")
+        else:
+            # Comportamento di default: usa dati_campione.json nella cartella data
+            data_dir = os.path.join(script_dir, "data")
+            json_path = os.path.join(data_dir, "dati_campione.json")
+            print(f"📁 Usando percorso di default: {json_path}")
+        
+        # 🔧 NUOVO: Verifica dettagliata dell'esistenza del file
+        print(f"🔍 Verificando esistenza file: {json_path}")
+        
         if not os.path.exists(json_path):
-            print(f"File dei dati campione non trovato: {json_path}")
+            # Debug aggiuntivo per capire cosa c'è nella directory
+            parent_dir = os.path.dirname(json_path)
+            if os.path.exists(parent_dir):
+                try:
+                    files_in_dir = os.listdir(parent_dir)
+                    print(f"📋 File nella directory {parent_dir}: {files_in_dir}")
+                except Exception as e:
+                    print(f"⚠️ Impossibile leggere directory {parent_dir}: {e}")
+            else:
+                print(f"❌ Directory parent non esiste: {parent_dir}")
+            
+            print(f"❌ File dei dati campione non trovato: {json_path}")
             return None
             
+        print(f"✅ File trovato, tentativo di caricamento...")
+        
         # Carica il file JSON
         with open(json_path, 'r', encoding='utf-8') as f:
             dati_reali = json.load(f)
             
         # Verifica che i dati siano validi
         if not dati_reali or not isinstance(dati_reali, dict) or len(dati_reali) == 0:
-            print("File JSON caricato, ma non contiene dati validi")
+            print("❌ File JSON caricato, ma non contiene dati validi")
+            print(f"🔍 Contenuto file: {dati_reali}")
             return None
             
-        print(f"Dati campione caricati con successo: {len(dati_reali)} sostanze trovate")
+        print(f"✅ Dati campione caricati con successo da {json_path}: {len(dati_reali)} sostanze trovate")
+        
+        # 🔧 NUOVO: Log delle sostanze caricate per debug
+        print(f"📋 Sostanze caricate: {list(dati_reali.keys())}")
+        
         return dati_reali
             
     except Exception as e:
-        print(f"Errore nel caricamento dei dati del campione: {str(e)}")
+        print(f"❌ Errore nel caricamento dei dati del campione: {str(e)}")
+        import traceback
+        print(f"🔍 Traceback completo:")
+        traceback.print_exc()
         return None
+    
+
+
+#DEBUG# Funzione di debug per verificare i percorsi dei file
+def debug_file_path(file_path):
+    """
+    Funzione di debug per verificare percorsi file
+    """
+    print(f"=== DEBUG FILE PATH ===")
+    print(f"📁 File path ricevuto: '{file_path}'")
+    print(f"📏 Lunghezza path: {len(file_path)}")
+    print(f"🔤 Tipo: {type(file_path)}")
+    print(f"📋 Caratteri speciali: {repr(file_path)}")
+    print(f"✅ Percorso assoluto: {os.path.isabs(file_path)}")
+    print(f"✅ File esiste: {os.path.exists(file_path)}")
+    
+    # Verifica carattere per carattere se ci sono problemi
+    if len(file_path) > 0:
+        print(f"🔤 Primo carattere: '{file_path[0]}' (ord: {ord(file_path[0])})")
+        print(f"🔤 Ultimo carattere: '{file_path[-1]}' (ord: {ord(file_path[-1])})")
+    
+    # Verifica directory parent
+    parent_dir = os.path.dirname(file_path)
+    print(f"📁 Directory parent: '{parent_dir}'")
+    print(f"✅ Directory parent esiste: {os.path.exists(parent_dir)}")
+    
+    if os.path.exists(parent_dir):
+        try:
+            files = os.listdir(parent_dir)
+            print(f"📋 File nella directory: {files}")
+        except Exception as e:
+            print(f"❌ Errore lettura directory: {e}")
+    
+    print(f"=== FINE DEBUG ===")
+
 
 
 # Funzione per caricare le informazioni della raccolta
@@ -2332,11 +2452,22 @@ def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
         return False
 
 
+# Funzione principale
 def main():
     """
     Funzione principale del programma
     """
     try:
+        # Verifica se è stato passato un nome file come argomento
+        nome_file = None
+        if len(sys.argv) > 1:
+            nome_file = sys.argv[1]
+            print(f"Classificazione richiesta per il file: {nome_file}")
+            #🔧 DEBUG path file caricato
+            debug_file_path(nome_file)
+        else:
+            print("Nessun file specificato, usando il file di default")
+        
         # Inizializza il database
         database = DatabaseSostanze()
         
@@ -2356,7 +2487,7 @@ def main():
                 "message": "Impossibile caricare i dati dal database"
             })
         
-        # AGGIUNTO: Carica frasi EUH
+        # Carica frasi EUH
         success_loading_euh = database.carica_frasi_euh()
         if not success_loading_euh:
             return json.dumps({
@@ -2367,15 +2498,21 @@ def main():
         # Inizializza il classificatore
         classificatore = ClassificatoreRifiuti(database)
         
-        # Carica i dati reali del campione
-        campione_dati = carica_dati_campione()
+        # Carica i dati reali del campione (con il file specificato o quello di default)
+        campione_dati = carica_dati_campione(nome_file)
         
         # Verifica che siano stati caricati dati
         if not campione_dati:
-            return json.dumps({
-                "success": False, 
-                "message": "Nessun dato campione disponibile"
-            })
+            if nome_file:
+                return json.dumps({
+                    "success": False, 
+                    "message": f"File '{nome_file}' non trovato o non contiene dati validi"
+                })
+            else:
+                return json.dumps({
+                    "success": False, 
+                    "message": "Nessun dato campione disponibile"
+                })
         
         # Classifica il rifiuto usando i dati reali
         risultati = classificatore.classifica_dati(campione_dati)
@@ -2387,17 +2524,36 @@ def main():
                 "message": "Errore durante la classificazione"
             })
         
+        # Genera un nome file per i risultati basato sul file di input
+        if nome_file and nome_file != "dati_campione.json":
+            # Estrai il timestamp dal nome del file e usalo per i risultati
+            timestamp_match = re.search(r'dati_campione_(\d{14})', nome_file)
+            if timestamp_match:
+                timestamp = timestamp_match.group(1)
+                nome_risultati = f"risultati_classificazione_{timestamp}.json"
+            else:
+                # Se non c'è timestamp, usa il nome del file
+                base_name = os.path.splitext(nome_file)[0]
+                nome_risultati = f"risultati_{base_name}.json"
+        else:
+            nome_risultati = "risultati_classificazione.json"
+        
         # Salva i risultati per uso futuro
-        salva_risultati(risultati, "risultati_classificazione.json")
+        salva_risultati(risultati, nome_risultati)
         
         # Chiudi la connessione al database
         database.chiudi_connessione()
         
+        # Aggiungi informazioni sul file utilizzato nei risultati
+        risultati["file_utilizzato"] = nome_file if nome_file else "dati_campione.json"
+        risultati["timestamp_classificazione"] = datetime.now().isoformat()
+        
         # Restituisci i risultati come JSON
         return json.dumps({
             "success": True, 
-            "message": "Classificazione completata con successo", 
-            "data": risultati
+            "message": f"Classificazione completata con successo usando il file: {nome_file if nome_file else 'dati_campione.json'}", 
+            "data": risultati,
+            "file_risultati": nome_risultati
         })
     
     except Exception as e:
@@ -2519,8 +2675,101 @@ def _get_hp_description(hp):
     
     return descrizioni.get(hp, "Descrizione non disponibile")
 
+# Aggiungi questa funzione di utilità per supportare la gestione di file multipli
+def lista_file_campione_disponibili():
+    """
+    Restituisce una lista dei file campione disponibili
+    
+    Returns:
+        list: Lista dei nomi dei file disponibili
+    """
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        file_disponibili = []
+        
+        # Cerca nella cartella userData (Electron)
+        try:
+            from pathlib import Path
+            
+            if os.name == 'nt':  # Windows
+                appdata = os.getenv('APPDATA')
+                if appdata:
+                    electron_dir = os.path.join(appdata, 'WasteGuard', 'campione_data')
+                else:
+                    electron_dir = None
+            else:  # Linux/Mac
+                home_dir = str(Path.home())
+                electron_dir = os.path.join(home_dir, '.config', 'WasteGuard', 'campione_data')
+            
+            if electron_dir and os.path.exists(electron_dir):
+                for file in os.listdir(electron_dir):
+                    if file.endswith('.json') and file.startswith('dati_campione_'):
+                        file_disponibili.append(file)
+                        
+        except Exception as e:
+            print(f"Errore nella ricerca in userData: {e}")
+        
+        # Cerca nella cartella data classica
+        data_dir = os.path.join(script_dir, "data")
+        if os.path.exists(data_dir):
+            for file in os.listdir(data_dir):
+                if file.endswith('.json') and ('dati_campione' in file or 'campione' in file):
+                    if file not in file_disponibili:  # Evita duplicati
+                        file_disponibili.append(file)
+        
+        # Ordina per timestamp (più recente per primo)
+        file_disponibili.sort(reverse=True)
+        
+        return file_disponibili
+        
+    except Exception as e:
+        print(f"Errore nella ricerca dei file campione: {e}")
+        return []
 
-# Avvia il programma se eseguito direttamente
-if __name__ == "__main__":
+
+# Funzione per uso da linea di comando per testare la disponibilità di file
+def mostra_file_disponibili():
+    """
+    Mostra i file campione disponibili (per uso da linea di comando)
+    """
+    try:
+        file_disponibili = lista_file_campione_disponibili()
+        
+        if not file_disponibili:
+            print("Nessun file campione trovato.")
+            return
+            
+        print("File campione disponibili:")
+        for i, file in enumerate(file_disponibili, 1):
+            # Estrai timestamp dal nome del file per mostrare data/ora
+            timestamp_match = re.search(r'dati_campione_(\d{14})', file)
+            if timestamp_match:
+                timestamp = timestamp_match.group(1)
+                year = timestamp[0:4]
+                month = timestamp[4:6]
+                day = timestamp[6:8]
+                hour = timestamp[8:10]
+                minute = timestamp[10:12]
+                second = timestamp[12:14]
+                data_ora = f"{day}/{month}/{year} {hour}:{minute}:{second}"
+                print(f"  {i}. {file} ({data_ora})")
+            else:
+                print(f"  {i}. {file}")
+                
+    except Exception as e:
+        print(f"Errore nella visualizzazione dei file disponibili: {e}")
+
+
+
+
+
+
+
+
+
+# Se il file viene eseguito con l'argomento --list, mostra i file disponibili
+if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "--list":
+    mostra_file_disponibili()
+elif __name__ == "__main__":
     # Stampa il risultato JSON
     print(main())

@@ -720,19 +720,18 @@
         </section>
 
         
-        <!-- Sezione Classificazione (Semplificata) -->
+        <!-- Sezione Classificazione -->
         <section id="classificazione" class="section">
             <h2>Classificazione Rifiuti</h2>
             
-            <!-- Informazioni sul file -->
+            <!-- Informazioni e selettore file -->
             <div class="file-info-header" id="classificationFileInfo" style="display: none;">
-                <p class="text-lg font-semibold" id="classificationFileName">File: </p>
-                <p class="text-sm text-gray-600" id="classificationFileDate">Caricato il </p>
+                <!-- Il contenuto verrà generato dinamicamente da updateClassificationFileSelector -->
             </div>
             
             <!-- Pulsanti di azione -->
             <div class="action-buttons" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
-                <button id="startClassificationBtn" class="btn btn-primary" style="margin-right: 1rem;">
+                <button id="startClassificationBtn" class="btn btn-primary" style="margin-right: 1rem;" disabled>
                     <i class="fas fa-play"></i> Avvia Classificazione
                 </button>
                 <button id="goToReportsBtn" class="btn btn-primary" style="display: none;">
@@ -741,16 +740,17 @@
             </div>
             
             <!-- Messaggio di informazione su come ottenere i risultati -->
-        <div class="info-box">
-            <h3><i class="fas fa-info-circle"></i> Come funziona la classificazione</h3>
-            <p>Quando avvii la classificazione, il sistema:</p>
-            <ol>
-                <li>Analizza i dati del campione e le sostanze con le relative frasi H</li>
-                <li>Applica i valori di cut-off e limite per ogni caratteristica di pericolo (HP)</li>
-                <li>Genera automaticamente un report nella sezione Reports</li>
-            </ol>
-            <p>Una volta completata la classificazione, usa il pulsante "Vai a Reports" per visualizzare e gestire i risultati.</p>
-        </div>
+            <div class="info-box">
+                <h3><i class="fas fa-info-circle"></i> Come funziona la classificazione</h3>
+                <p>Quando avvii la classificazione, il sistema:</p>
+                <ol>
+                    <li>Carica il file selezionato con i dati del campione e le sostanze</li>
+                    <li>Applica i valori di cut-off e limite per ogni caratteristica di pericolo (HP)</li>
+                    <li>Genera automaticamente un report nella sezione Reports</li>
+                </ol>
+                <p>Prima di avviare la classificazione, seleziona il file che vuoi analizzare dal menu a discesa sopra.</p>
+                <p><strong>Nota:</strong> È possibile salvare massimo 8 file. Quando il limite è raggiunto, elimina i file non più necessari.</p>
+            </div>
         </section>
     </main>
 
