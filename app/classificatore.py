@@ -35,14 +35,14 @@ def carica_dati_campione(nome_file=None):
             if os.path.isabs(nome_file):
                 # Se è un percorso assoluto, usalo direttamente
                 json_path = nome_file
-                print(f"🔧 Usando percorso assoluto: {json_path}")
+                print(f"Usando percorso assoluto: {json_path}")
             elif '/' in nome_file or '\\' in nome_file:
                 # Se contiene separatori di percorso, è un percorso relativo
                 json_path = os.path.join(script_dir, nome_file)
-                print(f"🔧 Usando percorso relativo: {json_path}")
+                print(f"Usando percorso relativo: {json_path}")
             else:
                 # Altrimenti, cerca nelle cartelle standard
-                print(f"🔍 Cercando file '{nome_file}' nelle cartelle standard...")
+                print(f"Cercando file '{nome_file}' nelle cartelle standard...")
                 
                 # Prima prova nella cartella userData (Electron)
                 try:
@@ -64,34 +64,34 @@ def carica_dati_campione(nome_file=None):
                         potential_path = os.path.join(electron_dir, nome_file)
                         if os.path.exists(potential_path):
                             json_path = potential_path
-                            print(f"✅ File trovato in userData: {json_path}")
+                            print(f"File trovato in userData: {json_path}")
                         else:
-                            print(f"❌ File non trovato in userData: {potential_path}")
+                            print(f"File non trovato in userData: {potential_path}")
                             # Fallback alla cartella data classica
                             data_dir = os.path.join(script_dir, "data")
                             json_path = os.path.join(data_dir, nome_file)
-                            print(f"🔄 Usando percorso fallback: {json_path}")
+                            print(f"Usando percorso fallback: {json_path}")
                     else:
-                        print(f"❌ Directory userData non esiste: {electron_dir}")
+                        print(f"Directory userData non esiste: {electron_dir}")
                         # Fallback alla cartella data classica
                         data_dir = os.path.join(script_dir, "data")
                         json_path = os.path.join(data_dir, nome_file)
-                        print(f"🔄 Usando percorso fallback: {json_path}")
+                        print(f"Usando percorso fallback: {json_path}")
                         
                 except Exception as e:
-                    print(f"⚠️ Errore nella determinazione del percorso userData: {e}")
+                    print(f"Errore nella determinazione del percorso userData: {e}")
                     # Fallback alla cartella data classica
                     data_dir = os.path.join(script_dir, "data")
                     json_path = os.path.join(data_dir, nome_file)
-                    print(f"🔄 Usando percorso fallback dopo errore: {json_path}")
+                    print(f"Usando percorso fallback dopo errore: {json_path}")
         else:
             # Comportamento di default: usa dati_campione.json nella cartella data
             data_dir = os.path.join(script_dir, "data")
             json_path = os.path.join(data_dir, "dati_campione.json")
-            print(f"📁 Usando percorso di default: {json_path}")
+            print(f"Usando percorso di default: {json_path}")
         
         # 🔧 NUOVO: Verifica dettagliata dell'esistenza del file
-        print(f"🔍 Verificando esistenza file: {json_path}")
+        print(f"Verificando esistenza file: {json_path}")
         
         if not os.path.exists(json_path):
             # Debug aggiuntivo per capire cosa c'è nella directory
@@ -99,16 +99,16 @@ def carica_dati_campione(nome_file=None):
             if os.path.exists(parent_dir):
                 try:
                     files_in_dir = os.listdir(parent_dir)
-                    print(f"📋 File nella directory {parent_dir}: {files_in_dir}")
+                    print(f"File nella directory {parent_dir}: {files_in_dir}")
                 except Exception as e:
-                    print(f"⚠️ Impossibile leggere directory {parent_dir}: {e}")
+                    print(f"Impossibile leggere directory {parent_dir}: {e}")
             else:
-                print(f"❌ Directory parent non esiste: {parent_dir}")
+                print(f"Directory parent non esiste: {parent_dir}")
             
-            print(f"❌ File dei dati campione non trovato: {json_path}")
+            print(f"File dei dati campione non trovato: {json_path}")
             return None
             
-        print(f"✅ File trovato, tentativo di caricamento...")
+        print(f"File trovato, tentativo di caricamento...")
         
         # Carica il file JSON
         with open(json_path, 'r', encoding='utf-8') as f:
@@ -116,21 +116,21 @@ def carica_dati_campione(nome_file=None):
             
         # Verifica che i dati siano validi
         if not dati_reali or not isinstance(dati_reali, dict) or len(dati_reali) == 0:
-            print("❌ File JSON caricato, ma non contiene dati validi")
-            print(f"🔍 Contenuto file: {dati_reali}")
+            print("File JSON caricato, ma non contiene dati validi")
+            print(f"Contenuto file: {dati_reali}")
             return None
             
-        print(f"✅ Dati campione caricati con successo da {json_path}: {len(dati_reali)} sostanze trovate")
+        print(f"Dati campione caricati con successo da {json_path}: {len(dati_reali)} sostanze trovate")
         
         # 🔧 NUOVO: Log delle sostanze caricate per debug
-        print(f"📋 Sostanze caricate: {list(dati_reali.keys())}")
+        print(f"Sostanze caricate: {list(dati_reali.keys())}")
         
         return dati_reali
             
     except Exception as e:
-        print(f"❌ Errore nel caricamento dei dati del campione: {str(e)}")
+        print(f"Errore nel caricamento dei dati del campione: {str(e)}")
         import traceback
-        print(f"🔍 Traceback completo:")
+        print(f"Traceback completo:")
         traceback.print_exc()
         return None
     
@@ -142,29 +142,29 @@ def debug_file_path(file_path):
     Funzione di debug per verificare percorsi file
     """
     print(f"=== DEBUG FILE PATH ===")
-    print(f"📁 File path ricevuto: '{file_path}'")
-    print(f"📏 Lunghezza path: {len(file_path)}")
-    print(f"🔤 Tipo: {type(file_path)}")
-    print(f"📋 Caratteri speciali: {repr(file_path)}")
-    print(f"✅ Percorso assoluto: {os.path.isabs(file_path)}")
-    print(f"✅ File esiste: {os.path.exists(file_path)}")
+    print(f"File path ricevuto: '{file_path}'")
+    print(f"Lunghezza path: {len(file_path)}")
+    print(f"Tipo: {type(file_path)}")
+    print(f"Caratteri speciali: {repr(file_path)}")
+    print(f"Percorso assoluto: {os.path.isabs(file_path)}")
+    print(f"File esiste: {os.path.exists(file_path)}")
     
     # Verifica carattere per carattere se ci sono problemi
     if len(file_path) > 0:
-        print(f"🔤 Primo carattere: '{file_path[0]}' (ord: {ord(file_path[0])})")
-        print(f"🔤 Ultimo carattere: '{file_path[-1]}' (ord: {ord(file_path[-1])})")
+        print(f"Primo carattere: '{file_path[0]}' (ord: {ord(file_path[0])})")
+        print(f"Ultimo carattere: '{file_path[-1]}' (ord: {ord(file_path[-1])})")
     
     # Verifica directory parent
     parent_dir = os.path.dirname(file_path)
-    print(f"📁 Directory parent: '{parent_dir}'")
-    print(f"✅ Directory parent esiste: {os.path.exists(parent_dir)}")
+    print(f"Directory parent: '{parent_dir}'")
+    print(f"Directory parent esiste: {os.path.exists(parent_dir)}")
     
     if os.path.exists(parent_dir):
         try:
             files = os.listdir(parent_dir)
-            print(f"📋 File nella directory: {files}")
+            print(f"File nella directory: {files}")
         except Exception as e:
-            print(f"❌ Errore lettura directory: {e}")
+            print(f"Errore lettura directory: {e}")
     
     print(f"=== FINE DEBUG ===")
 
