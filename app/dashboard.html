@@ -382,6 +382,43 @@
                 <small class="form-text text-muted">Il metallo a cui questo sale è associato</small>
             </div>
             
+            <div class="form-section">
+                <h4>Frasi H e Hazard Class</h4>
+                <button type="button" id="aggiungiHSaleBtn" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Aggiungi Frase H
+                </button>
+                
+                <div id="frasiHSaleContainer" class="mt-4">
+                    <!-- Qui verranno aggiunti dinamicamente i campi per le frasi H del sale -->
+                    <div class="frase-h-sale-row">
+                        <div class="form-group">
+                            <label>Frase H <span class="text-danger" style="color: red;">*</span></label>
+                            <input type="text" class="form-control frase-h-sale-input" placeholder="Frase H (es. H400)">
+                        </div>
+                        <div class="form-group">
+                            <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
+                            <select class="form-control hazard-class-sale-select" disabled>
+                                <option value="">Seleziona prima una frase H</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger remove-frase-sale-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h4>Frasi EUH</h4>
+                <button type="button" id="aggiungiEUHSaleBtn" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Aggiungi Frase EUH
+                </button>
+                
+                <div id="frasiEUHSaleContainer" class="mt-4">
+                    <!-- Qui verranno aggiunti dinamicamente i campi per le frasi EUH del sale -->
+                </div>
+            </div>
+            
             <div class="form-actions">
                 <button type="button" id="inserisciSaleBtn" class="btn btn-primary">
                     <i class="fas fa-save"></i> Inserisci Sale
