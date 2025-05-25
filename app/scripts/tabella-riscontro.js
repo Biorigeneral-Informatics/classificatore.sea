@@ -4213,7 +4213,7 @@ function integraValidazioneCASInSale() {
     window.inserisciNuovoSale = async function() {
         // Validazione CAS prima dell'inserimento
         const campoCAS = document.getElementById('codCasSale');
-        if (campoCAS && campoCAS.value.trim()) { // CAS opzionale per i sali
+        if (campoCAS) { 
             const risultatoCAS = validaCodCAS(campoCAS.value);
             
             if (!risultatoCAS.valido) {
@@ -4406,8 +4406,35 @@ async function inserisciNuovoSaleConFrasiValidato() {
             document.getElementById('fattoreConversione').classList.add('input-error');
             campiConErrore.push('Fattore di Conversione');
             hasErrors = true;
+        } else if (fattoreConversione.includes(',')) {
+            // Controllo specifico per la virgola
+            document.getElementById('fattoreConversione').classList.add('input-error');
+            
+            // Aggiungi messaggio di errore specifico
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = 'Usa il punto (.) come separatore decimale, non la virgola (,)';
+            document.getElementById('fattoreConversione').parentNode.appendChild(errorDiv);
+            
+            showNotification('Il fattore di conversione deve usare il punto come separatore decimale (es. 1.11)', 'warning');
+            hasErrors = true;
         }
         
+        // Validazione Metallo Associato
+        if (!sostanzaAssociataSelect || sostanzaAssociataSelect.selectedIndex === 0) {
+            document.getElementById('sostanzaAssociata').classList.add('input-error');
+            campiConErrore.push('Metallo Associato');
+            hasErrors = true;
+        }
+
+        // Validazione Codice CAS (obbligatorio)
+        if (!codCasSale) {
+            document.getElementById('codCasSale').classList.add('input-error');
+            campiConErrore.push('Codice CAS');
+            hasErrors = true;
+        }
+
+
         // Se ci sono errori di base, mostra notifica e interrompi
         if (hasErrors) {
             const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
@@ -4529,6 +4556,25 @@ async function inserisciNuovoSaleConFrasiValidato() {
                     }
                 }
             }
+        }
+
+        // Controllo se almeno una frase H valida è stata trovata
+        if (!fraseHValidaTrovata) {
+            campiConErrore.push('Frasi H e Hazard Class');
+            
+            // Evidenzia il primo campo se non ci sono errori già evidenziati
+            if (!document.querySelector('.frase-h-sale-input.input-error')) {
+                const primaRiga = frasiHSaleContainer.querySelector('.frase-h-sale-row');
+                if (primaRiga) {
+                    const fraseHInput = primaRiga.querySelector('.frase-h-sale-input');
+                    const hazardClassSelect = primaRiga.querySelector('.hazard-class-sale-select');
+                    
+                    if (fraseHInput) fraseHInput.classList.add('input-error');
+                    if (hazardClassSelect) hazardClassSelect.classList.add('input-error');
+                }
+            }
+            
+            hasErrors = true;
         }
         
         // Se ci sono errori di validazione, mostra notifica e interrompi
@@ -6394,7 +6440,6 @@ window.aggiungiCampoFraseEUHSale = aggiungiCampoFraseEUHSale;
 window.updateHazardClassSaleOptions = updateHazardClassSaleOptions;
 window.validaFrasiHSale = validaFrasiHSale;
 window.resetFormNuovoSaleCompleto = resetFormNuovoSaleCompleto;
-window.inserisciNuovoSaleConFrasi = inserisciNuovoSaleConFrasi;
 window.inizializzaFormFrasiHSale = inizializzaFormFrasiHSale;
 
 // Esponi le nuove funzioni globalmente
