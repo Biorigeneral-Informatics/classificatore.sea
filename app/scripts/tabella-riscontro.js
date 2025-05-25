@@ -2840,7 +2840,7 @@ function setupFormHandlers() {
         // Rimuovi il vecchio event listener e aggiungi quello nuovo
         const newInserisciSaleBtn = inserisciSaleBtn.cloneNode(true);
         inserisciSaleBtn.parentNode.replaceChild(newInserisciSaleBtn, inserisciSaleBtn);
-        newInserisciSaleBtn.addEventListener('click', inserisciNuovoSaleConFrasi);
+        newInserisciSaleBtn.addEventListener('click', inserisciNuovoSaleConFrasiValidato);
     }
 
     // Bottone per aggiungere frase H per i sali
@@ -4374,7 +4374,7 @@ function resetFormNuovaSostanza() {
 
 
 // Modifica la funzione inserisciNuovoSale esistente per includere frasi H e EUH
-async function inserisciNuovoSaleConFrasi() {
+async function inserisciNuovoSaleConFrasiValidato() {
     try {
         // Ottieni i valori dal form
         const nomeSale = document.getElementById('nomeSale').value.trim();
@@ -4408,6 +4408,70 @@ async function inserisciNuovoSaleConFrasi() {
             hasErrors = true;
         }
         
+        // Se ci sono errori di base, mostra notifica e interrompi
+        if (hasErrors) {
+            const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
+            showNotification(messaggioErrore, 'warning');
+            
+            setTimeout(() => {
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+            }, 2000);
+            
+            return false;
+        }
+        
+        // NUOVO: Verifica se il nome sale è già presente nel database
+        const verificaDuplicati = await verificaNomeSaleEsistente(nomeSale);
+        if (!verificaDuplicati.valido) {
+            // Evidenzia il campo nome con errore
+            document.getElementById('nomeSale').classList.add('input-error');
+            
+            // Aggiungi messaggio di errore sotto il campo
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = verificaDuplicati.messaggio;
+            document.getElementById('nomeSale').parentNode.appendChild(errorDiv);
+            
+            showNotification(verificaDuplicati.messaggio, 'error', 4000);
+            
+            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
+            setTimeout(() => {
+                document.getElementById('nomeSale').classList.remove('input-error');
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 4000);
+            
+            return false;
+        }
+        
+        // NUOVO: Verifica se il nome sale corrisponde a una sostanza esistente
+        const verificaSostanze = await verificaNomeSaleVsSostanze(nomeSale);
+        if (!verificaSostanze.valido) {
+            // Evidenzia il campo nome con errore
+            document.getElementById('nomeSale').classList.add('input-error');
+            
+            // Aggiungi messaggio di errore sotto il campo
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = verificaSostanze.messaggio;
+            document.getElementById('nomeSale').parentNode.appendChild(errorDiv);
+            
+            showNotification(verificaSostanze.messaggio, 'error', 4000);
+            
+            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
+            setTimeout(() => {
+                document.getElementById('nomeSale').classList.remove('input-error');
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 4000);
+            
+            return false;
+        }
+        
         // Validazione CAS se fornito
         if (codCasSale) {
             const risultatoCAS = validaCodCAS(codCasSale);
@@ -4421,7 +4485,7 @@ async function inserisciNuovoSaleConFrasi() {
             }
         }
         
-        // Validazione frasi H
+        // Validazione frasi H (il resto del codice rimane uguale)
         let fraseHValidaTrovata = false;
         const frasiHSaleContainer = document.getElementById('frasiHSaleContainer');
         
@@ -4436,22 +4500,15 @@ async function inserisciNuovoSaleConFrasi() {
                     if (fraseHInput) {
                         const fraseHValue = fraseHInput.value.trim();
                         
-                        // Verifica se il campo frase H è compilato
                         if (fraseHValue) {
-                            // Verifica se la frase H è valida
                             if (!frasiHValide.includes(fraseHValue)) {
-                                // Frase H non valida
                                 fraseHInput.classList.add('input-error');
-                                
-                                // Aggiungi messaggio di errore sotto il campo
                                 const errorDiv = document.createElement('div');
                                 errorDiv.className = 'error-message';
                                 errorDiv.textContent = 'Errore frase H non gestita nel classificatore. Contattare il supporto.';
                                 fraseHInput.parentNode.appendChild(errorDiv);
-                                
                                 hasErrors = true;
                             } else {
-                                // Controlla se c'è un valore Hazard Class valido
                                 let hazardClassValue = '';
                                 
                                 if (hazardClassSelect && !hazardClassSelect.disabled) {
@@ -4459,16 +4516,13 @@ async function inserisciNuovoSaleConFrasi() {
                                 }
                                 
                                 if (!hazardClassValue) {
-                                    // Hazard class mancante
                                     if (hazardClassSelect) hazardClassSelect.classList.add('input-error');
                                     hasErrors = true;
                                 } else {
-                                    // Entrambi i campi sono validi
                                     fraseHValidaTrovata = true;
                                 }
                             }
                         } else if (hazardClassSelect && hazardClassSelect.value.trim()) {
-                            // Hazard Class compilato ma frase H mancante
                             fraseHInput.classList.add('input-error');
                             hasErrors = true;
                         }
@@ -4477,16 +4531,10 @@ async function inserisciNuovoSaleConFrasi() {
             }
         }
         
-        // Se ci sono errori di validazione, mostra una notifica e interrompi
+        // Se ci sono errori di validazione, mostra notifica e interrompi
         if (hasErrors) {
-            if (campiConErrore.length > 0) {
-                const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
-                showNotification(messaggioErrore, 'warning');
-            } else {
-                showNotification('Correggi gli errori nei campi evidenziati', 'warning');
-            }
+            showNotification('Correggi gli errori nei campi evidenziati', 'warning');
             
-            // Rimuovi automaticamente gli errori e i messaggi dopo 3 secondi
             setTimeout(() => {
                 document.querySelectorAll('.input-error').forEach(el => {
                     el.classList.remove('input-error');
@@ -4499,6 +4547,10 @@ async function inserisciNuovoSaleConFrasi() {
             return false;
         }
         
+        // Continua con il resto del codice originale per l'inserimento...
+        // (il resto della funzione rimane identico alla versione originale)
+        
+        // Se tutti i controlli sono passati, procedi con l'inserimento
         // Ottieni informazioni sulla sostanza associata
         let metalloNome = "";
         if (sostanzaAssociataSelect && sostanzaAssociataSelect.selectedIndex > 0) {
@@ -4630,6 +4682,211 @@ async function inserisciNuovoSaleConFrasi() {
         console.error('Errore nell\'inserimento del sale:', error);
         showNotification('Errore nell\'inserimento del sale: ' + error.message, 'error');
         return false;
+    }
+}
+
+
+// Funzione per verificare che il nome sale non sia già presente nella tabella sali
+async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
+    try {
+        if (!nomeSale || nomeSale.trim() === '') {
+            return {
+                valido: false,
+                messaggio: 'Il nome del sale non può essere vuoto'
+            };
+        }
+
+        // Normalizza il nome per la ricerca (trim e converti a lowercase)
+        const nomeNormalizzato = nomeSale.trim().toLowerCase();
+        
+        console.log(`Verifica nome sale esistente: Nome='${nomeNormalizzato}'`);
+        
+        // Ottieni tutti i sali dal database per fare un controllo flessibile
+        let query = 'SELECT ID, Sali, Sinonimi_Col_B_file_ECHA, CAS FROM sali';
+        let params = [];
+        
+        // Se stiamo modificando un sale esistente, escludiamo il suo ID
+        if (idEscludere) {
+            query += ' WHERE ID != ?';
+            params.push(idEscludere);
+        }
+        
+        const result = await window.electronAPI.querySQLite(query, params);
+        
+        if (!result.success) {
+            throw new Error(`Errore nel controllo del database: ${result.message}`);
+        }
+        
+        if (result.data && result.data.length > 0) {
+            // Prepara il nome per il confronto: rimuovi spazi extra, converti in minuscolo
+            const nomeComparazione = nomeNormalizzato.replace(/\s+/g, ' ');
+            
+            // Cerca corrispondenze nei sali esistenti
+            for (const sale of result.data) {
+                // Controlla sia il nome del sale che i sinonimi
+                const campiDaControllare = [
+                    { campo: 'Sali', valore: sale.Sali },
+                    { campo: 'Sinonimi_Col_B_file_ECHA', valore: sale.Sinonimi_Col_B_file_ECHA }
+                ];
+                
+                for (const campoInfo of campiDaControllare) {
+                    if (!campoInfo.valore) continue;
+                    
+                    const saleComparazione = campoInfo.valore.toLowerCase().replace(/\s+/g, ' ');
+                    
+                    // 1. Confronto esatto (case-insensitive)
+                    if (saleComparazione === nomeComparazione) {
+                        return {
+                            valido: false,
+                            messaggio: `Un sale con il nome "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
+                            saleCorrispondente: sale,
+                            tipoCorrispondenza: 'esatta'
+                        };
+                    }
+                    
+                    // 2. Verifica se una è contenuta nell'altra (gestisce abbreviazioni/forme alternative)
+                    if (saleComparazione.includes(nomeComparazione) || nomeComparazione.includes(saleComparazione)) {
+                        // Se una è contenuta nell'altra e la più corta è almeno 4 caratteri
+                        const lunghezzaMinima = Math.min(saleComparazione.length, nomeComparazione.length);
+                        
+                        if (lunghezzaMinima >= 4) {
+                            return {
+                                valido: false,
+                                messaggio: `Un sale con nome simile "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
+                                saleCorrispondente: sale,
+                                tipoCorrispondenza: 'contenimento'
+                            };
+                        }
+                    }
+                    
+                    // 3. Distanza di Levenshtein per nomi molto simili
+                    const distanza = calcolaDistanzaLevenshtein(nomeComparazione, saleComparazione);
+                    const lunghezzaMassima = Math.max(nomeComparazione.length, saleComparazione.length);
+                    
+                    // Soglia di similarità: massimo 3 caratteri o 20% della lunghezza
+                    const sogliaSimilarità = Math.min(3, Math.floor(lunghezzaMassima * 0.2));
+                    
+                    if (distanza <= sogliaSimilarità && lunghezzaMassima > 4) {
+                        return {
+                            valido: false,
+                            messaggio: `Un sale con nome molto simile "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
+                            saleCorrispondente: sale,
+                            tipoCorrispondenza: 'similarità',
+                            distanza: distanza
+                        };
+                    }
+                }
+            }
+        }
+        
+        // Se arriviamo qui, il nome non corrisponde a nessun sale esistente
+        return {
+            valido: true,
+            messaggio: '',
+            saleCorrispondente: null,
+            tipoCorrispondenza: null
+        };
+        
+    } catch (error) {
+        console.error('Errore nella verifica nome sale esistente:', error);
+        // In caso di errore, restituisci un risultato sicuro che non blocchi l'inserimento
+        return {
+            valido: true, // Permetti l'inserimento in caso di errore di sistema
+            messaggio: 'Avviso: Impossibile verificare i duplicati a causa di un errore tecnico: ' + error.message,
+            errore: true
+        };
+    }
+}
+
+// Funzione per verificare che il nome sale non corrisponda a una sostanza esistente
+async function verificaNomeSaleVsSostanze(nomeSale) {
+    try {
+        if (!nomeSale || nomeSale.trim() === '') {
+            return {
+                valido: false,
+                messaggio: 'Il nome del sale non può essere vuoto'
+            };
+        }
+
+        // Normalizza il nome per la ricerca
+        const nomeNormalizzato = nomeSale.trim().toLowerCase();
+        
+        console.log(`Verifica nome sale vs sostanze: Nome='${nomeNormalizzato}'`);
+        
+        // Ottieni tutte le sostanze dal database
+        const result = await window.electronAPI.querySQLite(
+            'SELECT ID, Nome, CAS, Categoria FROM sostanze',
+            []
+        );
+        
+        if (!result.success) {
+            throw new Error(`Errore nel controllo del database: ${result.message}`);
+        }
+        
+        if (result.data && result.data.length > 0) {
+            const nomeComparazione = nomeNormalizzato.replace(/\s+/g, ' ');
+            
+            // Cerca corrispondenze nelle sostanze
+            for (const sostanza of result.data) {
+                if (!sostanza.Nome) continue;
+                
+                const sostanzaComparazione = sostanza.Nome.toLowerCase().replace(/\s+/g, ' ');
+                
+                // 1. Confronto esatto (case-insensitive)
+                if (sostanzaComparazione === nomeComparazione) {
+                    return {
+                        valido: false,
+                        messaggio: `Il nome "${nomeSale}" corrisponde esattamente alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
+                        sostanzaCorrispondente: sostanza,
+                        tipoCorrispondenza: 'esatta'
+                    };
+                }
+                
+                // 2. Verifica contenimento (per forme alternative)
+                if (sostanzaComparazione.includes(nomeComparazione) || nomeComparazione.includes(sostanzaComparazione)) {
+                    const lunghezzaMinima = Math.min(sostanzaComparazione.length, nomeComparazione.length);
+                    
+                    if (lunghezzaMinima >= 4) {
+                        return {
+                            valido: false,
+                            messaggio: `Il nome "${nomeSale}" è molto simile alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
+                            sostanzaCorrispondente: sostanza,
+                            tipoCorrispondenza: 'contenimento'
+                        };
+                    }
+                }
+                
+                // 3. Distanza di Levenshtein per similarità
+                const distanza = calcolaDistanzaLevenshtein(nomeComparazione, sostanzaComparazione);
+                const lunghezzaMassima = Math.max(nomeComparazione.length, sostanzaComparazione.length);
+                const sogliaSimilarità = Math.min(3, Math.floor(lunghezzaMassima * 0.2));
+                
+                if (distanza <= sogliaSimilarità && lunghezzaMassima > 4) {
+                    return {
+                        valido: false,
+                        messaggio: `Il nome "${nomeSale}" è molto simile alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
+                        sostanzaCorrispondente: sostanza,
+                        tipoCorrispondenza: 'similarità',
+                        distanza: distanza
+                    };
+                }
+            }
+        }
+        
+        return {
+            valido: true,
+            messaggio: '',
+            sostanzaCorrispondente: null,
+            tipoCorrispondenza: null
+        };
+        
+    } catch (error) {
+        console.error('Errore nella verifica nome sale vs sostanze:', error);
+        return {
+            valido: true, // Permetti l'inserimento in caso di errore di sistema
+            messaggio: 'Avviso: Impossibile verificare la corrispondenza con le sostanze a causa di un errore tecnico: ' + error.message,
+            errore: true
+        };
     }
 }
 
@@ -6139,3 +6396,8 @@ window.validaFrasiHSale = validaFrasiHSale;
 window.resetFormNuovoSaleCompleto = resetFormNuovoSaleCompleto;
 window.inserisciNuovoSaleConFrasi = inserisciNuovoSaleConFrasi;
 window.inizializzaFormFrasiHSale = inizializzaFormFrasiHSale;
+
+// Esponi le nuove funzioni globalmente
+window.verificaNomeSaleEsistente = verificaNomeSaleEsistente;
+window.verificaNomeSaleVsSostanze = verificaNomeSaleVsSostanze;
+window.inserisciNuovoSaleConFrasiValidato = inserisciNuovoSaleConFrasiValidato;
