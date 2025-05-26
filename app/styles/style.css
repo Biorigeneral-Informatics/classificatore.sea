@@ -955,8 +955,8 @@
             top: 20px;
             right: 20px;
             padding: 1rem 2rem;
-            background: var(--success);
-            color: white;
+            background: var(--success) !important;
+            color: white !important;
             border-radius: 8px;
             display: none;
             animation: slideIn 0.3s ease-in-out;
@@ -3041,6 +3041,37 @@ select[disabled] {
     display: flex;
     gap: 0.5rem;
 }
+
+
+
+/* Stili per le righe delle frasi H del sale - layout orizzontale */
+.frase-h-sale-row, .frase-euh-sale-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: flex-end;
+}
+
+.frase-h-sale-row .form-group, .frase-euh-sale-row .form-group {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* Pulsante rimozione frasi per i sali */
+.remove-frase-sale-btn {
+    height: 38px;
+    align-self: flex-end;
+    margin-bottom: 0.5rem;
+    flex-shrink: 0;
+}
+
+/* Assicura che i campi abbiano la stessa altezza */
+.frase-h-sale-row .form-control,
+.frase-euh-sale-row .form-control {
+    height: 38px;
+}
+
+
 
 /* Stili per le celle modificabili nella tabella sali */
 .edit-mode td.editable {

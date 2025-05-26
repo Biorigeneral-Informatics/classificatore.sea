@@ -46,6 +46,7 @@ function initTabellaRiscontro() {
     setupSostanzeEventListeners();
     setupFrasiHEventListeners();
     setupFrasiEUHEventListeners(); // Assicurati che questa funzione venga chiamata
+    inizializzaFormFrasiHSale();
     inserisciNuovaFraseEUH();
 
     // Inizializza la ricerca per la tabella di confronto
@@ -2832,11 +2833,40 @@ function setupFormHandlers() {
         inserisciSostanzaBtn.addEventListener('click', inserisciNuovaSostanza);
     }
     
+    
     // Bottone per inserire nuovo sale
     const inserisciSaleBtn = document.getElementById('inserisciSaleBtn');
     if (inserisciSaleBtn) {
-        inserisciSaleBtn.addEventListener('click', inserisciNuovoSale);
+        // Rimuovi il vecchio event listener e aggiungi quello nuovo
+        const newInserisciSaleBtn = inserisciSaleBtn.cloneNode(true);
+        inserisciSaleBtn.parentNode.replaceChild(newInserisciSaleBtn, inserisciSaleBtn);
+        newInserisciSaleBtn.addEventListener('click', inserisciNuovoSaleConFrasiValidato);
     }
+
+    // Bottone per aggiungere frase H per i sali
+    const aggiungiHSaleBtn = document.getElementById('aggiungiHSaleBtn');
+    if (aggiungiHSaleBtn) {
+        aggiungiHSaleBtn.addEventListener('click', aggiungiCampoFraseHSale);
+    }
+
+    // Bottone per aggiungere frase EUH per i sali
+    const aggiungiEUHSaleBtn = document.getElementById('aggiungiEUHSaleBtn');
+    if (aggiungiEUHSaleBtn) {
+        aggiungiEUHSaleBtn.addEventListener('click', aggiungiCampoFraseEUHSale);
+    }
+
+    // Gestisci rimozione frasi per i sali
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-frase-sale-btn') || e.target.closest('.remove-frase-sale-btn')) {
+            const btn = e.target.classList.contains('remove-frase-sale-btn') ? e.target : e.target.closest('.remove-frase-sale-btn');
+            const row = btn.closest('.frase-h-sale-row') || btn.closest('.frase-euh-sale-row');
+            if (row) {
+                row.remove();
+            }
+        }
+    });
+    
+
     
     // Ricerca nelle tabelle
     const saliSearchInput = document.getElementById('saliSearchInput');
@@ -4183,7 +4213,7 @@ function integraValidazioneCASInSale() {
     window.inserisciNuovoSale = async function() {
         // Validazione CAS prima dell'inserimento
         const campoCAS = document.getElementById('codCasSale');
-        if (campoCAS && campoCAS.value.trim()) { // CAS opzionale per i sali
+        if (campoCAS) { 
             const risultatoCAS = validaCodCAS(campoCAS.value);
             
             if (!risultatoCAS.valido) {
@@ -4343,8 +4373,8 @@ function resetFormNuovaSostanza() {
 }
 
 
-// Funzione per inserire un nuovo sale (corretta)
-async function inserisciNuovoSale() {
+// Modifica la funzione inserisciNuovoSale esistente per includere frasi H e EUH
+async function inserisciNuovoSaleConFrasiValidato() {
     try {
         // Ottieni i valori dal form
         const nomeSale = document.getElementById('nomeSale').value.trim();
@@ -4352,17 +4382,221 @@ async function inserisciNuovoSale() {
         const codCasSale = document.getElementById('codCasSale').value.trim();
         const sostanzaAssociataSelect = document.getElementById('sostanzaAssociata');
         
-        // Validazione
+        // Rimuovi eventuali evidenziazioni di errore precedenti
+        document.querySelectorAll('.input-error').forEach(el => {
+            el.classList.remove('input-error');
+        });
+        
+        // Rimuovi messaggi di errore precedenti
+        document.querySelectorAll('.error-message').forEach(el => {
+            el.remove();
+        });
+        
+        // Validazione base
+        let hasErrors = false;
+        let campiConErrore = [];
+        
         if (!nomeSale) {
-            showNotification('Il nome del sale è obbligatorio', 'warning');
-            return false;
+            document.getElementById('nomeSale').classList.add('input-error');
+            campiConErrore.push('Nome Sale');
+            hasErrors = true;
         }
         
         if (!fattoreConversione || isNaN(parseFloat(fattoreConversione))) {
-            showNotification('Il fattore di conversione deve essere un numero valido', 'warning');
+            document.getElementById('fattoreConversione').classList.add('input-error');
+            campiConErrore.push('Fattore di Conversione');
+            hasErrors = true;
+        } else if (fattoreConversione.includes(',')) {
+            // Controllo specifico per la virgola
+            document.getElementById('fattoreConversione').classList.add('input-error');
+            
+            // Aggiungi messaggio di errore specifico
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = 'Usa il punto (.) come separatore decimale, non la virgola (,)';
+            document.getElementById('fattoreConversione').parentNode.appendChild(errorDiv);
+            
+            showNotification('Il fattore di conversione deve usare il punto come separatore decimale (es. 1.11)', 'warning');
+            hasErrors = true;
+        }
+        
+        // Validazione Metallo Associato
+        if (!sostanzaAssociataSelect || sostanzaAssociataSelect.selectedIndex === 0) {
+            document.getElementById('sostanzaAssociata').classList.add('input-error');
+            campiConErrore.push('Metallo Associato');
+            hasErrors = true;
+        }
+
+        // Validazione Codice CAS (obbligatorio)
+        if (!codCasSale) {
+            document.getElementById('codCasSale').classList.add('input-error');
+            campiConErrore.push('Codice CAS');
+            hasErrors = true;
+        }
+
+
+        // Se ci sono errori di base, mostra notifica e interrompi
+        if (hasErrors) {
+            const messaggioErrore = `Compila i seguenti campi obbligatori: ${campiConErrore.join(', ')}`;
+            showNotification(messaggioErrore, 'warning');
+            
+            setTimeout(() => {
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+            }, 2000);
+            
             return false;
         }
         
+        // NUOVO: Verifica se il nome sale è già presente nel database
+        const verificaDuplicati = await verificaNomeSaleEsistente(nomeSale);
+        if (!verificaDuplicati.valido) {
+            // Evidenzia il campo nome con errore
+            document.getElementById('nomeSale').classList.add('input-error');
+            
+            // Aggiungi messaggio di errore sotto il campo
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = verificaDuplicati.messaggio;
+            document.getElementById('nomeSale').parentNode.appendChild(errorDiv);
+            
+            showNotification(verificaDuplicati.messaggio, 'error', 4000);
+            
+            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
+            setTimeout(() => {
+                document.getElementById('nomeSale').classList.remove('input-error');
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 4000);
+            
+            return false;
+        }
+        
+        // NUOVO: Verifica se il nome sale corrisponde a una sostanza esistente
+        const verificaSostanze = await verificaNomeSaleVsSostanze(nomeSale);
+        if (!verificaSostanze.valido) {
+            // Evidenzia il campo nome con errore
+            document.getElementById('nomeSale').classList.add('input-error');
+            
+            // Aggiungi messaggio di errore sotto il campo
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = verificaSostanze.messaggio;
+            document.getElementById('nomeSale').parentNode.appendChild(errorDiv);
+            
+            showNotification(verificaSostanze.messaggio, 'error', 4000);
+            
+            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
+            setTimeout(() => {
+                document.getElementById('nomeSale').classList.remove('input-error');
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 4000);
+            
+            return false;
+        }
+        
+        // Validazione CAS se fornito
+        if (codCasSale) {
+            const risultatoCAS = validaCodCAS(codCasSale);
+            if (!risultatoCAS.valido) {
+                document.getElementById('codCasSale').classList.add('input-error');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = risultatoCAS.messaggio;
+                document.getElementById('codCasSale').parentNode.appendChild(errorDiv);
+                hasErrors = true;
+            }
+        }
+        
+        // Validazione frasi H (il resto del codice rimane uguale)
+        let fraseHValidaTrovata = false;
+        const frasiHSaleContainer = document.getElementById('frasiHSaleContainer');
+        
+        if (frasiHSaleContainer) {
+            const rows = frasiHSaleContainer.querySelectorAll('.frase-h-sale-row');
+            
+            if (rows.length > 0) {
+                for (const row of rows) {
+                    const fraseHInput = row.querySelector('.frase-h-sale-input');
+                    const hazardClassSelect = row.querySelector('.hazard-class-sale-select:not([disabled])');
+                    
+                    if (fraseHInput) {
+                        const fraseHValue = fraseHInput.value.trim();
+                        
+                        if (fraseHValue) {
+                            if (!frasiHValide.includes(fraseHValue)) {
+                                fraseHInput.classList.add('input-error');
+                                const errorDiv = document.createElement('div');
+                                errorDiv.className = 'error-message';
+                                errorDiv.textContent = 'Errore frase H non gestita nel classificatore. Contattare il supporto.';
+                                fraseHInput.parentNode.appendChild(errorDiv);
+                                hasErrors = true;
+                            } else {
+                                let hazardClassValue = '';
+                                
+                                if (hazardClassSelect && !hazardClassSelect.disabled) {
+                                    hazardClassValue = hazardClassSelect.value.trim();
+                                }
+                                
+                                if (!hazardClassValue) {
+                                    if (hazardClassSelect) hazardClassSelect.classList.add('input-error');
+                                    hasErrors = true;
+                                } else {
+                                    fraseHValidaTrovata = true;
+                                }
+                            }
+                        } else if (hazardClassSelect && hazardClassSelect.value.trim()) {
+                            fraseHInput.classList.add('input-error');
+                            hasErrors = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Controllo se almeno una frase H valida è stata trovata
+        if (!fraseHValidaTrovata) {
+            campiConErrore.push('Frasi H e Hazard Class');
+            
+            // Evidenzia il primo campo se non ci sono errori già evidenziati
+            if (!document.querySelector('.frase-h-sale-input.input-error')) {
+                const primaRiga = frasiHSaleContainer.querySelector('.frase-h-sale-row');
+                if (primaRiga) {
+                    const fraseHInput = primaRiga.querySelector('.frase-h-sale-input');
+                    const hazardClassSelect = primaRiga.querySelector('.hazard-class-sale-select');
+                    
+                    if (fraseHInput) fraseHInput.classList.add('input-error');
+                    if (hazardClassSelect) hazardClassSelect.classList.add('input-error');
+                }
+            }
+            
+            hasErrors = true;
+        }
+        
+        // Se ci sono errori di validazione, mostra notifica e interrompi
+        if (hasErrors) {
+            showNotification('Correggi gli errori nei campi evidenziati', 'warning');
+            
+            setTimeout(() => {
+                document.querySelectorAll('.input-error').forEach(el => {
+                    el.classList.remove('input-error');
+                });
+                document.querySelectorAll('.error-message').forEach(el => {
+                    el.remove();
+                });
+            }, 3000);
+            
+            return false;
+        }
+        
+        // Continua con il resto del codice originale per l'inserimento...
+        // (il resto della funzione rimane identico alla versione originale)
+        
+        // Se tutti i controlli sono passati, procedi con l'inserimento
         // Ottieni informazioni sulla sostanza associata
         let metalloNome = "";
         if (sostanzaAssociataSelect && sostanzaAssociataSelect.selectedIndex > 0) {
@@ -4372,11 +4606,9 @@ async function inserisciNuovoSale() {
         
         // Preparazione dei dati da inviare
         const fattore = parseFloat(fattoreConversione);
-        
-        // Valore di default, impostato a 0 (non di default)
         const isDefault = 0;
         
-        console.log('Preparazione inserimento nuovo sale:', {
+        console.log('Preparazione inserimento nuovo sale con frasi:', {
             nome: nomeSale,
             fattore: fattore,
             cas: codCasSale,
@@ -4384,7 +4616,7 @@ async function inserisciNuovoSale() {
             default: isDefault
         });
         
-        // Usa l'API per inserire nel database senza specificare ID
+        // Usa l'API per inserire nel database
         const result = await window.electronAPI.executeSQLite(
             'INSERT INTO sali (Sali, Sinonimi_Col_B_file_ECHA, CAS, Fattore, Metallo, "Default") VALUES (?, ?, ?, ?, ?, ?)',
             [nomeSale, nomeSale, codCasSale, fattore, metalloNome, isDefault]
@@ -4403,6 +4635,78 @@ async function inserisciNuovoSale() {
             [newSaleId, newSaleId]
         );
         
+        // Raccogli le frasi H se presenti
+        const frasiH = [];
+        if (fraseHValidaTrovata) {
+            document.querySelectorAll('.frase-h-sale-row').forEach(row => {
+                const fraseHInput = row.querySelector('.frase-h-sale-input');
+                const hazardClassSelect = row.querySelector('.hazard-class-sale-select:not([disabled])');
+                
+                if (fraseHInput && fraseHInput.value.trim()) {
+                    let hazardClass = '';
+                    
+                    if (hazardClassSelect && hazardClassSelect.value.trim()) {
+                        hazardClass = hazardClassSelect.value.trim();
+                    }
+                    
+                    if (hazardClass) {
+                        frasiH.push({
+                            fraseH: fraseHInput.value.trim(),
+                            hazardClass: hazardClass
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Inserisci le frasi H associate se presenti
+        for (const frase of frasiH) {
+            const fraseHResult = await window.electronAPI.executeSQLite(
+                'INSERT INTO "frasi H" (Nome_sostanza, CAS, Hazard_Statement, Hazard_Class_and_Category) VALUES (?, ?, ?, ?)',
+                [nomeSale, codCasSale, frase.fraseH, frase.hazardClass]
+            );
+            
+            if (!fraseHResult.success) {
+                console.warn(`Avviso: Errore nell'inserimento della frase H ${frase.fraseH}: ${fraseHResult.message}`);
+            } else {
+                const newFraseHId = fraseHResult.lastID;
+                await window.electronAPI.executeSQLite(
+                    'UPDATE "frasi H" SET ID_PK = ? WHERE ROWID = ?',
+                    [newFraseHId, newFraseHId]
+                );
+                console.log(`Frase H inserita per sale con ROWID: ${newFraseHId}`);
+            }
+        }
+        
+        // Raccogli le frasi EUH se presenti
+        const frasiEUH = [];
+        document.querySelectorAll('.frase-euh-sale-row').forEach(row => {
+            const fraseEUHInput = row.querySelector('.frase-euh-sale-input');
+            
+            if (fraseEUHInput && fraseEUHInput.value.trim()) {
+                frasiEUH.push(fraseEUHInput.value.trim());
+            }
+        });
+        
+        // Inserisci le frasi EUH associate se presenti
+        for (const fraseEUH of frasiEUH) {
+            const fraseEUHResult = await window.electronAPI.executeSQLite(
+                'INSERT INTO "EUH" (EUH, CAS_EK) VALUES (?, ?)',
+                [fraseEUH, codCasSale]
+            );
+            
+            if (!fraseEUHResult.success) {
+                console.warn(`Avviso: Errore nell'inserimento della frase EUH ${fraseEUH}: ${fraseEUHResult.message}`);
+            } else {
+                const newFraseEUHId = fraseEUHResult.lastID;
+                await window.electronAPI.executeSQLite(
+                    'UPDATE "EUH" SET ID_PK = ? WHERE ROWID = ?',
+                    [newFraseEUHId, newFraseEUHId]
+                );
+                console.log(`Frase EUH inserita per sale con ROWID: ${newFraseEUHId}`);
+            }
+        }
+        
         // Notifica di successo
         showNotification('Sale inserito con successo');
         
@@ -4410,10 +4714,14 @@ async function inserisciNuovoSale() {
         addActivity('Nuovo sale', `${nomeSale} aggiunto al database`, 'fas fa-flask');
         
         // Reset del form
-        resetFormNuovoSale();
+        resetFormNuovoSaleCompleto();
         
-        // Ricarica la tabella
+        // Ricarica le tabelle
         await loadTabellaRiscontroSali();
+        await loadTabellaRiscontroFrasiH();
+        if (typeof loadTabellaRiscontroFrasiEUH === 'function') {
+            await loadTabellaRiscontroFrasiEUH();
+        }
         
         return true;
     } catch (error) {
@@ -4422,6 +4730,540 @@ async function inserisciNuovoSale() {
         return false;
     }
 }
+
+
+// Funzione per verificare che il nome sale non sia già presente nella tabella sali
+async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
+    try {
+        if (!nomeSale || nomeSale.trim() === '') {
+            return {
+                valido: false,
+                messaggio: 'Il nome del sale non può essere vuoto'
+            };
+        }
+
+        // Normalizza il nome per la ricerca (trim e converti a lowercase)
+        const nomeNormalizzato = nomeSale.trim().toLowerCase();
+        
+        console.log(`Verifica nome sale esistente: Nome='${nomeNormalizzato}'`);
+        
+        // Ottieni tutti i sali dal database per fare un controllo flessibile
+        let query = 'SELECT ID, Sali, Sinonimi_Col_B_file_ECHA, CAS FROM sali';
+        let params = [];
+        
+        // Se stiamo modificando un sale esistente, escludiamo il suo ID
+        if (idEscludere) {
+            query += ' WHERE ID != ?';
+            params.push(idEscludere);
+        }
+        
+        const result = await window.electronAPI.querySQLite(query, params);
+        
+        if (!result.success) {
+            throw new Error(`Errore nel controllo del database: ${result.message}`);
+        }
+        
+        if (result.data && result.data.length > 0) {
+            // Prepara il nome per il confronto: rimuovi spazi extra, converti in minuscolo
+            const nomeComparazione = nomeNormalizzato.replace(/\s+/g, ' ');
+            
+            // Cerca corrispondenze nei sali esistenti
+            for (const sale of result.data) {
+                // Controlla sia il nome del sale che i sinonimi
+                const campiDaControllare = [
+                    { campo: 'Sali', valore: sale.Sali },
+                    { campo: 'Sinonimi_Col_B_file_ECHA', valore: sale.Sinonimi_Col_B_file_ECHA }
+                ];
+                
+                for (const campoInfo of campiDaControllare) {
+                    if (!campoInfo.valore) continue;
+                    
+                    const saleComparazione = campoInfo.valore.toLowerCase().replace(/\s+/g, ' ');
+                    
+                    // 1. Confronto esatto (case-insensitive)
+                    if (saleComparazione === nomeComparazione) {
+                        return {
+                            valido: false,
+                            messaggio: `Un sale con il nome "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
+                            saleCorrispondente: sale,
+                            tipoCorrispondenza: 'esatta'
+                        };
+                    }
+                    
+                    // 2. Verifica se una è contenuta nell'altra (gestisce abbreviazioni/forme alternative)
+                    if (saleComparazione.includes(nomeComparazione) || nomeComparazione.includes(saleComparazione)) {
+                        // Se una è contenuta nell'altra e la più corta è almeno 4 caratteri
+                        const lunghezzaMinima = Math.min(saleComparazione.length, nomeComparazione.length);
+                        
+                        if (lunghezzaMinima >= 4) {
+                            return {
+                                valido: false,
+                                messaggio: `Un sale con nome simile "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
+                                saleCorrispondente: sale,
+                                tipoCorrispondenza: 'contenimento'
+                            };
+                        }
+                    }
+                    
+                    // 3. Distanza di Levenshtein per nomi molto simili
+                    const distanza = calcolaDistanzaLevenshtein(nomeComparazione, saleComparazione);
+                    const lunghezzaMassima = Math.max(nomeComparazione.length, saleComparazione.length);
+                    
+                    // Soglia di similarità: massimo 3 caratteri o 20% della lunghezza
+                    const sogliaSimilarità = Math.min(3, Math.floor(lunghezzaMassima * 0.2));
+                    
+                    if (distanza <= sogliaSimilarità && lunghezzaMassima > 4) {
+                        return {
+                            valido: false,
+                            messaggio: `Un sale con nome molto simile "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
+                            saleCorrispondente: sale,
+                            tipoCorrispondenza: 'similarità',
+                            distanza: distanza
+                        };
+                    }
+                }
+            }
+        }
+        
+        // Se arriviamo qui, il nome non corrisponde a nessun sale esistente
+        return {
+            valido: true,
+            messaggio: '',
+            saleCorrispondente: null,
+            tipoCorrispondenza: null
+        };
+        
+    } catch (error) {
+        console.error('Errore nella verifica nome sale esistente:', error);
+        // In caso di errore, restituisci un risultato sicuro che non blocchi l'inserimento
+        return {
+            valido: true, // Permetti l'inserimento in caso di errore di sistema
+            messaggio: 'Avviso: Impossibile verificare i duplicati a causa di un errore tecnico: ' + error.message,
+            errore: true
+        };
+    }
+}
+
+// Funzione per verificare che il nome sale non corrisponda a una sostanza esistente
+async function verificaNomeSaleVsSostanze(nomeSale) {
+    try {
+        if (!nomeSale || nomeSale.trim() === '') {
+            return {
+                valido: false,
+                messaggio: 'Il nome del sale non può essere vuoto'
+            };
+        }
+
+        // Normalizza il nome per la ricerca
+        const nomeNormalizzato = nomeSale.trim().toLowerCase();
+        
+        console.log(`Verifica nome sale vs sostanze: Nome='${nomeNormalizzato}'`);
+        
+        // Ottieni tutte le sostanze dal database
+        const result = await window.electronAPI.querySQLite(
+            'SELECT ID, Nome, CAS, Categoria FROM sostanze',
+            []
+        );
+        
+        if (!result.success) {
+            throw new Error(`Errore nel controllo del database: ${result.message}`);
+        }
+        
+        if (result.data && result.data.length > 0) {
+            const nomeComparazione = nomeNormalizzato.replace(/\s+/g, ' ');
+            
+            // Cerca corrispondenze nelle sostanze
+            for (const sostanza of result.data) {
+                if (!sostanza.Nome) continue;
+                
+                const sostanzaComparazione = sostanza.Nome.toLowerCase().replace(/\s+/g, ' ');
+                
+                // 1. Confronto esatto (case-insensitive)
+                if (sostanzaComparazione === nomeComparazione) {
+                    return {
+                        valido: false,
+                        messaggio: `Il nome "${nomeSale}" corrisponde esattamente alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
+                        sostanzaCorrispondente: sostanza,
+                        tipoCorrispondenza: 'esatta'
+                    };
+                }
+                
+                // 2. Verifica contenimento (per forme alternative)
+                if (sostanzaComparazione.includes(nomeComparazione) || nomeComparazione.includes(sostanzaComparazione)) {
+                    const lunghezzaMinima = Math.min(sostanzaComparazione.length, nomeComparazione.length);
+                    
+                    if (lunghezzaMinima >= 4) {
+                        return {
+                            valido: false,
+                            messaggio: `Il nome "${nomeSale}" è molto simile alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
+                            sostanzaCorrispondente: sostanza,
+                            tipoCorrispondenza: 'contenimento'
+                        };
+                    }
+                }
+                
+                // 3. Distanza di Levenshtein per similarità
+                const distanza = calcolaDistanzaLevenshtein(nomeComparazione, sostanzaComparazione);
+                const lunghezzaMassima = Math.max(nomeComparazione.length, sostanzaComparazione.length);
+                const sogliaSimilarità = Math.min(3, Math.floor(lunghezzaMassima * 0.2));
+                
+                if (distanza <= sogliaSimilarità && lunghezzaMassima > 4) {
+                    return {
+                        valido: false,
+                        messaggio: `Il nome "${nomeSale}" è molto simile alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
+                        sostanzaCorrispondente: sostanza,
+                        tipoCorrispondenza: 'similarità',
+                        distanza: distanza
+                    };
+                }
+            }
+        }
+        
+        return {
+            valido: true,
+            messaggio: '',
+            sostanzaCorrispondente: null,
+            tipoCorrispondenza: null
+        };
+        
+    } catch (error) {
+        console.error('Errore nella verifica nome sale vs sostanze:', error);
+        return {
+            valido: true, // Permetti l'inserimento in caso di errore di sistema
+            messaggio: 'Avviso: Impossibile verificare la corrispondenza con le sostanze a causa di un errore tecnico: ' + error.message,
+            errore: true
+        };
+    }
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+////////// ========== FUNZIONI SPECIFICHE PER FRASI H E EUH DEI SALI ==========///////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Aggiungi un campo per la frase H del sale
+function aggiungiCampoFraseHSale() {
+    console.log("Aggiungendo nuovo campo frase H per sale...");
+    const container = document.getElementById('frasiHSaleContainer');
+    const row = document.createElement('div');
+    row.className = 'frase-h-sale-row';
+    row.innerHTML = `
+        <div class="form-group">
+            <label>Frase H <span class="text-danger" style="color: red;">*</span></label>
+            <input type="text" class="form-control frase-h-sale-input" placeholder="Frase H">
+        </div>
+        <div class="form-group">
+            <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
+            <select class="form-control hazard-class-sale-select" disabled>
+                <option value="">Seleziona prima una frase H</option>
+            </select>
+        </div>
+        <button type="button" class="btn btn-sm btn-danger remove-frase-sale-btn">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(row);
+    
+    // Trova l'input appena aggiunto
+    const fraseHInput = row.querySelector('.frase-h-sale-input');
+    
+    console.log("Input frase H sale creato:", fraseHInput);
+    
+    // Aggiungi event listener alla frase H input
+    if (fraseHInput) {
+        fraseHInput.addEventListener('input', function() {
+            console.log("Input frase H sale modificato:", this.value);
+            updateHazardClassSaleOptions(this);
+        });
+        console.log("Event listener per updateHazardClassSaleOptions aggiunto");
+    }
+    
+    // Aggiungi event listener per il bottone di rimozione
+    const removeBtn = row.querySelector('.remove-frase-sale-btn');
+    if (removeBtn) {
+        removeBtn.addEventListener('click', function() {
+            row.remove();
+        });
+    }
+}
+
+// Aggiungi un campo per la frase EUH del sale
+function aggiungiCampoFraseEUHSale() {
+    const container = document.getElementById('frasiEUHSaleContainer');
+    const row = document.createElement('div');
+    row.className = 'frase-euh-sale-row';
+    row.innerHTML = `
+        <div class="form-group">
+            <label>Frase EUH</label>
+            <input type="text" class="form-control frase-euh-sale-input" placeholder="Frase EUH (es. EUH029)">
+        </div>
+        <button type="button" class="btn btn-sm btn-danger remove-frase-sale-btn">
+            <i class="fas fa-times"></i>
+        </button>
+    `;
+    container.appendChild(row);
+}
+
+// Funzione per aggiornare le opzioni del menu a tendina dell'Hazard Class per i sali
+function updateHazardClassSaleOptions(fraseHInput, showErrors = false) {
+    const fraseH = fraseHInput.value.trim();
+    const row = fraseHInput.closest('.frase-h-sale-row');
+    if (!row) return;
+    
+    const hazardClassSelect = row.querySelector('.hazard-class-sale-select');
+    if (!hazardClassSelect) return;
+    
+    // Rimuovi eventuali errori precedenti se non stiamo mostrando errori
+    if (!showErrors) {
+        fraseHInput.classList.remove('input-error');
+        const errorMsg = row.querySelector('.error-message');
+        if (errorMsg) errorMsg.remove();
+    }
+    
+    // Abilita/disabilita il select di Hazard Class in base alla presenza di una frase H valida
+    hazardClassSelect.disabled = !fraseH || !frasiHValide.includes(fraseH);
+    
+    // Reset delle opzioni
+    hazardClassSelect.innerHTML = '';
+    
+    // Opzione vuota predefinita
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    
+    if (!fraseH) {
+        defaultOption.textContent = 'Seleziona prima una frase H';
+    } else if (!frasiHValide.includes(fraseH)) {
+        defaultOption.textContent = 'Frase H non valida';
+        
+        // Mostra l'errore solo se richiesto (durante la validazione)
+        if (showErrors) {
+            // Evidenzia l'errore nella frase H
+            fraseHInput.classList.add('input-error');
+            
+            // Aggiungi messaggio di errore se non esiste già
+            if (!row.querySelector('.error-message')) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = 'Errore frase H non gestita nel classificatore. Contattare il supporto.';
+                fraseHInput.parentNode.appendChild(errorDiv);
+            }
+        }
+    } else {
+        // Frase H valida
+        defaultOption.textContent = 'Seleziona un Hazard Class';
+    }
+    
+    hazardClassSelect.appendChild(defaultOption);
+    
+    // Se c'è una frase H valida, popola le opzioni di Hazard Class
+    if (fraseH && frasiHToHazardClass[fraseH]) {
+        frasiHToHazardClass[fraseH].forEach(hazardClass => {
+            const option = document.createElement('option');
+            option.value = hazardClass;
+            option.textContent = hazardClass;
+            hazardClassSelect.appendChild(option);
+        });
+    }
+    
+    return frasiHValide.includes(fraseH);
+}
+
+// Funzione per validare tutte le frasi H del sale e mostrare errori
+function validaFrasiHSale() {
+    let tutteValide = true;
+    let fraseHSenzaHazardClass = false;
+    
+    // Controlla tutte le frasi H del sale
+    document.querySelectorAll('.frase-h-sale-row').forEach(row => {
+        const fraseHInput = row.querySelector('.frase-h-sale-input');
+        const hazardClassSelect = row.querySelector('.hazard-class-sale-select');
+        
+        if (!fraseHInput || !hazardClassSelect) return;
+        
+        const fraseH = fraseHInput.value.trim();
+        const hazardClass = hazardClassSelect.value.trim();
+        
+        // Se la frase H è compilata ma non è valida, segna come errore
+        if (fraseH && !frasiHValide.includes(fraseH)) {
+            tutteValide = false;
+            // Aggiorna le opzioni mostrando gli errori
+            updateHazardClassSaleOptions(fraseHInput, true);
+        } 
+        // Se la frase H è valida ma manca l'Hazard Class
+        else if (fraseH && frasiHValide.includes(fraseH) && !hazardClass) {
+            fraseHSenzaHazardClass = true;
+            hazardClassSelect.classList.add('input-error');
+            
+            // Aggiungi messaggio di errore sotto il select se non esiste già
+            if (!row.querySelector('.hazard-error-message')) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message hazard-error-message';
+                errorDiv.textContent = 'Seleziona un Hazard Class per questa frase H';
+                hazardClassSelect.parentNode.appendChild(errorDiv);
+            }
+        }
+    });
+    
+    return { tutteValide, fraseHSenzaHazardClass };
+}
+
+
+// Inizializzazione specifica per i sali
+function inizializzaFormFrasiHSale() {
+    console.log("Inizializzazione form frasi H per sali...");
+    
+    // Aggiungi event listener all'input iniziale se esiste
+    const initialFraseHInput = document.querySelector('.frase-h-sale-input');
+    if (initialFraseHInput) {
+        console.log("Trovato input iniziale frase H sale, aggiungendo listener...");
+        initialFraseHInput.addEventListener('input', function() {
+            updateHazardClassSaleOptions(this);
+        });
+    }
+    
+    // Monitora tutti gli input esistenti per i sali
+    function monitoraInputSaleEsistenti() {
+        // Monitora tutte le frasi H esistenti per i sali
+        document.querySelectorAll('.frase-h-sale-input').forEach(input => {
+            input.removeEventListener('input', validazioneFraseHSale);
+            input.addEventListener('input', validazioneFraseHSale);
+            
+            // Aggiungi anche il listener per updateHazardClassSaleOptions
+            input.removeEventListener('input', handleFraseHSaleInput);
+            input.addEventListener('input', handleFraseHSaleInput);
+        });
+        
+        // Monitora tutte le frasi EUH esistenti per i sali
+        document.querySelectorAll('.frase-euh-sale-input').forEach(input => {
+            input.removeEventListener('input', validazioneFraseEUHSale);
+            input.addEventListener('input', validazioneFraseEUHSale);
+        });
+    }
+    
+    // Handler combinato per l'input della frase H del sale
+    function handleFraseHSaleInput() {
+        updateHazardClassSaleOptions(this);
+        validazioneFraseHSale.call(this);
+    }
+    
+    // Funzioni di validazione specifiche per i sali
+    function validazioneFraseHSale() {
+        const regexH = /^H\d{3}$/;
+        validaInputSale(this, regexH, 'Formato richiesto: H seguito da 3 cifre (es. H230)');
+    }
+    
+    function validazioneFraseEUHSale() {
+        const regexEUH = /^EUH\d{3}$/;
+        validaInputSale(this, regexEUH, 'Formato richiesto: EUH seguito da 3 cifre (es. EUH029)');
+    }
+    
+    // Funzione per validare un input del sale
+    function validaInputSale(input, regex, messaggioErrore) {
+        const valore = input.value.trim();
+        const contenitore = input.parentNode;
+        
+        // Rimuovi eventuali messaggi di errore esistenti
+        const vecchioErrore = contenitore.querySelector('.messaggio-errore');
+        if (vecchioErrore) {
+            vecchioErrore.remove();
+        }
+        
+        // Se l'input è vuoto, non mostrare errori
+        if (valore === '') {
+            input.classList.remove('input-error');
+            return;
+        }
+        
+        // Verifica se il valore corrisponde al formato richiesto
+        if (!regex.test(valore)) {
+            input.classList.add('input-error');
+            
+            // Crea e aggiungi messaggio di errore
+            const errore = document.createElement('span');
+            errore.className = 'messaggio-errore';
+            errore.textContent = messaggioErrore;
+            contenitore.appendChild(errore);
+        } else {
+            input.classList.remove('input-error');
+        }
+    }
+    
+    // Osserva le modifiche al DOM per intercettare nuovi input aggiunti per i sali
+    const observer = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.addedNodes.length) {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType === 1) {
+                        // Cerca nuovi input frase H per sali
+                        const inputsH = node.querySelectorAll ? node.querySelectorAll('.frase-h-sale-input') : [];
+                        inputsH.forEach(input => {
+                            console.log("Nuovo input frase H sale aggiunto, aggiungendo listeners...");
+                            input.addEventListener('input', validazioneFraseHSale);
+                            input.addEventListener('input', function() {
+                                updateHazardClassSaleOptions(this);
+                            });
+                        });
+                        
+                        // Cerca nuovi input frase EUH per sali
+                        const inputsEUH = node.querySelectorAll ? node.querySelectorAll('.frase-euh-sale-input') : [];
+                        inputsEUH.forEach(input => {
+                            input.addEventListener('input', validazioneFraseEUHSale);
+                        });
+                    }
+                });
+            }
+        });
+    });
+    
+    // Avvia l'osservazione dei container per i sali
+    const frasiHSaleContainer = document.getElementById('frasiHSaleContainer');
+    const frasiEUHSaleContainer = document.getElementById('frasiEUHSaleContainer');
+    
+    if (frasiHSaleContainer) {
+        observer.observe(frasiHSaleContainer, { 
+            childList: true, 
+            subtree: true 
+        });
+    }
+    
+    if (frasiEUHSaleContainer) {
+        observer.observe(frasiEUHSaleContainer, { 
+            childList: true, 
+            subtree: true 
+        });
+    }
+    
+    // Monitora gli input già esistenti per i sali
+    monitoraInputSaleEsistenti();
+    
+    // Assicuriamoci di monitorare anche quando si aggiungono nuovi campi per i sali
+    const aggiungiHSaleBtn = document.getElementById('aggiungiHSaleBtn');
+    if (aggiungiHSaleBtn) {
+        aggiungiHSaleBtn.addEventListener('click', () => {
+            setTimeout(() => {
+                monitoraInputSaleEsistenti();
+                console.log("Nuovi input monitorati dopo aggiunta campo H sale");
+            }, 50);
+        });
+    }
+    
+    const aggiungiEUHSaleBtn = document.getElementById('aggiungiEUHSaleBtn');
+    if (aggiungiEUHSaleBtn) {
+        aggiungiEUHSaleBtn.addEventListener('click', () => {
+            setTimeout(() => {
+                monitoraInputSaleEsistenti();
+                console.log("Nuovi input monitorati dopo aggiunta campo EUH sale");
+            }, 50);
+        });
+    }
+    
+    console.log("Inizializzazione form frasi H per sali completata");
+}
+
+// ========== FINE FUNZIONI SPECIFICHE PER FRASI H E EUH DEI SALI ==========
+
+
+
 
 
 // Carica le categorie disponibili dal database per popolare il select
@@ -4478,8 +5320,8 @@ async function loadCategorieSelect() {
 }
 
 
-// Reset del form nuovo sale
-function resetFormNuovoSale() {
+// Reset del form nuovo sale con gestione frasi H e EUH
+function resetFormNuovoSaleCompleto() {
     document.getElementById('nomeSale').value = '';
     document.getElementById('fattoreConversione').value = '';
     document.getElementById('codCasSale').value = '';
@@ -4487,7 +5329,46 @@ function resetFormNuovoSale() {
     if (selectSostanza) {
         selectSostanza.selectedIndex = 0;
     }
+    
+    // Reset frasi H - mantieni solo una riga vuota con i menu a tendina
+    document.getElementById('frasiHSaleContainer').innerHTML = `
+        <div class="frase-h-sale-row">
+            <div class="form-group">
+                <label>Frase H <span class="text-danger" style="color: red;">*</span></label>
+                <input type="text" class="form-control frase-h-sale-input" placeholder="Frase H">
+            </div>
+            <div class="form-group">
+                <label>Hazard Class and Category <span class="text-danger" style="color: red;">*</span></label>
+                <select class="form-control hazard-class-sale-select" disabled>
+                    <option value="">Seleziona prima una frase H</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-sm btn-danger remove-frase-sale-btn">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    // Reset frasi EUH
+    document.getElementById('frasiEUHSaleContainer').innerHTML = '';
+    
+    // Aggiungi event listener alla frase H input
+    const fraseHInput = document.querySelector('.frase-h-sale-input');
+    if (fraseHInput) {
+        fraseHInput.addEventListener('input', function() {
+            updateHazardClassSaleOptions(this);
+        });
+    }
+    
+    // Rimuovi eventuali errori residui
+    document.querySelectorAll('.input-error').forEach(el => {
+        el.classList.remove('input-error');
+    });
+    document.querySelectorAll('.error-message').forEach(el => {
+        el.remove();
+    });
 }
+
 
 // Ricerca in una tabella
 function ricercaTabella(query, tableId) {
@@ -5533,7 +6414,6 @@ window.salvaSaliModificati = salvaSaliModificati;
 window.inserisciNuovaSostanza = inserisciNuovaSostanza;
 window.resetFormNuovaSostanza = resetFormNuovaSostanza;
 window.inserisciNuovoSale = inserisciNuovoSale;
-window.resetFormNuovoSale = resetFormNuovoSale;
 window.inserisciNuovaFraseH = inserisciNuovaFraseH;
 window.inserisciNuovaFraseEUH = inserisciNuovaFraseEUH;
 window.initConfrontoSection = initConfrontoSection;
@@ -5553,3 +6433,16 @@ window.inizializzaFormFrasiH = inizializzaFormFrasiH;
 // Esponi le funzioni globalmente per uso esterno
 window.validaCodCAS = validaCodCAS;
 window.aggiungiValidazioneCAS = aggiungiValidazioneCAS;
+
+// Esponi le nuove funzioni per i sali con frasi H e EUH
+window.aggiungiCampoFraseHSale = aggiungiCampoFraseHSale;
+window.aggiungiCampoFraseEUHSale = aggiungiCampoFraseEUHSale;
+window.updateHazardClassSaleOptions = updateHazardClassSaleOptions;
+window.validaFrasiHSale = validaFrasiHSale;
+window.resetFormNuovoSaleCompleto = resetFormNuovoSaleCompleto;
+window.inizializzaFormFrasiHSale = inizializzaFormFrasiHSale;
+
+// Esponi le nuove funzioni globalmente
+window.verificaNomeSaleEsistente = verificaNomeSaleEsistente;
+window.verificaNomeSaleVsSostanze = verificaNomeSaleVsSostanze;
+window.inserisciNuovoSaleConFrasiValidato = inserisciNuovoSaleConFrasiValidato;

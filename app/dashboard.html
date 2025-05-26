@@ -358,28 +358,65 @@
             <h3>Inserimento Nuovo Sale</h3>
             
             <div class="form-group">
-                <label for="nomeSale">Nome Sale <span class="text-danger">*</span></label>
+                <label for="nomeSale">Nome Sale <span class="text-danger" style="color: red !important;">*</span></label>
                 <input type="text" id="nomeSale" class="form-control" placeholder="Inserisci il nome del sale" required>
             </div>
             
             <div class="form-group">
-                <label for="fattoreConversione">Fattore di Conversione <span class="text-danger">*</span></label>
+                <label for="fattoreConversione">Fattore di Conversione <span class="text-danger" style="color: red !important;">*</span></label>
                 <input type="number" id="fattoreConversione" class="form-control" placeholder="Inserisci il fattore di conversione" step="0.01" min="0" required>
                 <small class="form-text text-muted">Utilizzato per calcolare la concentrazione effettiva del metallo</small>
             </div>
             
             <div class="form-group">
-                <label for="codCasSale">Codice CAS</label>
+                <label for="codCasSale">Codice CAS <span class="text-danger" style="color: red !important;">*</span></label>
                 <input type="text" id="codCasSale" class="form-control" placeholder="Inserisci il codice CAS">
             </div>
             
             <div class="form-group">
-                <label for="sostanzaAssociata">Metallo Associato <span class="text-danger">*</span></label>
+                <label for="sostanzaAssociata">Metallo Associato <span class="text-danger" style="color: red !important;">*</span></label>
                 <select id="sostanzaAssociata" class="form-control" required>
                     <option value="">Seleziona un metallo</option>
                     <!-- Options caricate dinamicamente -->
                 </select>
                 <small class="form-text text-muted">Il metallo a cui questo sale è associato</small>
+            </div>
+            
+            <div class="form-section">
+                <h4>Frasi H e Hazard Class</h4>
+                <button type="button" id="aggiungiHSaleBtn" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Aggiungi Frase H
+                </button>
+                
+                <div id="frasiHSaleContainer" class="mt-4">
+                    <!-- Qui verranno aggiunti dinamicamente i campi per le frasi H del sale -->
+                    <div class="frase-h-sale-row">
+                        <div class="form-group">
+                            <label>Frase H <span class="text-danger" style="color: red !important;">*</span></label>
+                            <input type="text" class="form-control frase-h-sale-input" placeholder="Frase H (es. H400)">
+                        </div>
+                        <div class="form-group">
+                            <label>Hazard Class and Category <span class="text-danger" style="color: red !important;">*</span></label>
+                            <select class="form-control hazard-class-sale-select" disabled>
+                                <option value="">Seleziona prima una frase H</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger remove-frase-sale-btn">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h4>Frasi EUH</h4>
+                <button type="button" id="aggiungiEUHSaleBtn" class="btn btn-sm btn-primary">
+                    <i class="fas fa-plus"></i> Aggiungi Frase EUH
+                </button>
+                
+                <div id="frasiEUHSaleContainer" class="mt-4">
+                    <!-- Qui verranno aggiunti dinamicamente i campi per le frasi EUH del sale -->
+                </div>
             </div>
             
             <div class="form-actions">
