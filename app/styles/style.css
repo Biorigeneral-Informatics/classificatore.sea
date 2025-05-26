@@ -3340,6 +3340,116 @@ select[disabled] {
     transform: rotate(10deg);
 }
 
+.file-management-section .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.file-management-section .section-header i {
+    font-size: 1.2rem;
+}
+
+/* Stile icona warning quando il limite è raggiunto */
+.file-management-section .section-header .fa-exclamation-triangle {
+    color: var(--warning);
+}
+
+/* Stile icona normale per la gestione file */
+.file-management-section .section-header .fa-folder-open {
+    color: var(--primary);
+}
+
+/* Paragrafo nella sezione di gestione */
+.file-management-section p {
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+}
+
+/* Lista dei file da eliminare */
+.file-delete-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Singolo elemento file nella lista */
+.file-delete-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background-color: var(--bg-color);
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.file-delete-item:hover {
+    background-color: rgba(46, 125, 50, 0.05);
+    border-color: var(--primary);
+}
+
+/* Nome del file */
+.file-delete-item .file-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+/* Bottone elimina specifico per questa sezione */
+.file-delete-item .btn-danger {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+}
+
+/* Dark mode per la sezione di gestione file */
+[data-theme="dark"] .file-management-section {
+    background: rgba(18, 18, 18, 0.3);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid var(--glass-border);
+}
+
+[data-theme="dark"] .file-delete-item {
+    background-color: rgba(30, 30, 30, 0.5);
+}
+
+[data-theme="dark"] .file-delete-item:hover {
+    background-color: rgba(0, 214, 91, 0.05);
+    border-color: var(--primary);
+}
+
+/* Responsive design per la sezione di gestione file */
+@media (max-width: 768px) {
+    .file-management-section {
+        padding: 1rem;
+    }
+    
+    .file-delete-item {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: stretch;
+    }
+    
+    .file-delete-item .file-name {
+        text-align: center;
+        margin-bottom: 0.5rem;
+    }
+    
+    .file-delete-item .btn-danger {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+
+
+
+
+
 /* Stili per il selettore di file nella classificazione */
 .file-selector-container {
     background: var(--card-bg);
@@ -3382,12 +3492,13 @@ select[disabled] {
 }
 
 /* Stili per il warning del limite raggiunto */
-.file-limit-warning {
-    background: linear-gradient(135deg, rgba(255, 193, 7, 0.1), rgba(255, 193, 7, 0.05));
-    border: 1px solid #ffc107;
-    border-radius: 8px;
+.file-management-section {
+    margin-top: 2rem;
     padding: 1.5rem;
-    margin-top: 1rem;
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
 }
 
 .warning-header {

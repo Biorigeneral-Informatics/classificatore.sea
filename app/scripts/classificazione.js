@@ -125,15 +125,23 @@ function updateClassificationFileSelector(fileList) {
         </div>
     `;
     
-    // Se il limite è raggiunto, aggiungi la sezione per eliminare file
-    if (fileList.length >= 8) {
+    // MODIFICA: Mostra sempre la sezione per eliminare file se ci sono file disponibili
+    if (fileList.length > 0) {
+        // Aggiungi intestazione diversa in base al numero di file
+        const headerText = fileList.length >= 8 
+            ? '<i class="fas fa-exclamation-triangle"></i><span>Limite massimo raggiunto (8/8 file)</span>' 
+            : '<i class="fas fa-folder-open"></i><span>Gestione file campione</span>';
+        
+        const descriptionText = fileList.length >= 8
+            ? 'Per aggiungere nuovi file, elimina alcuni di quelli esistenti:'
+            : 'Puoi eliminare i file che non ti servono più:';
+        
         selectorHtml += `
-            <div class="file-limit-warning">
-                <div class="warning-header">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <span>Limite massimo raggiunto (8/8 file)</span>
+            <div class="file-management-section">
+                <div class="section-header">
+                    ${headerText}
                 </div>
-                <p>Per aggiungere nuovi file, elimina alcuni di quelli esistenti:</p>
+                <p>${descriptionText}</p>
                 <div class="file-delete-list">
         `;
         
