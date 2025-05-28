@@ -4,7 +4,7 @@ const fs = require('fs');
 const Store = require('electron-store');
 const { spawn } = require('child_process');
 const os = require('os');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 
 // Percorso fisso del database
 const DB_PATH = path.join(__dirname, 'app', 'DB', 'database_app.db');
@@ -15,71 +15,120 @@ const store = new Store();
 let mainWindow;
 let loginWindow;
 
-// Funzione helper per eseguire comandi Python
+// Funzione helper per eseguire comandi Python (USA SEMPRE .venv)
 function runPythonScript(scriptName, args) {
   return new Promise((resolve, reject) => {
-      const isWin = process.platform === 'win32';
-      
-      // Usa il percorso specifico all'ambiente virtuale Python
-      const pythonCmd = isWin ? 
-          path.join(__dirname, '.venv', 'Scripts', 'python.exe') : 
-          path.join(__dirname, '.venv', 'bin', 'python');
-      
-      const scriptPath = path.join(__dirname, 'app', scriptName);
-      
-      // Crea processo Python
-      const python = spawn(pythonCmd, [scriptPath, ...args]);
-      
-      let dataString = '';
-      let errorString = '';
-
-      // Raccoglie dati dall'output standard
-      python.stdout.on('data', (data) => {
-          dataString += data.toString();
+    const isWin = process.platform === 'win32';
+    
+    // Determina il percorso di Python - sempre .venv
+    let pythonCmd;
+    let venvPath;
+    
+    if (app.isPackaged) {
+      // App impacchettata: .venv è in process.resourcesPath
+      venvPath = path.join(process.resourcesPath, '.venv');
+      pythonCmd = isWin ? 
+        path.join(venvPath, 'Scripts', 'python.exe') : 
+        path.join(venvPath, 'bin', 'python');
+    } else {
+      // Sviluppo: .venv è nella directory del progetto
+      venvPath = path.join(__dirname, '.venv');
+      pythonCmd = isWin ? 
+        path.join(venvPath, 'Scripts', 'python.exe') : 
+        path.join(venvPath, 'bin', 'python');
+    }
+    
+    const scriptPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app', scriptName)
+      : path.join(__dirname, 'app', scriptName);
+    
+    console.log(`🐍 Running Python script: ${scriptPath} with ${pythonCmd}`);
+    
+    // Verifica che Python esista
+    if (!fs.existsSync(pythonCmd)) {
+      const errorMsg = `Python non trovato in: ${pythonCmd}`;
+      console.error(errorMsg);
+      resolve({
+        success: false,
+        message: errorMsg
       });
-
-      // Raccoglie eventuali errori
-      python.stderr.on('data', (data) => {
-          errorString += data.toString();
+      return;
+    }
+    
+    // Verifica che lo script esista
+    if (!fs.existsSync(scriptPath)) {
+      const errorMsg = `Script Python non trovato in: ${scriptPath}`;
+      console.error(errorMsg);
+      resolve({
+        success: false,
+        message: errorMsg
       });
+      return;
+    }
+    
+    // Crea processo Python
+    const python = spawn(pythonCmd, [scriptPath, ...args]);
+    
+    let dataString = '';
+    let errorString = '';
 
-      // Gestisce la chiusura del processo
-      python.on('close', (code) => {
-          if (code !== 0) {
-              console.error(`Python process exited with code ${code}`);
-              console.error(`Error: ${errorString}`);
-              resolve({
-                  success: false,
-                  message: `Errore nell'esecuzione dello script: ${errorString}`
-              });
-              return;
-          }
-          
-          try {
-              // Verifica se l'output contiene JSON valido
-              // Cerca l'ultima sequenza che inizia con { e termina con }
-              const jsonMatch = dataString.match(/\{.*\}/s);
-              if (jsonMatch) {
-                  const jsonData = JSON.parse(jsonMatch[0]);
-                  resolve(jsonData);
-              } else {
-                  console.error('No valid JSON found in Python output:', dataString);
-                  resolve({
-                      success: false,
-                      message: 'Output Python non valido'
-                  });
-              }
-          } catch (e) {
-              console.error('Error parsing Python output:', e);
-              console.error('Python output:', dataString);
-              resolve({
-                  success: false,
-                  message: `Errore nell'analisi dell'output Python: ${e.message}`
-              });
-          }
+    // Raccoglie dati dall'output standard
+    python.stdout.on('data', (data) => {
+      const output = data.toString();
+      dataString += output;
+      console.log(`Python stdout: ${output.substring(0, 50)}...`);
+    });
+
+    // Raccoglie eventuali errori o messaggi di debug
+    python.stderr.on('data', (data) => {
+      errorString += data.toString();
+      console.log(`Python stderr: ${data.toString().trim()}`);
+    });
+
+    // Gestisce la chiusura del processo
+    python.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`Python process exited with code ${code}`);
+        console.error(`Error: ${errorString}`);
+        resolve({
+          success: false,
+          message: `Errore nell'esecuzione dello script: ${errorString}`
+        });
+        return;
+      }
+      
+      try {
+        // Pulisci l'output rimuovendo eventuali testi non JSON all'inizio
+        let jsonStartIndex = dataString.indexOf('{');
+        if (jsonStartIndex === -1) {
+          throw new Error('Nessun JSON trovato nell\'output');
+        }
+        
+        let jsonString = dataString.substring(jsonStartIndex);
+        console.log('Parsing JSON string:', jsonString.substring(0, 100) + '...');
+        
+        const jsonData = JSON.parse(jsonString);
+        resolve(jsonData);
+      } catch (e) {
+        console.error('Error parsing Python output:', e);
+        console.error('Python output:', dataString);
+        resolve({
+          success: false,
+          message: `Errore nell'analisi dell'output Python: ${e.message}`
+        });
+      }
+    });
+
+    python.on('error', (error) => {
+      console.error('Failed to start Python process:', error);
+      resolve({
+        success: false,
+        message: `Impossibile avviare Python: ${error.message}. Path: ${pythonCmd}`
       });
+    });
   });
 }
+
 
 // Crea la directory dei database se non esiste
 function ensureDirectoriesExist() {
@@ -300,18 +349,39 @@ function createApplicationMenu() {
 }
 
 // Funzione per controllare le dipendenze Python
+// Funzione per controllare le dipendenze Python (CORRETTA)
+// Funzione per controllare le dipendenze Python (USA SEMPRE .venv)
 function checkPythonDependencies() {
   return new Promise((resolve, reject) => {
-    // Usa il percorso specifico all'ambiente virtuale Python
-    const pythonCmd = process.platform === 'win32' 
-      ? path.join(__dirname, '.venv', 'Scripts', 'python.exe')
-      : path.join(__dirname, '.venv', 'bin', 'python');
+    // Usa il percorso specifico all'ambiente virtuale Python - sempre .venv
+    let pythonCmd;
+    
+    if (app.isPackaged) {
+      // App impacchettata: .venv è in process.resourcesPath
+      pythonCmd = process.platform === 'win32' 
+        ? path.join(process.resourcesPath, '.venv', 'Scripts', 'python.exe')
+        : path.join(process.resourcesPath, '.venv', 'bin', 'python');
+    } else {
+      // Sviluppo: .venv è nella directory del progetto
+      pythonCmd = process.platform === 'win32' 
+        ? path.join(__dirname, '.venv', 'Scripts', 'python.exe')
+        : path.join(__dirname, '.venv', 'bin', 'python');
+    }
+    
+    console.log(`🔍 Controllo dipendenze Python con: ${pythonCmd}`);
+    
+    // Verifica che Python esista
+    if (!fs.existsSync(pythonCmd)) {
+      console.error(`❌ Python non trovato in: ${pythonCmd}`);
+      resolve(); // Non bloccare l'avvio
+      return;
+    }
     
     const checkScript = `
 import importlib.util
 import sys
 
-required_packages = ['pandas', 'numpy', 'sqlite3']
+required_packages = ['pandas', 'numpy', 'openpyxl', 'xlrd']
 missing_packages = []
 
 for package in required_packages:
@@ -347,110 +417,27 @@ else:
     });
     
     python.on('close', (code) => {
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {
+        console.warn('Non è stato possibile eliminare il file temporaneo');
+      }
+      
       if (code !== 0) {
-        console.error(`Missing Python dependencies: ${output}`);
-        
-        // Tenta di installare automaticamente pandas se mancante
-        console.log('Trying to install missing dependencies...');
-        const installProcess = spawn(pythonCmd, ['-m', 'pip', 'install', 'pandas']);
-        
-        let installOutput = '';
-        installProcess.stdout.on('data', (data) => {
-          installOutput += data.toString();
-          console.log(data.toString());
-        });
-        
-        installProcess.stderr.on('data', (data) => {
-          installOutput += data.toString();
-          console.error(data.toString());
-        });
-        
-        installProcess.on('close', (installCode) => {
-          if (installCode === 0) {
-            console.log('Dependencies installed successfully');
-            resolve();
-          } else {
-            reject(new Error(`Failed to install dependencies: ${installOutput}`));
-          }
-        });
+        console.error(`❌ Missing Python dependencies: ${output}`);
+        resolve(); // Non bloccare l'avvio
       } else {
-        console.log('All Python dependencies are installed');
+        console.log('✅ All Python dependencies are installed');
         resolve();
       }
     });
-  });
-}
-
-// Funzione per eseguire script Python
-function runPythonScript(scriptName, args) {
-  return new Promise((resolve, reject) => {
-    const isWin = process.platform === 'win32';
     
-    // Usa il percorso specifico all'ambiente virtuale Python
-    const pythonCmd = isWin ? 
-      path.join(__dirname, '.venv', 'Scripts', 'python.exe') : 
-      path.join(__dirname, '.venv', 'bin', 'python');
-    
-    const scriptPath = path.join(__dirname, 'app', scriptName);
-    
-    console.log(`Running Python script: ${scriptPath} with args ${args.join(' ')}`);
-    
-    // Crea processo Python
-    const python = spawn(pythonCmd, [scriptPath, ...args]);
-    
-    let dataString = '';
-    let errorString = '';
-
-    // Raccoglie dati dall'output standard
-    python.stdout.on('data', (data) => {
-      const output = data.toString();
-      dataString += output;
-      console.log(`Python stdout: ${output.substring(0, 50)}...`); // Log solo dei primi 50 caratteri
-    });
-
-    // Raccoglie eventuali errori o messaggi di debug
-    python.stderr.on('data', (data) => {
-      errorString += data.toString();
-      // Log dei messaggi di debug
-      console.log(`Python debug: ${data.toString().trim()}`);
-    });
-
-    // Gestisce la chiusura del processo
-    python.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`Python process exited with code ${code}`);
-        console.error(`Error: ${errorString}`);
-        resolve({
-          success: false,
-          message: `Errore nell'esecuzione dello script: ${errorString}`
-        });
-        return;
-      }
-      
-      try {
-        // Pulisci l'output rimuovendo eventuali testi non JSON all'inizio
-        let jsonStartIndex = dataString.indexOf('{');
-        if (jsonStartIndex === -1) {
-          throw new Error('Nessun JSON trovato nell\'output');
-        }
-        
-        let jsonString = dataString.substring(jsonStartIndex);
-        console.log('Parsing JSON string:', jsonString.substring(0, 100) + '...');
-        
-        const jsonData = JSON.parse(jsonString);
-        resolve(jsonData);
-      } catch (e) {
-        console.error('Error parsing Python output:', e);
-        console.error('Python output:', dataString);
-        resolve({
-          success: false,
-          message: `Errore nell'analisi dell'output Python: ${e.message}`
-        });
-      }
+    python.on('error', (error) => {
+      console.error(`❌ Errore nell'avvio di Python: ${error.message}`);
+      resolve(); // Non bloccare l'avvio
     });
   });
 }
-
 
 
 
@@ -1340,18 +1327,15 @@ ipcMain.handle('delete-campione-file', async (event, fileName) => {
 
 
 //======== Handle SQL Lite
-// Funzione per eseguire query SELECT su un database SQLite
+// Handler per query SELECT (AGGIORNATO)
 ipcMain.handle('query-sqlite', async (event, query, params, dbName) => {
   try {
-    // Costruisci il percorso relativo del database
+    // Costruisci il percorso del database
     let dbPath;
     
-    // Se il dbName è un percorso relativo alla cartella echa/data
     if (dbName && dbName.startsWith('echa/data/')) {
       dbPath = path.join(__dirname, 'app', dbName);
-    } 
-    // Altrimenti usa il path predefinito nella cartella DB
-    else {
+    } else {
       dbPath = dbName ? path.join(__dirname, 'app', 'DB', dbName) : DB_PATH;
     }
     
@@ -1364,34 +1348,28 @@ ipcMain.handle('query-sqlite', async (event, query, params, dbName) => {
       };
     }
     
-    return new Promise((resolve, reject) => {
-      const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
-        if (err) {
-          console.error(`Errore nell'apertura del database: ${err.message}`);
-          reject({ 
-            success: false, 
-            message: `Errore nell'apertura del database: ${err.message}` 
-          });
-        }
-      });
+    try {
+      // Apri database con better-sqlite3
+      const db = new Database(dbPath, { readonly: true });
       
-      db.all(query, params, (err, rows) => {
-        if (err) {
-          db.close();
-          console.error(`Errore nell'esecuzione della query: ${err.message}`);
-          reject({ 
-            success: false, 
-            message: `Errore nell'esecuzione della query: ${err.message}` 
-          });
-        } else {
-          db.close();
-          resolve({ 
-            success: true, 
-            data: rows 
-          });
-        }
-      });
-    });
+      // Prepara e esegui la query
+      const stmt = db.prepare(query);
+      const rows = params && params.length > 0 ? stmt.all(...params) : stmt.all();
+      
+      // Chiudi il database
+      db.close();
+      
+      return { 
+        success: true, 
+        data: rows 
+      };
+    } catch (err) {
+      console.error(`Errore nell'esecuzione della query: ${err.message}`);
+      return { 
+        success: false, 
+        message: `Errore nell'esecuzione della query: ${err.message}` 
+      };
+    }
   } catch (error) {
     console.error('Errore nell\'esecuzione della query SQLite:', error);
     return { 
@@ -1401,11 +1379,9 @@ ipcMain.handle('query-sqlite', async (event, query, params, dbName) => {
   }
 });
 
-// Funzione per eseguire query INSERT, UPDATE, DELETE su un database SQLite
+// Handler per query INSERT, UPDATE, DELETE (AGGIORNATO)
 ipcMain.handle('execute-sqlite', async (event, query, params, dbName) => {
   try {
-    // Se viene specificato un nome di database, costruisci un percorso basato su di esso
-    // altrimenti usa il percorso predefinito
     const dbPath = dbName ? path.join(__dirname, 'app', 'DB', dbName) : DB_PATH;
     
     // Verifica che il file del database esista
@@ -1417,35 +1393,29 @@ ipcMain.handle('execute-sqlite', async (event, query, params, dbName) => {
       };
     }
     
-    return new Promise((resolve, reject) => {
-      const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE, (err) => {
-        if (err) {
-          console.error(`Errore nell'apertura del database: ${err.message}`);
-          reject({ 
-            success: false, 
-            message: `Errore nell'apertura del database: ${err.message}` 
-          });
-        }
-      });
+    try {
+      // Apri database con better-sqlite3 (read-write)
+      const db = new Database(dbPath);
       
-      db.run(query, params, function(err) {
-        if (err) {
-          db.close();
-          console.error(`Errore nell'esecuzione della query: ${err.message}`);
-          reject({ 
-            success: false, 
-            message: `Errore nell'esecuzione della query: ${err.message}` 
-          });
-        } else {
-          db.close();
-          resolve({ 
-            success: true, 
-            lastID: this.lastID, 
-            changes: this.changes 
-          });
-        }
-      });
-    });
+      // Prepara e esegui la query
+      const stmt = db.prepare(query);
+      const result = params && params.length > 0 ? stmt.run(...params) : stmt.run();
+      
+      // Chiudi il database
+      db.close();
+      
+      return { 
+        success: true, 
+        lastID: result.lastInsertRowid, 
+        changes: result.changes 
+      };
+    } catch (err) {
+      console.error(`Errore nell'esecuzione della query: ${err.message}`);
+      return { 
+        success: false, 
+        message: `Errore nell'esecuzione della query: ${err.message}` 
+      };
+    }
   } catch (error) {
     console.error('Errore nell\'esecuzione della query SQLite:', error);
     return { 
