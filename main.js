@@ -16,115 +16,227 @@ let mainWindow;
 let loginWindow;
 
 // Funzione helper per eseguire comandi Python (USA SEMPRE .venv)
+// Funzione helper per eseguire comandi Python (USA SEMPRE .venv)
 function runPythonScript(scriptName, args) {
   return new Promise((resolve, reject) => {
     const isWin = process.platform === 'win32';
+    const isDev = !app.isPackaged;
     
-    // Determina il percorso di Python - sempre .venv
+    console.log('===========================================');
+    console.log('PYTHON SCRIPT EXECUTION');
+    console.log(`Script: ${scriptName}`);
+    console.log(`Packaged: ${app.isPackaged}`);
+    console.log(`Platform: ${process.platform}`);
+    console.log('===========================================');
+    
+    // Determina i percorsi base
     let pythonCmd;
     let venvPath;
+    let scriptPath;
     
-    if (app.isPackaged) {
-      // App impacchettata: .venv è in process.resourcesPath
-      venvPath = path.join(process.resourcesPath, '.venv');
-      pythonCmd = isWin ? 
-        path.join(venvPath, 'Scripts', 'python.exe') : 
-        path.join(venvPath, 'bin', 'python');
-    } else {
-      // Sviluppo: .venv è nella directory del progetto
+    if (isDev) {
+      // === MODALITÀ SVILUPPO ===
+      console.log('Running in DEVELOPMENT mode');
+      
+      // Python path in sviluppo
       venvPath = path.join(__dirname, '.venv');
       pythonCmd = isWin ? 
         path.join(venvPath, 'Scripts', 'python.exe') : 
         path.join(venvPath, 'bin', 'python');
+      
+      // Script path in sviluppo
+      scriptPath = path.join(__dirname, 'app', scriptName);
+      
+      console.log(`Dev venv path: ${venvPath}`);
+      console.log(`Dev python cmd: ${pythonCmd}`);
+      console.log(`Dev script path: ${scriptPath}`);
+      
+    } else {
+      // === MODALITÀ PRODUZIONE ===
+      console.log('Running in PRODUCTION mode');
+      console.log(`App path: ${app.getAppPath()}`);
+      console.log(`Resources path: ${process.resourcesPath}`);
+      
+      // In produzione, i file in extraResources vanno in process.resourcesPath
+      venvPath = path.join(process.resourcesPath, '.venv');
+      pythonCmd = isWin ? 
+        path.join(venvPath, 'Scripts', 'python.exe') : 
+        path.join(venvPath, 'bin', 'python');
+      
+      // Gli script Python vanno anche loro in extraResources
+      scriptPath = path.join(process.resourcesPath, 'app', scriptName);
+      
+      console.log(`Prod venv path: ${venvPath}`);
+      console.log(`Prod python cmd: ${pythonCmd}`);
+      console.log(`Prod script path: ${scriptPath}`);
     }
     
-    const scriptPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'app', scriptName)
-      : path.join(__dirname, 'app', scriptName);
-    
-    console.log(`🐍 Running Python script: ${scriptPath} with ${pythonCmd}`);
-    
-    // Verifica che Python esista
+    // Verifica esistenza Python
+    console.log('\nChecking Python executable...');
     if (!fs.existsSync(pythonCmd)) {
-      const errorMsg = `Python non trovato in: ${pythonCmd}`;
+      const errorMsg = `Python NOT FOUND at: ${pythonCmd}`;
       console.error(errorMsg);
+      
+      // Log aggiuntivi per debug
+      console.log('\nDirectory listing for parent folder:');
+      const parentDir = path.dirname(pythonCmd);
+      if (fs.existsSync(parentDir)) {
+        const files = fs.readdirSync(parentDir);
+        files.forEach(file => console.log(`  - ${file}`));
+      } else {
+        console.log(`  Parent directory does not exist: ${parentDir}`);
+      }
+      
+      // Controlla se esiste il venv
+      if (!fs.existsSync(venvPath)) {
+        console.error(`Virtual environment NOT FOUND at: ${venvPath}`);
+        
+        // Lista contenuto della directory resources in produzione
+        if (!isDev && fs.existsSync(process.resourcesPath)) {
+          console.log('\nResources directory content:');
+          const resourceFiles = fs.readdirSync(process.resourcesPath);
+          resourceFiles.forEach(file => console.log(`  - ${file}`));
+        }
+      }
+      
       resolve({
         success: false,
-        message: errorMsg
+        message: `Python non trovato. Percorso cercato: ${pythonCmd}`
       });
       return;
     }
+    console.log('Python executable found!');
     
-    // Verifica che lo script esista
+    // Verifica esistenza script
+    console.log('\nChecking Python script...');
     if (!fs.existsSync(scriptPath)) {
-      const errorMsg = `Script Python non trovato in: ${scriptPath}`;
+      const errorMsg = `Script NOT FOUND at: ${scriptPath}`;
       console.error(errorMsg);
+      
+      // Log directory dello script per debug
+      const scriptDir = path.dirname(scriptPath);
+      if (fs.existsSync(scriptDir)) {
+        console.log(`\nScript directory content (${scriptDir}):`);
+        const files = fs.readdirSync(scriptDir);
+        files.forEach(file => console.log(`  - ${file}`));
+      } else {
+        console.log(`  Script directory does not exist: ${scriptDir}`);
+      }
+      
       resolve({
         success: false,
-        message: errorMsg
+        message: `Script Python non trovato. Percorso cercato: ${scriptPath}`
       });
       return;
     }
+    console.log('Python script found!');
+    
+    // Prepara gli argomenti
+    console.log('\nStarting Python process...');
+    console.log(`Arguments: ${args.length > 0 ? args.join(' ') : 'none'}`);
     
     // Crea processo Python
-    const python = spawn(pythonCmd, [scriptPath, ...args]);
+    const python = spawn(pythonCmd, [scriptPath, ...args], {
+      env: { ...process.env },
+      windowsHide: true // Nasconde la finestra della console su Windows
+    });
     
     let dataString = '';
     let errorString = '';
+    let outputStarted = false;
 
     // Raccoglie dati dall'output standard
     python.stdout.on('data', (data) => {
       const output = data.toString();
+      if (!outputStarted) {
+        console.log('\nPython output started...');
+        outputStarted = true;
+      }
       dataString += output;
-      console.log(`Python stdout: ${output.substring(0, 50)}...`);
+      
+      // Log solo le prime righe per debug
+      const lines = output.split('\n');
+      const preview = lines[0].substring(0, 100);
+      if (preview.trim()) {
+        console.log(`Output: ${preview}${lines[0].length > 100 ? '...' : ''}`);
+      }
     });
 
-    // Raccoglie eventuali errori o messaggi di debug
+    // Raccoglie eventuali errori
     python.stderr.on('data', (data) => {
-      errorString += data.toString();
-      console.log(`Python stderr: ${data.toString().trim()}`);
+      const error = data.toString();
+      errorString += error;
+      
+      // Log errori Python (potrebbero essere anche solo warning)
+      const lines = error.split('\n');
+      lines.forEach(line => {
+        if (line.trim()) {
+          console.log(`Python stderr: ${line.trim()}`);
+        }
+      });
+    });
+
+    // Gestisce eventuali errori di spawn
+    python.on('error', (error) => {
+      console.error('\nFailed to start Python process:', error);
+      resolve({
+        success: false,
+        message: `Impossibile avviare Python: ${error.message}`
+      });
     });
 
     // Gestisce la chiusura del processo
     python.on('close', (code) => {
+      console.log(`\nPython process exited with code: ${code}`);
+      
       if (code !== 0) {
-        console.error(`Python process exited with code ${code}`);
-        console.error(`Error: ${errorString}`);
+        console.error('Python process failed');
+        if (errorString) {
+          console.error('Error details:', errorString);
+        }
+        
         resolve({
           success: false,
-          message: `Errore nell'esecuzione dello script: ${errorString}`
+          message: `Errore nell'esecuzione dello script Python (exit code: ${code}). ${errorString || 'Nessun dettaglio errore disponibile.'}`
         });
         return;
       }
       
+      // Processo completato con successo
+      console.log('Python process completed successfully');
+      
       try {
-        // Pulisci l'output rimuovendo eventuali testi non JSON all'inizio
-        let jsonStartIndex = dataString.indexOf('{');
-        if (jsonStartIndex === -1) {
-          throw new Error('Nessun JSON trovato nell\'output');
+        // Cerca l'inizio del JSON nell'output
+        const jsonStartIndex = dataString.indexOf('{');
+        const jsonEndIndex = dataString.lastIndexOf('}');
+        
+        if (jsonStartIndex === -1 || jsonEndIndex === -1) {
+          throw new Error('Nessun JSON valido trovato nell\'output');
         }
         
-        let jsonString = dataString.substring(jsonStartIndex);
-        console.log('Parsing JSON string:', jsonString.substring(0, 100) + '...');
+        // Estrai il JSON
+        const jsonString = dataString.substring(jsonStartIndex, jsonEndIndex + 1);
+        console.log(`Parsing JSON (${jsonString.length} characters)...`);
         
         const jsonData = JSON.parse(jsonString);
+        console.log('JSON parsed successfully');
+        console.log('===========================================\n');
+        
         resolve(jsonData);
+        
       } catch (e) {
-        console.error('Error parsing Python output:', e);
-        console.error('Python output:', dataString);
+        console.error('Error parsing Python output as JSON:', e.message);
+        console.error('Raw output preview:', dataString.substring(0, 200) + '...');
+        console.log('===========================================\n');
+        
+        // Se non è JSON, restituisci comunque l'output raw
         resolve({
           success: false,
-          message: `Errore nell'analisi dell'output Python: ${e.message}`
+          message: `Errore nel parsing JSON: ${e.message}`,
+          rawOutput: dataString,
+          errorOutput: errorString
         });
       }
-    });
-
-    python.on('error', (error) => {
-      console.error('Failed to start Python process:', error);
-      resolve({
-        success: false,
-        message: `Impossibile avviare Python: ${error.message}. Path: ${pythonCmd}`
-      });
     });
   });
 }

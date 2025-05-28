@@ -33,13 +33,13 @@
         "files": [
             "**/*"
         ],
-        "extraResources": [
-            {
-                "from": ".venv",
-                "to": ".venv",
-                "filter": ["**/*"]
-            }
-        ],
+    "extraResources": [
+        {
+            "from": "C:/Users/zizif/Documents/GitHub/classificatore.sea/.venv",
+            "to": ".venv",
+            "filter": ["**/*"]
+        }
+    ],
         "win": {
             "target": [
                 "nsis"
