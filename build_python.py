@@ -5,7 +5,10 @@ import shutil
 # Lista degli script Python da compilare
 scripts = [
     'app/raccolta.py',
-    'app/calcolo_metalli.py',
+    'app/calcola_metalli.py',
+    'app/echa/convert_echa.py',
+    'app/echa/aggiornamento_echa.py',
+    'app/classificatore.py'
     # Aggiungi altri script se necessario
 ]
 
