@@ -6,8 +6,56 @@ const { spawn } = require('child_process');
 const os = require('os');
 const Database = require('better-sqlite3');
 
-// Percorso fisso del database
-const DB_PATH = path.join(__dirname, 'app', 'DB', 'database_app.db');
+// Funzione semplificata per inizializzare il database in userData
+function initializeDatabase() {
+  const userDataPath = app.getPath('userData');
+  const userDbPath = path.join(userDataPath, 'database_app.db');
+  
+  // Se il database non esiste in userData, lo copiamo dal bundle
+  if (!fs.existsSync(userDbPath)) {
+    let sourceDbPath;
+    
+    if (app.isPackaged) {
+      // In produzione: prendi dal bundle
+      sourceDbPath = path.join(process.resourcesPath, 'app', 'DB', 'database_app.db');
+    } else {
+      // In sviluppo: prendi dalla directory del progetto
+      sourceDbPath = path.join(__dirname, 'app', 'DB', 'database_app.db');
+    }
+    
+    console.log(`Copio database da: ${sourceDbPath}`);
+    console.log(`Destinazione: ${userDbPath}`);
+    
+    try {
+      // Verifica che il database sorgente esista
+      if (!fs.existsSync(sourceDbPath)) {
+        throw new Error(`Database non trovato: ${sourceDbPath}`);
+      }
+      
+      // Crea la directory userData se non esiste
+      const userDbDir = path.dirname(userDbPath);
+      if (!fs.existsSync(userDbDir)) {
+        fs.mkdirSync(userDbDir, { recursive: true });
+      }
+      
+      // Copia il database
+      fs.copyFileSync(sourceDbPath, userDbPath);
+      console.log('Database copiato con successo in userData');
+      
+    } catch (error) {
+      console.error('Errore nella copia del database:', error);
+      throw error;
+    }
+  } else {
+    console.log('Database già presente in userData');
+  }
+  
+  return userDbPath;
+}
+
+// Inizializza il database e imposta il percorso
+const DB_PATH = initializeDatabase();
+
 
 // Inizializzazione dello store per i dati persistenti
 const store = new Store();
