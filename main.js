@@ -699,6 +699,13 @@ app.whenReady().then(async () => {
 
     //--------- inizio ipcMain.Handle----------//
     
+
+    // Handler per ottenere il percorso userData
+    ipcMain.handle('get-user-data-path', async () => {
+        return app.getPath('userData');
+    });
+
+
     // Gestione selezione file
     ipcMain.handle('select-file', async (event, options) => {
       const { canceled, filePaths } = await dialog.showOpenDialog(options);
@@ -1210,40 +1217,33 @@ ipcMain.handle('file-exists', async (event, filePath) => {
   }
 });
 
-// Gestione copia file
+// Gestione copia file (AGGIORNATA)
 ipcMain.handle('copy-file', async (event, srcPath, destPath) => {
-  try {
-    // Crea la directory di destinazione se non esiste
-    const destDir = path.dirname(destPath);
-    if (!fs.existsSync(destDir)) {
-      fs.mkdirSync(destDir, { recursive: true });
+    try {
+        // Assicurati che la directory di destinazione esista
+        const destDir = path.dirname(destPath);
+        if (!fs.existsSync(destDir)) {
+            fs.mkdirSync(destDir, { recursive: true });
+        }
+        
+        // Il destPath è già un percorso assoluto completo
+        const absoluteDestPath = destPath;
+        
+        // Copia il file
+        fs.copyFileSync(srcPath, absoluteDestPath);
+        
+        return { 
+            success: true, 
+            message: "File copiato con successo",
+            destPath: absoluteDestPath
+        };
+    } catch (error) {
+        console.error('Errore nella copia del file:', error);
+        return { 
+            success: false, 
+            message: `Errore: ${error.message}` 
+        };
     }
-    
-    // Percorso assoluto della destinazione
-    let absoluteDestPath;
-    if (path.isAbsolute(destPath)) {
-      absoluteDestPath = destPath;
-    } else {
-      // Se è un percorso relativo, lo rendi assoluto riferendolo alla cartella dell'app
-      const appDir = path.join(__dirname, 'app', 'echa');
-      absoluteDestPath = path.join(appDir, destPath);
-    }
-    
-    // Copia il file
-    fs.copyFileSync(srcPath, absoluteDestPath);
-    
-    return { 
-      success: true, 
-      message: "File copiato con successo",
-      destPath: absoluteDestPath
-    };
-  } catch (error) {
-    console.error('Errore nella copia del file:', error);
-    return { 
-      success: false, 
-      message: `Errore: ${error.message}` 
-    };
-  }
 });
 
 // Gestione eliminazione file OLD ALE

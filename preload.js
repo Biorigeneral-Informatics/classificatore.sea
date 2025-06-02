@@ -23,6 +23,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   login: (userData) => ipcRenderer.send('login-success', userData),
   logout: () => ipcRenderer.send('logout'),
   
+  // API per ottenere il percorso userData
+  getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
+
   // API per gestione file
   selectFile: (options) => ipcRenderer.invoke('select-file', options),
   saveFile: (options) => ipcRenderer.invoke('save-file', options),

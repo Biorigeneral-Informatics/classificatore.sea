@@ -277,32 +277,31 @@ async function importEchaExcel(filePath) {
         // Mostra notifica di caricamento
         showNotification(`Caricamento file ECHA "${fileName}" in corso...`, 'info');
         
-        // Crea percorsi per i file di destinazione nella cartella echa/data
+        // Crea percorsi per i file di destinazione nella cartella userData
         const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
         const excelFileName = `echa_${timestamp}_${fileName}`;
         const dbFileName = excelFileName.replace(/\.(xlsx|xls)$/i, '.db');
         
-        // Percorsi completi
-        const scriptDir = window.electronAPI.getAppPath();
-        const dataDirRelative = './data';
+        // MODIFICA PRINCIPALE: Usa userData invece di app directory
+        const userDataPath = await window.electronAPI.getUserDataPath(); // Aggiungi questa API
+        const echaDataDir = path.join(userDataPath, 'echa', 'data');
         
-        // Crea cartella di destinazione se non esiste
-        await window.electronAPI.ensureDir(dataDirRelative);
+        // Assicurati che la directory esista
+        await window.electronAPI.ensureDir(echaDataDir);
         
-        // Copia il file Excel nella cartella echa/data
+        // Percorsi completi per la destinazione
+        const savedExcelPath = path.join(echaDataDir, excelFileName);
+        const dbPath = path.join(echaDataDir, dbFileName);
+        
+        // Copia il file Excel nella cartella userData
         const saveResult = await window.electronAPI.copyFile(
             filePath, 
-            `${dataDirRelative}/${excelFileName}`
+            savedExcelPath
         );
         
         if (!saveResult.success) {
             throw new Error(saveResult.message || 'Errore nella copia del file ECHA');
         }
-        
-        // Percorso del file Excel salvato
-        const savedExcelPath = saveResult.destPath;
-        // Percorso per il database SQLite (usa il percorso restituito)
-        const dbPath = savedExcelPath.replace(/\.(xlsx|xls)$/i, '.db');
         
         // Mostra notifica di conversione
         showNotification(`Conversione di "${fileName}" in database SQLite...`, 'info');
@@ -320,7 +319,6 @@ async function importEchaExcel(filePath) {
         console.log('Risultato conversione in SQLite:', conversionResult);
         
         // Usa il percorso del database restituito dallo script Python
-        // Il percorso è ora corretto e non viene manipolato ulteriormente
         const actualDbPath = conversionResult.database_path || dbPath;
         
         // Salva info sul file e database nei sessionStorage/localStorage
@@ -331,28 +329,21 @@ async function importEchaExcel(filePath) {
             name: fileName,
             path: savedExcelPath,
             date: new Date().toISOString(),
-            dbPath: actualDbPath,  // Usa il percorso aggiornato
+            dbPath: actualDbPath,
             dbInfo: conversionResult
         };
-
+        
         console.log(`Percorso database salvato: ${actualDbPath}`);
         
         localStorage.setItem('echaFileInfo', JSON.stringify(fileInfo));
         
-        // Nascondi la zona di caricamento
+        // Resto del codice rimane uguale...
         hideEchaDropZone();
-        
-        // Aggiorna le informazioni del file nell'UI
         updateEchaFileInfo();
-        
-        // Mostra notifica di successo
         showNotification(`File ECHA "${fileName}" caricato e convertito in database con successo!`);
-        
-        // Aggiungi attività
         addActivity('File ECHA caricato', `${fileName} convertito in database SQLite`, 'fas fa-database');
         
-        // Carica ed elabora il file per la visualizzazione
-        await loadEchaFromDatabase(actualDbPath);  // Usa il percorso aggiornato
+        await loadEchaFromDatabase(actualDbPath);
         
         return true;
     } catch (error) {

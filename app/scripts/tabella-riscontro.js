@@ -36,9 +36,12 @@ function initTabellaRiscontro() {
     loadTabellaRiscontroFrasiH();
     loadTabellaRiscontroFrasiEUH();
     
-    // Carica le sostanze nel select per inserimento sali
+      // Carica le sostanze nel select per inserimento sostanze (form sostanze)
     loadSostanzeSelect();
     loadCategorieSelect();
+
+     // Carica i metalli nel select per inserimento sali (form sali)
+    loadMetalliSelect();
     
     // Inizializza tutti gli event handlers
     setupFormHandlers();
@@ -4593,15 +4596,13 @@ async function inserisciNuovoSaleConFrasiValidato() {
             return false;
         }
         
-        // Continua con il resto del codice originale per l'inserimento...
-        // (il resto della funzione rimane identico alla versione originale)
         
         // Se tutti i controlli sono passati, procedi con l'inserimento
-        // Ottieni informazioni sulla sostanza associata
+        // Ottieni informazioni sul metallo associato
         let metalloNome = "";
         if (sostanzaAssociataSelect && sostanzaAssociataSelect.selectedIndex > 0) {
             const selectedOption = sostanzaAssociataSelect.options[sostanzaAssociataSelect.selectedIndex];
-            metalloNome = selectedOption.textContent;
+            metalloNome = selectedOption.value; // Il value contiene il nome del metallo
         }
         
         // Preparazione dei dati da inviare
@@ -5263,7 +5264,46 @@ function inizializzaFormFrasiHSale() {
 // ========== FINE FUNZIONI SPECIFICHE PER FRASI H E EUH DEI SALI ==========
 
 
-
+// Carica le sostanze disponibili dal database per popolare il select
+async function loadSostanzeSelect() {
+    try {
+        // Interroga il database per ottenere tutte le sostanze
+        const result = await window.electronAPI.querySQLite(
+            'SELECT ID, Nome FROM sostanze ORDER BY Nome',
+            []
+        );
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Errore nel caricamento delle sostanze');
+        }
+        
+        const select = document.getElementById('sostanzaAssociata');
+        
+        if (select) {
+            // Mantieni l'opzione vuota
+            let html = '<option value="">Seleziona una sostanza</option>';
+            
+            // Aggiungi le opzioni dalle sostanze disponibili
+            result.data.forEach(sostanza => {
+                if (sostanza.Nome) {
+                    html += `<option value="${sostanza.ID}">${sostanza.Nome}</option>`;
+                }
+            });
+            
+            select.innerHTML = html;
+            console.log('Sostanze caricate nel select:', result.data.length);
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento delle sostanze per il select:', error);
+        showNotification('Errore nel caricamento delle sostanze', 'error');
+        
+        // Fallback a una lista vuota in caso di errore
+        const select = document.getElementById('sostanzaAssociata');
+        if (select) {
+            select.innerHTML = '<option value="">Errore nel caricamento</option>';
+        }
+    }
+}
 
 
 // Carica le categorie disponibili dal database per popolare il select
@@ -5271,7 +5311,7 @@ async function loadCategorieSelect() {
     try {
         // Interroga il database per ottenere le categorie uniche
         const result = await window.electronAPI.querySQLite(
-            'SELECT DISTINCT Categoria FROM sostanze WHERE Categoria IS NOT NULL AND Categoria != ""',
+            'SELECT DISTINCT Categoria FROM sostanze WHERE Categoria IS NOT NULL AND TRIM(Categoria) != \'\'',
             []
         );
         
@@ -5318,6 +5358,58 @@ async function loadCategorieSelect() {
         }
     }
 }
+
+
+// Carica i metalli disponibili dalla tabella sostanze (categoria Metallo) per popolare il select
+async function loadMetalliSelect() {
+    try {
+        // Interroga il database per ottenere le sostanze con categoria "Metallo"
+        const result = await window.electronAPI.querySQLite(
+            'SELECT ID, Nome FROM sostanze WHERE Categoria = ? ORDER BY Nome',
+            ['Metallo']
+        );
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Errore nel caricamento dei metalli');
+        }
+        
+        const select = document.getElementById('sostanzaAssociata');
+        
+        if (select) {
+            // Mantieni l'opzione vuota
+            let html = '<option value="">Seleziona un metallo</option>';
+            
+            // Aggiungi le opzioni dai metalli disponibili
+            result.data.forEach(metallo => {
+                if (metallo.Nome) {
+                    html += `<option value="${metallo.Nome}">${metallo.Nome}</option>`;
+                }
+            });
+            
+            select.innerHTML = html;
+            console.log('Metalli caricati nel select:', result.data.length);
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento dei metalli per il select:', error);
+        showNotification('Errore nel caricamento dei metalli', 'error');
+        
+        // Fallback a una lista di base in caso di errore
+        const select = document.getElementById('sostanzaAssociata');
+        if (select) {
+            select.innerHTML = `
+                <option value="">Seleziona un metallo</option>
+                <option value="Rame">Rame</option>
+                <option value="Piombo">Piombo</option>
+                <option value="Zinco">Zinco</option>
+                <option value="Ferro">Ferro</option>
+                <option value="Alluminio">Alluminio</option>
+                <option value="Nichel">Nichel</option>
+                <option value="Cromo">Cromo</option>
+            `;
+        }
+    }
+}
+
 
 
 // Reset del form nuovo sale con gestione frasi H e EUH
@@ -6410,6 +6502,7 @@ window.salvaFraseEUHSingola = salvaFraseEUHSingola;
 window.eliminaFraseEUH = eliminaFraseEUH;
 window.loadSostanzeSelect = loadSostanzeSelect;
 window.loadCategorieSelect = loadCategorieSelect;
+window.loadMetalliSelect = loadMetalliSelect;
 window.salvaSaliModificati = salvaSaliModificati;
 window.inserisciNuovaSostanza = inserisciNuovaSostanza;
 window.resetFormNuovaSostanza = resetFormNuovaSostanza;
