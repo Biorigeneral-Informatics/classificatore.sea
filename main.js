@@ -1217,33 +1217,40 @@ ipcMain.handle('file-exists', async (event, filePath) => {
   }
 });
 
-// Gestione copia file (AGGIORNATA)
+// Gestione copia file
 ipcMain.handle('copy-file', async (event, srcPath, destPath) => {
-    try {
-        // Assicurati che la directory di destinazione esista
-        const destDir = path.dirname(destPath);
-        if (!fs.existsSync(destDir)) {
-            fs.mkdirSync(destDir, { recursive: true });
-        }
-        
-        // Il destPath è già un percorso assoluto completo
-        const absoluteDestPath = destPath;
-        
-        // Copia il file
-        fs.copyFileSync(srcPath, absoluteDestPath);
-        
-        return { 
-            success: true, 
-            message: "File copiato con successo",
-            destPath: absoluteDestPath
-        };
-    } catch (error) {
-        console.error('Errore nella copia del file:', error);
-        return { 
-            success: false, 
-            message: `Errore: ${error.message}` 
-        };
+  try {
+    // Crea la directory di destinazione se non esiste
+    const destDir = path.dirname(destPath);
+    if (!fs.existsSync(destDir)) {
+      fs.mkdirSync(destDir, { recursive: true });
     }
+    
+    // Percorso assoluto della destinazione
+    let absoluteDestPath;
+    if (path.isAbsolute(destPath)) {
+      absoluteDestPath = destPath;
+    } else {
+      // Se è un percorso relativo, lo rendi assoluto riferendolo alla cartella dell'app
+      const appDir = path.join(__dirname, 'app', 'echa');
+      absoluteDestPath = path.join(appDir, destPath);
+    }
+    
+    // Copia il file
+    fs.copyFileSync(srcPath, absoluteDestPath);
+    
+    return { 
+      success: true, 
+      message: "File copiato con successo",
+      destPath: absoluteDestPath
+    };
+  } catch (error) {
+    console.error('Errore nella copia del file:', error);
+    return { 
+      success: false, 
+      message: `Errore: ${error.message}` 
+    };
+  }
 });
 
 // Gestione eliminazione file OLD ALE
@@ -1493,10 +1500,21 @@ ipcMain.handle('query-sqlite', async (event, query, params, dbName) => {
     // Costruisci il percorso del database
     let dbPath;
     
-    if (dbName && dbName.startsWith('echa/data/')) {
+    // NUOVO: Se dbName è un percorso assoluto, usalo direttamente
+    if (dbName && (dbName.includes(':') || dbName.startsWith('/'))) {
+      // È un percorso assoluto (Windows: contiene ':', Unix: inizia con '/')
+      dbPath = dbName;
+      console.log(`Usando percorso assoluto: ${dbPath}`);
+    }
+    // Se dbName inizia con "echa/data/", costruisci il percorso relativo all'app
+    else if (dbName && dbName.startsWith('echa/data/')) {
       dbPath = path.join(__dirname, 'app', dbName);
-    } else {
+      console.log(`Usando percorso relativo echa: ${dbPath}`);
+    }
+    // Altrimenti usa il database principale
+    else {
       dbPath = dbName ? path.join(__dirname, 'app', 'DB', dbName) : DB_PATH;
+      console.log(`Usando percorso database principale: ${dbPath}`);
     }
     
     // Verifica che il file del database esista
@@ -1542,7 +1560,25 @@ ipcMain.handle('query-sqlite', async (event, query, params, dbName) => {
 // Handler per query INSERT, UPDATE, DELETE (AGGIORNATO)
 ipcMain.handle('execute-sqlite', async (event, query, params, dbName) => {
   try {
-    const dbPath = dbName ? path.join(__dirname, 'app', 'DB', dbName) : DB_PATH;
+    // Costruisci il percorso del database
+    let dbPath;
+    
+    // NUOVO: Se dbName è un percorso assoluto, usalo direttamente
+    if (dbName && (dbName.includes(':') || dbName.startsWith('/'))) {
+      // È un percorso assoluto (Windows: contiene ':', Unix: inizia con '/')
+      dbPath = dbName;
+      console.log(`Usando percorso assoluto: ${dbPath}`);
+    }
+    // Se dbName inizia con "echa/data/", costruisci il percorso relativo all'app
+    else if (dbName && dbName.startsWith('echa/data/')) {
+      dbPath = path.join(__dirname, 'app', dbName);
+      console.log(`Usando percorso relativo echa: ${dbPath}`);
+    }
+    // Altrimenti usa il database principale
+    else {
+      dbPath = dbName ? path.join(__dirname, 'app', 'DB', dbName) : DB_PATH;
+      console.log(`Usando percorso database principale: ${dbPath}`);
+    }
     
     // Verifica che il file del database esista
     if (!fs.existsSync(dbPath)) {

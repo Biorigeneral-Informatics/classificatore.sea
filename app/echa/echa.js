@@ -103,7 +103,7 @@ async function loadSavedEchaData() {
                 // Aggiorna le informazioni sul file
                 updateEchaFileInfo();
                 
-                // Carica il database
+                // Carica il database usando il percorso assoluto
                 await loadEchaFromDatabase(dbPath);
             } else {
                 // Qualcosa è stato eliminato, reset delle info
@@ -213,7 +213,7 @@ async function updateEchaDatabase() {
         
         if (!newFilePath) {
             console.log("Selezione file annullata dall'utente");
-            return; // Utente ha annullato la selezione
+            return;
         }
         
         console.log("Nuovo file selezionato:", newFilePath);
@@ -221,12 +221,31 @@ async function updateEchaDatabase() {
         // Mostra notifica di inizio confronto
         showNotification('Confronto file ECHA in corso...', 'info');
         
-        console.log('Avvio script Python con il nuovo file:', newFilePath);
+        // CORRETTO: Ottieni il percorso del database ECHA corrente
+        const echaFileInfoStr = localStorage.getItem('echaFileInfo');
+        if (!echaFileInfoStr) {
+            throw new Error('Nessun database ECHA precedente trovato. Carica prima un database ECHA.');
+        }
         
-        // Esegui lo script Python per confrontare i file Excel
+        const echaFileInfo = JSON.parse(echaFileInfoStr);
+        const currentDbPath = echaFileInfo.dbPath; // Questo è il percorso in userData
+        
+        console.log('Database ECHA corrente:', currentDbPath);
+        
+        // Verifica che il database corrente esista
+        const dbExists = await window.electronAPI.fileExists(currentDbPath);
+        if (!dbExists) {
+            throw new Error('Il database ECHA corrente non esiste più. Ricarica un database ECHA.');
+        }
+        
+        console.log('Avvio script Python per confronto database');
+        console.log('Nuovo file Excel:', newFilePath);
+        console.log('Database SQLite corrente:', currentDbPath);
+        
+        // CORRETTO: Passa entrambi i parametri allo script Python
         const result = await window.electronAPI.runPythonScript(
             'echa/aggiornamento_echa.py', 
-            [newFilePath]
+            [newFilePath, currentDbPath]  // Nuovo file Excel + Database SQLite corrente
         );
         
         console.log('Risultato script Python:', result);
@@ -282,16 +301,23 @@ async function importEchaExcel(filePath) {
         const excelFileName = `echa_${timestamp}_${fileName}`;
         const dbFileName = excelFileName.replace(/\.(xlsx|xls)$/i, '.db');
         
-        // MODIFICA PRINCIPALE: Usa userData invece di app directory
-        const userDataPath = await window.electronAPI.getUserDataPath(); // Aggiungi questa API
-        const echaDataDir = path.join(userDataPath, 'echa', 'data');
+        // USA LE API DI ELECTRON invece di path direttamente
+        const userDataPath = await window.electronAPI.getUserDataPath();
+        
+        // Costruisci i percorsi usando solo slash forward (funziona su tutti i OS)
+        const echaDataDir = `${userDataPath}/echa/data`;
         
         // Assicurati che la directory esista
         await window.electronAPI.ensureDir(echaDataDir);
         
         // Percorsi completi per la destinazione
-        const savedExcelPath = path.join(echaDataDir, excelFileName);
-        const dbPath = path.join(echaDataDir, dbFileName);
+        const savedExcelPath = `${echaDataDir}/${excelFileName}`;
+        const dbPath = `${echaDataDir}/${dbFileName}`;
+        
+        console.log('Percorsi creati:', {
+            savedExcelPath,
+            dbPath
+        });
         
         // Copia il file Excel nella cartella userData
         const saveResult = await window.electronAPI.copyFile(
@@ -337,12 +363,19 @@ async function importEchaExcel(filePath) {
         
         localStorage.setItem('echaFileInfo', JSON.stringify(fileInfo));
         
-        // Resto del codice rimane uguale...
+        // Nascondi la zona di caricamento
         hideEchaDropZone();
+        
+        // Aggiorna le informazioni del file nell'UI
         updateEchaFileInfo();
+        
+        // Mostra notifica di successo
         showNotification(`File ECHA "${fileName}" caricato e convertito in database con successo!`);
+        
+        // Aggiungi attività
         addActivity('File ECHA caricato', `${fileName} convertito in database SQLite`, 'fas fa-database');
         
+        // Carica ed elabora il file per la visualizzazione
         await loadEchaFromDatabase(actualDbPath);
         
         return true;
@@ -526,23 +559,17 @@ async function loadEchaFromDatabase(dbPath) {
     try {
         console.log(`Caricamento dati ECHA dal database: ${dbPath}`);
         
-        // Converti il percorso assoluto in un percorso relativo alla cartella app/
-        // Estrai solo la parte "echa/data/db_echa.db" dal percorso completo
-        // Questa è la soluzione più semplice che evita problemi di risoluzione dei percorsi
+        // USA DIRETTAMENTE IL PERCORSO FORNITO (già corretto)
+        // Non fare nessuna manipolazione del percorso
+        const pathToUse = dbPath;
         
-        // Estrai il nome del file dal percorso
-        const dbFilename = dbPath.split(/[\\/]/).pop();
-        
-        // Crea un percorso relativo semplice
-        const relativePath = `echa/data/${dbFilename}`;
-        
-        console.log(`Percorso relativo database utilizzato: ${relativePath}`);
+        console.log(`Percorso database utilizzato: ${pathToUse}`);
         
         // Recupera le tabelle disponibili nel database
         const echaDbQueryResult = await window.electronAPI.querySQLite(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name", 
             [],
-            relativePath  // Usa il percorso relativo semplice
+            pathToUse  // Usa il percorso fornito direttamente
         );
         
         if (!echaDbQueryResult.success) {
@@ -564,7 +591,7 @@ async function loadEchaFromDatabase(dbPath) {
         const echaDataResult = await window.electronAPI.querySQLite(
             `SELECT * FROM "${defaultTable}" LIMIT ${echaPageSize}`, 
             [],
-            relativePath  // Usa il percorso relativo semplice
+            pathToUse  // Usa il percorso fornito direttamente
         );
         
         if (!echaDataResult.success) {
@@ -575,7 +602,7 @@ async function loadEchaFromDatabase(dbPath) {
         const echaCountResult = await window.electronAPI.querySQLite(
             `SELECT COUNT(*) AS total FROM "${defaultTable}"`, 
             [],
-            relativePath  // Usa il percorso relativo semplice
+            pathToUse  // Usa il percorso fornito direttamente
         );
         
         totalEchaRows = echaCountResult.success ? echaCountResult.data[0].total : echaDataResult.data.length;
@@ -597,8 +624,8 @@ async function loadEchaFromDatabase(dbPath) {
         // Mostra il numero di record
         document.getElementById('echaResultsCount').textContent = `${totalEchaRows} record totali (${Math.min(echaPageSize, echaDataResult.data.length)} visualizzati)`;
         
-        // Salva il percorso relativo in sessionStorage per future operazioni
-        sessionStorage.setItem('echaDbRelativePath', relativePath);
+        // Salva il percorso completo in sessionStorage per future operazioni
+        sessionStorage.setItem('echaDbFullPath', pathToUse);
         
     } catch (error) {
         console.error('Errore nel caricamento dei dati dal database:', error);
@@ -662,7 +689,7 @@ async function loadEchaTableData(dbPath, tableName, searchQuery = '', page = 1, 
             throw new Error('Nessun percorso database fornito');
         }
         
-        // Usa direttamente il percorso fornito
+        // USA DIRETTAMENTE IL PERCORSO FORNITO (senza manipolazioni)
         const pathToUse = dbPath;
         console.log(`Percorso finale utilizzato: ${pathToUse}`);
         
@@ -798,14 +825,12 @@ function searchEchaData(query) {
     console.log('=== INIZIO RICERCA ===');
     console.log('Query di ricerca:', query);
     
-    // Verifica percorsi salvati
-    const echaDbPath = sessionStorage.getItem('echaDbPath');
-    const echaDbRelativePath = sessionStorage.getItem('echaDbRelativePath');
+    // Usa il percorso completo salvato in sessionStorage
+    const echaDbFullPath = sessionStorage.getItem('echaDbFullPath');
     
-    console.log('echaDbPath in sessionStorage:', echaDbPath);
-    console.log('echaDbRelativePath in sessionStorage:', echaDbRelativePath);
+    console.log('echaDbFullPath in sessionStorage:', echaDbFullPath);
     
-    const dbPath = echaDbRelativePath || echaDbPath;
+    const dbPath = echaDbFullPath;
     
     if (!dbPath) {
         console.error('Nessun percorso database trovato');

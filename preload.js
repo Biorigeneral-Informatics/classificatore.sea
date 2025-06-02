@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // API per ottenere il percorso userData
   getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
+  
 
   // API per gestione file
   selectFile: (options) => ipcRenderer.invoke('select-file', options),
