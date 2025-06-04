@@ -210,7 +210,7 @@ function initThemeToggle() {
 
 
 
-// EVENT LISTNERS
+// EVENT LISTNERS - MODIFICATO
 function initEventListeners() {
     // Home page buttons
     initTabellaRiscontro();
@@ -234,7 +234,6 @@ function initEventListeners() {
         }
     });
 
-
     // Modifica il comportamento del bottone "Aggiorna ECHA"
     const importEchaBtn = document.getElementById('importEchaBtn');
     if (importEchaBtn) {
@@ -245,8 +244,6 @@ function initEventListeners() {
         });
     }
 
-
-
     // EventListener per raggiungimento sezione ECHA database dal menù
     const echaLink = document.getElementById('echaLink');
     if (echaLink) {
@@ -256,8 +253,6 @@ function initEventListeners() {
             window.electronAPI.openPage('./echa/echa.html');
         });
     }
-
-
     
     // File upload nella sezione Raccolta
     const dropZone = document.getElementById('dropZone');
@@ -283,33 +278,32 @@ function initEventListeners() {
             }
         });
 
-    // Aggiungi event listener per il pulsante Salva Modifiche nella sezione raccolta
-    const saveChangesBtn = document.getElementById('saveChangesBtn');
-    if (saveChangesBtn) {
-        saveChangesBtn.addEventListener('click', saveChanges);
-        console.log("Event listener aggiunto al bottone Salva Modifiche");
-    } else {
-        console.error("Bottone Salva Modifiche non trovato!");
+        // MODIFICATO: Event listener unificato per il pulsante Salva Tutto
+        const saveChangesBtn = document.getElementById('saveChangesBtn');
+        if (saveChangesBtn) {
+            saveChangesBtn.addEventListener('click', saveAllData);
+            console.log("Event listener aggiunto al bottone Salva Tutto");
+        } else {
+            console.error("Bottone Salva Tutto non trovato!");
+        }
+
+        // Aggiungi event listener per il pulsante Elimina File
+        const deleteFileBtn = document.getElementById('deleteFileBtn');
+        if (deleteFileBtn) {
+            deleteFileBtn.addEventListener('click', deleteUploadedFile);
+            console.log("Event listener aggiunto al bottone Elimina File");
+        } else {
+            console.error("Bottone Elimina File non trovato!");
+        }
+        
+        // Aggiungi event listener per il pulsante Esporta nella sezione raccolta
+        const exportToExcelBtn = document.getElementById('exportToExcelBtn');
+        if (exportToExcelBtn) {
+            exportToExcelBtn.addEventListener('click', exportToExcel);
+        }
     }
 
-    // Aggiungi event listener per il pulsante Elimina File
-    const deleteFileBtn = document.getElementById('deleteFileBtn');
-    if (deleteFileBtn) {
-        deleteFileBtn.addEventListener('click', deleteUploadedFile);
-        console.log("Event listener aggiunto al bottone Elimina File");
-    } else {
-        console.error("Bottone Elimina File non trovato!");
-    }
-    
-    // Aggiungi event listener per il pulsante Esporta nella sezione raccolta
-    const exportToExcelBtn = document.getElementById('exportToExcelBtn');
-    if (exportToExcelBtn) {
-        exportToExcelBtn.addEventListener('click', exportToExcel);
-    }
-    }
-
-
-
+    // Resto dei listener rimane invariato...
     document.addEventListener('click', function(e) {
         // Trova il pulsante delete-btn o l'icona all'interno che ha ricevuto il click
         const deleteBtn = e.target.closest('.delete-btn');
@@ -334,60 +328,56 @@ function initEventListeners() {
         }
     });
 
-
-
     // Verifica se siamo nella sezione tabella-di-riscontro quando la pagina carica
-if (window.location.hash === '#tabella-di-riscontro') {
-    // Esegui con un leggero ritardo per assicurarsi che tutto sia caricato
-    setTimeout(() => {
-        // Se ci sono risultati di confronto ECHA, caricali nella tab aggiornamenti
-        if (localStorage.getItem('echaComparisonResults')) {
-            console.log("Rilevati risultati confronto ECHA al caricamento pagina");
-            
-            // Attiva la tab aggiornamenti
-            document.querySelectorAll('.tab-item').forEach(tab => {
-                if (tab.getAttribute('data-tab') === 'aggiornamenti') {
-                    tab.click();
-                }
-            });
-            
-            // Carica i risultati se la funzione è disponibile
-            if (typeof window.loadEchaComparisonResults === 'function') {
-                window.loadEchaComparisonResults();
-            }
-        }
-    }, 500);
-}
-
-// Aggiungi un listener per il cambio di hash/sezione
-window.addEventListener('hashchange', function() {
-    const newHash = window.location.hash.slice(1);
-    console.log("Hash changed to:", newHash);
-    
-    // Se il cambio è verso tabella-di-riscontro, verifica i risultati ECHA
-    if (newHash === 'tabella-di-riscontro' && localStorage.getItem('echaComparisonResults')) {
-        console.log("Hash change: tabella-di-riscontro con risultati ECHA");
-        
-        // Attendi che la sezione sia attivata e poi carica i risultati
+    if (window.location.hash === '#tabella-di-riscontro') {
+        // Esegui con un leggero ritardo per assicurarsi che tutto sia caricato
         setTimeout(() => {
-            // Attiva la tab aggiornamenti
-            document.querySelectorAll('.tab-item').forEach(tab => {
-                if (tab.getAttribute('data-tab') === 'aggiornamenti') {
-                    tab.click();
+            // Se ci sono risultati di confronto ECHA, caricali nella tab aggiornamenti
+            if (localStorage.getItem('echaComparisonResults')) {
+                console.log("Rilevati risultati confronto ECHA al caricamento pagina");
+                
+                // Attiva la tab aggiornamenti
+                document.querySelectorAll('.tab-item').forEach(tab => {
+                    if (tab.getAttribute('data-tab') === 'aggiornamenti') {
+                        tab.click();
+                    }
+                });
+                
+                // Carica i risultati se la funzione è disponibile
+                if (typeof window.loadEchaComparisonResults === 'function') {
+                    window.loadEchaComparisonResults();
                 }
-            });
-            
-            // Carica i risultati ECHA
-            if (typeof window.loadEchaComparisonResults === 'function') {
-                window.loadEchaComparisonResults();
-            } else {
-                console.error("Funzione loadEchaComparisonResults non disponibile");
             }
         }, 500);
     }
-});
 
-    
+    // Aggiungi un listener per il cambio di hash/sezione
+    window.addEventListener('hashchange', function() {
+        const newHash = window.location.hash.slice(1);
+        console.log("Hash changed to:", newHash);
+        
+        // Se il cambio è verso tabella-di-riscontro, verifica i risultati ECHA
+        if (newHash === 'tabella-di-riscontro' && localStorage.getItem('echaComparisonResults')) {
+            console.log("Hash change: tabella-di-riscontro con risultati ECHA");
+            
+            // Attendi che la sezione sia attivata e poi carica i risultati
+            setTimeout(() => {
+                // Attiva la tab aggiornamenti
+                document.querySelectorAll('.tab-item').forEach(tab => {
+                    if (tab.getAttribute('data-tab') === 'aggiornamenti') {
+                        tab.click();
+                    }
+                });
+                
+                // Carica i risultati ECHA
+                if (typeof window.loadEchaComparisonResults === 'function') {
+                    window.loadEchaComparisonResults();
+                } else {
+                    console.error("Funzione loadEchaComparisonResults non disponibile");
+                }
+            }, 500);
+        }
+    });
 }
 
 // Inizializza i listener di eventi Electron
@@ -826,6 +816,7 @@ function validateAndDisplayExcel(worksheet) {
 //questa funzione è il ponte tra il file Excel caricato dall'utente e i dati strutturati che 
 // l'applicazione può elaborare per le successive fasi di analisi e classificazione dei rifiuti.
 // Modifiche alla funzione handleFileSelection() per gestire l'errore di sostanze mancanti
+// MODIFICATO: handleFileSelection - Aggiornata la logica di visibilità dei pulsanti
 async function handleFileSelection(filePath) {
     try {
         showNotification('Caricamento file in corso...', 'info');
@@ -913,14 +904,134 @@ async function handleFileSelection(filePath) {
                 dropZone.style.display = 'none';
             }
 
+            // MODIFICATO: Mostra il pulsante Salva Tutto solo quando il file è caricato
+            updateSaveButtonVisibility();
+
             // Mostra notifica di successo
             showNotification(`File ${fileName} caricato con successo! (${filteredData.length} righe valide)`, 'success');
-            document.getElementById('salvaInfoRaccoltaBtn').style.display = 'inline-flex';  // Attivazione bottone forms        
         }
         
     } catch (error) {
         console.error('Errore nel caricamento del file:', error);
         showNotification('Errore nel caricamento del file', 'error');
+    }
+}
+
+// Gestisce la visibilità del pulsante Salva Tutto
+function updateSaveButtonVisibility() {
+    const saveBtn = document.getElementById('saveChangesBtn');
+    const hasExcelData = sessionStorage.getItem('raccoltaExcelData') !== null;
+    
+    if (saveBtn) {
+        if (hasExcelData) {
+            saveBtn.style.display = 'inline-flex';
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Salva Tutto';
+        } else {
+            saveBtn.style.display = 'none';
+        }
+    }
+}
+
+// NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
+async function saveAllData() {
+    console.log("Funzione saveAllData avviata - Salvataggio unificato");
+    
+    // Notifica l'utente che il processo di salvataggio è iniziato
+    showNotification('Salvataggio di tutti i dati in corso...', 'info');
+    
+    try {
+        // STEP 1: Salva i dati dei form
+        console.log("Step 1: Salvataggio form...");
+        const formSaved = await window.infoRaccoltaManager.saveFormData();
+        
+        if (!formSaved) {
+            console.error("Errore nel salvataggio dei form");
+            return; // Interrompi se i form non sono validi
+        }
+        
+        console.log("Form salvati con successo");
+
+        // STEP 2: Salva i dati Excel
+        console.log("Step 2: Salvataggio dati Excel...");
+        const table = document.querySelector('.excel-data-table');
+        if (!table) {
+            console.error("Nessuna tabella Excel trovata nell'interfaccia");
+            showNotification('Nessuna tabella Excel trovata', 'error');
+            return;
+        }
+
+        // Crea un array di oggetti con i dati aggiornati
+        const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
+        const updatedData = [];
+        
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const rowData = {};
+            row.querySelectorAll('td').forEach((cell, index) => {
+                rowData[headers[index]] = cell.textContent.trim();
+            });
+            updatedData.push(rowData);
+        });
+
+        // Salva i dati in sessionStorage con chiave specifica per la sezione Raccolta
+        sessionStorage.setItem('raccoltaExcelData', JSON.stringify(updatedData));
+
+        // Recupera i dati salvati dal sessionStorage
+        const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+        const raccoltaData = JSON.parse(raccoltaDataStr);
+        console.log("Dati RACCOLTA da salvare:", raccoltaData);
+
+        // Rimuovi markature di modifiche per pulizia visiva
+        document.querySelectorAll('.excel-data-table td.modified').forEach(cell => {
+            cell.classList.remove('modified');
+        });
+
+        // STEP 3: Salva in Python e attendi il risultato
+        try {
+            console.log("Step 3: Invio dei dati RACCOLTA a Python...");
+            // Specifica esplicitamente 'raccolta' come tipo
+            const pythonResult = await window.electronAPI.saveExcelToPython(raccoltaData, 'raccolta');
+            console.log("Risultato Python dopo il salvataggio RACCOLTA:", pythonResult);
+            
+            if (pythonResult.success) {
+                // Verifica che metalli_campione esista nella risposta
+                if (pythonResult.metalli_campione && Object.keys(pythonResult.metalli_campione).length > 0) {
+                    // Salva in sessionStorage per uso nella sezione sali-metalli
+                    sessionStorage.setItem('metalliCampione', JSON.stringify(pythonResult.metalli_campione));
+                    console.log("Metalli campione salvati:", pythonResult.metalli_campione);
+                    
+                    // Mostra notifica specifica per i metalli
+                    showNotification('Metalli rilevati! Vai alla sezione Sali-Metalli per assegnare i sali.', 'info');
+                } else {
+                    console.warn("Nessun metallo trovato nei dati del campione o valori non numerici");
+                    showNotification('Dati salvati ma nessun metallo con valore numerico trovato nel campione', 'warning');
+                }
+                
+                // Aggiorna la sezione sali-metalli
+                await initSaliMetalli();
+                
+                // Notifica generale di successo
+                showNotification('Tutti i dati salvati con successo!', 'success');
+                
+                // Aggiungi attività
+                addActivity('Dati salvati', 'Excel e Form salvati insieme', 'fas fa-save');
+            } else {
+                // Gestione dell'errore di sostanze mancanti
+                if (pythonResult.sostanze_mancanti && pythonResult.sostanze_mancanti.length > 0) {
+                    console.error("Sostanze mancanti rilevate:", pythonResult.sostanze_mancanti);
+                    showNotification(pythonResult.message, 'error', 4000);
+                } else {
+                    // Altri tipi di errori
+                    throw new Error(pythonResult.message || 'Errore nel salvataggio in Python');
+                }
+            }
+        } catch (pythonError) {
+            console.error("Errore nell'elaborazione Python:", pythonError);
+            showNotification(pythonError.message, 'error', 4000);
+        }
+        
+    } catch (error) {
+        console.error('Errore nel salvataggio unificato:', error);
+        showNotification('Errore nel salvataggio: ' + error.message, 'error');
     }
 }
 
@@ -1241,6 +1352,7 @@ async function exportToExcel() {
 
 // Funzione per eliminare il file caricato su raccolta
 // Elimina file caricato su raccolta
+// MODIFICATO: deleteUploadedFile - Aggiornata per gestire la nuova logica dei pulsanti
 function deleteUploadedFile() {
     try {
         // Rimuovi le informazioni del file
@@ -1248,8 +1360,6 @@ function deleteUploadedFile() {
         sessionStorage.removeItem('uploadedFileDate');
         // Usa la chiave dedicata per la sezione Raccolta
         sessionStorage.removeItem('raccoltaExcelData');
-        // Scomparsa pulsante del form in raccolta
-        document.getElementById('salvaInfoRaccoltaBtn').style.display = 'none';
         
         // Rimuovi anche i dati relativi ai metalli
         sessionStorage.removeItem('metalliCampione');
@@ -1276,6 +1386,9 @@ function deleteUploadedFile() {
         if (dropZone) {
             dropZone.style.display = 'block';
         }
+        
+        // MODIFICATO: Aggiorna la visibilità del pulsante
+        updateSaveButtonVisibility();
         
         // Aggiorna la sezione sali-metalli
         updateSaliMetalliWithExcelData([]);

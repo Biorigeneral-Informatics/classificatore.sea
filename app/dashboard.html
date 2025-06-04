@@ -552,196 +552,193 @@
 
 </section>
 
-        <!-- Raccolta Section -->
-        <section id="raccolta" class="section">
-            <h2 style="padding-bottom: 2rem;">Raccolta Dati</h2>
-            <div class="upload-area" id="dropZone">
-                <i class="fas fa-file-excel"></i>
-                <h3>Carica File Excel</h3>
-                <p>Trascina qui i tuoi file Excel o clicca per selezionarli</p>
-                <div class="file-progress">
-                    <div class="progress-bar"></div>
-                </div>
-            </div>
 
-            <div class="excel-table" id="excelDataTable" style="display: none;">
-                <div class="table-toolbar">
-                    <button class="btn btn-primary" id="saveChangesBtn">
-                        <i class="fas fa-save"></i> Salva Modifiche
-                    </button>
-                    <button class="btn btn-primary" id="exportToExcelBtn">
-                        <i class="fas fa-download"></i> Esporta
-                    </button>
-                    <!-- Aggiungi questo nuovo bottone -->
-                    <button class="btn btn-danger" id="deleteFileBtn">
-                        <i class="fas fa-trash"></i> Elimina File
-                    </button>
-                </div>
-                <div class="table-container">
-                    <!-- Excel data will be inserted here -->
-                </div>
-            </div>
+<!-- Raccolta Section -->
+<section id="raccolta" class="section">
+    <h2 style="padding-bottom: 2rem;">Raccolta Dati</h2>
+    <div class="upload-area" id="dropZone">
+        <i class="fas fa-file-excel"></i>
+        <h3>Carica File Excel</h3>
+        <p>Trascina qui i tuoi file Excel o clicca per selezionarli</p>
+        <div class="file-progress">
+            <div class="progress-bar"></div>
+        </div>
+    </div>
 
-            <!-- Forms di input Container -->
-            <div class="raccolta-forms" id="raccoltaForms"">
-                <!-- Form 1: Caratteristiche Fisiche -->
-                <div class="data-table">
-                    <h3>Caratteristiche Fisiche del Campione</h3>
-                    <form id="caratteristicheFisicheForm" class="raccolta-form">
-                        
-                        <!-- Gasoli, oli e carburanti: cambia la soglia del punto di infiammabilità -->
-                        <div class="form-group special-checkbox" style="margin: 1.5rem 0.5;">
-                            <label class="checkbox-container" style="position: relative; padding-left: 0; display: flex; align-items: center;">
-                                <input type="checkbox" id="gasolioCheckbox" style="position: static; margin-right: 8px; width: 18px; height: 18px; opacity: 1;">
-                                <span class="checkmark" style="display: none;"></span>
-                                <span class="checkbox-label" style="margin-left: 0;">Il campione contiene gasoli, carburanti o oli</span>
-                            </label>
-                            <small class="form-text text-muted">Seleziona questa opzione se il campione contiene prodotti derivati da petrolio come gasoli, carburanti o oli minerali.</small>
+    <div class="excel-table" id="excelDataTable" style="display: none;">
+        <div class="table-toolbar">
+            <button class="btn btn-primary" id="saveChangesBtn">
+                <i class="fas fa-save"></i> Salva Tutto
+            </button>
+            <button class="btn btn-primary" id="exportToExcelBtn">
+                <i class="fas fa-download"></i> Esporta
+            </button>
+            <button class="btn btn-danger" id="deleteFileBtn">
+                <i class="fas fa-trash"></i> Elimina File
+            </button>
+        </div>
+        <div class="table-container">
+            <!-- Excel data will be inserted here -->
+        </div>
+    </div>
+
+    <!-- Forms di input Container -->
+    <div class="raccolta-forms" id="raccoltaForms">
+        <!-- Form 1: Caratteristiche Fisiche -->
+        <div class="data-table">
+            <h3>Caratteristiche Fisiche del Campione</h3>
+            <form id="caratteristicheFisicheForm" class="raccolta-form">
+                
+                <!-- Gasoli, oli e carburanti: cambia la soglia del punto di infiammabilità -->
+                <div class="form-group special-checkbox" style="margin: 1.5rem 0.5;">
+                    <label class="checkbox-container" style="position: relative; padding-left: 0; display: flex; align-items: center;">
+                        <input type="checkbox" id="gasolioCheckbox" style="position: static; margin-right: 8px; width: 18px; height: 18px; opacity: 1;">
+                        <span class="checkmark" style="display: none;"></span>
+                        <span class="checkbox-label" style="margin-left: 0;">Il campione contiene gasoli, carburanti o oli</span>
+                    </label>
+                    <small class="form-text text-muted">Seleziona questa opzione se il campione contiene prodotti derivati da petrolio come gasoli, carburanti o oli minerali.</small>
+                </div>
+                
+                <div class="form-group-grid">
+                   <!-- Prima colonna -->
+                    <div class="form-column">
+                        <div class="form-group">
+                            <label for="colore">Colore</label>
+                            <select id="colore" class="form-control" required>
+                                <option value="">Seleziona colore...</option>
+                                <option value="Incolore">Incolore</option>
+                                <option value="Vario">Vario</option>
+                                <option value="Altro">Altro (specificare)</option>
+                            </select>
+                            <input type="text" id="coloreCustom" class="form-control mt-2" 
+                                placeholder="Specificare se 'Altro'" style="display: none;">
                         </div>
                         
-                        <div class="form-group-grid">
-                           <!-- Prima colonna -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="colore">Colore</label>
-                                    <select id="colore" class="form-control" required>
-                                        <option value="">Seleziona colore...</option>
-                                        <option value="Incolore">Incolore</option>
-                                        <option value="Vario">Vario</option>
-                                        <option value="Altro">Altro (specificare)</option>
-                                    </select>
-                                    <input type="text" id="coloreCustom" class="form-control mt-2" 
-                                        placeholder="Specificare se 'Altro'" style="display: none;">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="odore">Odore</label>
-                                    <select id="odore" class="form-control" required>
-                                        <option value="">Seleziona odore...</option>
-                                        <option value="Chimico non definibile">Chimico non definibile</option>
-                                        <option value="Di carta">Di carta</option>
-                                        <option value="Di idrocarburi">Di idrocarburi</option>
-                                        <option value="Di legno">Di legno</option>
-                                        <option value="Di solvente">Di solvente</option>
-                                        <option value="Di terra">Di terra</option>
-                                        <option value="Inodore">Inodore</option>
-                                        <option value="Metallico">Metallico</option>
-                                        <option value="Non determinabile">Non determinabile</option>
-                                        <option value="Sgradevole">Sgradevole</option>
-                                        <option value="Altro">Altro (specificare)</option>
-                                    </select>
-                                    <input type="text" id="odoreCustom" class="form-control mt-2" 
-                                        placeholder="Specificare se 'Altro'" style="display: none;">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="statoFisico">Stato Fisico</label>
-                                    <select id="statoFisico" class="form-control" required>
-                                        <option value="">Seleziona stato fisico...</option>
-                                        <option value="Fangoso palabile">Fangoso palabile</option>
-                                        <option value="Fangoso pompabile">Fangoso pompabile</option>
-                                        <option value="Liquido">Liquido</option>
-                                        <option value="Solido non polverulento">Solido non polverulento</option>
-                                        <option value="Solido polverulento">Solido polverulento</option>
-                                        <option value="Altro">Altro (specificare)</option>
-                                    </select>
-                                    <input type="text" id="statoFisicoCustom" class="form-control mt-2" 
-                                        placeholder="Specificare se 'Altro'" style="display: none;">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="ph">pH</label>
-                                    <input type="text" id="ph" class="form-control" required>
-                                </div>
-                            </div>
-
-                            <!-- Seconda colonna -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="residuo105">Residuo a 105°C</label>
-                                    <input type="text" id="residuo105" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="residuo180">Residuo a 180°C</label>
-                                    <input type="text" id="residuo180" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="residuo600">Residuo a 600°C</label>
-                                    <input type="text" id="residuo600" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="infiammabilita">Infiammabilità</label>
-                                    <input type="text" id="infiammabilita" class="form-control" required>
-                                </div>
-                            </div>
-
+                        <div class="form-group">
+                            <label for="odore">Odore</label>
+                            <select id="odore" class="form-control" required>
+                                <option value="">Seleziona odore...</option>
+                                <option value="Chimico non definibile">Chimico non definibile</option>
+                                <option value="Di carta">Di carta</option>
+                                <option value="Di idrocarburi">Di idrocarburi</option>
+                                <option value="Di legno">Di legno</option>
+                                <option value="Di solvente">Di solvente</option>
+                                <option value="Di terra">Di terra</option>
+                                <option value="Inodore">Inodore</option>
+                                <option value="Metallico">Metallico</option>
+                                <option value="Non determinabile">Non determinabile</option>
+                                <option value="Sgradevole">Sgradevole</option>
+                                <option value="Altro">Altro (specificare)</option>
+                            </select>
+                            <input type="text" id="odoreCustom" class="form-control mt-2" 
+                                placeholder="Specificare se 'Altro'" style="display: none;">
                         </div>
-                    </form>
-                </div>
-
-                <!-- Form 2: Informazioni Certificato -->
-                <div class="data-table">
-                    <h3>Informazioni Certificato</h3>
-                    <form id="infoCertificatoForm" class="raccolta-form">
-                        <div class="form-group-grid">
-                            <!-- Prima colonna -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="rapportoProva">Rapporto di prova n.</label>
-                                    <input type="text" id="rapportoProva" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="descrizione">Descrizione</label>
-                                    <textarea id="descrizione" class="form-control" rows="3" required></textarea>
-                                </div>
-                            </div>
-
-                            <!-- Seconda colonna -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="dataCampionamento">Data di campionamento</label>
-                                    <input type="date" id="dataCampionamento" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="dataStampa">Data stampa certificato</label>
-                                    <input type="date" id="dataStampa" class="form-control" required>
-                                </div>
-                            </div>
-
-                            <!-- Terza colonna -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="codiceEER">Codice EER</label>
-                                    <input type="text" id="codiceEER" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="committente">Committente</label>
-                                    <input type="text" id="committente" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="riferimentoVerbale">Riferimento verbale di campionamento</label>
-                                    <input type="text" id="riferimentoVerbale" class="form-control" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="matrice">Matrice</label>
-                                    <input type="text" id="matrice" class="form-control" required>
-                                </div>
-                            </div>
+                        
+                        <div class="form-group">
+                            <label for="statoFisico">Stato Fisico</label>
+                            <select id="statoFisico" class="form-control" required>
+                                <option value="">Seleziona stato fisico...</option>
+                                <option value="Fangoso palabile">Fangoso palabile</option>
+                                <option value="Fangoso pompabile">Fangoso pompabile</option>
+                                <option value="Liquido">Liquido</option>
+                                <option value="Solido non polverulento">Solido non polverulento</option>
+                                <option value="Solido polverulento">Solido polverulento</option>
+                                <option value="Altro">Altro (specificare)</option>
+                            </select>
+                            <input type="text" id="statoFisicoCustom" class="form-control mt-2" 
+                                placeholder="Specificare se 'Altro'" style="display: none;">
                         </div>
-                    </form>
-                </div>
+                        
+                        <div class="form-group">
+                            <label for="ph">pH</label>
+                            <input type="text" id="ph" class="form-control" required>
+                        </div>
+                    </div>
 
-                <!-- Bottoni di azione -->
-                <div class="form-actions">
-                    <button type="button" id="salvaInfoRaccoltaBtn" class="btn btn-primary" style="display: none">
-                        <i class="fas fa-save"></i> Salva Informazioni
-                    </button>
-                    <button type="button" id="resetInfoRaccoltaBtn" class="btn btn-secondary">
-                        <i class="fas fa-undo"></i> Reset
-                    </button>
+                    <!-- Seconda colonna -->
+                    <div class="form-column">
+                        <div class="form-group">
+                            <label for="residuo105">Residuo a 105°C</label>
+                            <input type="text" id="residuo105" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="residuo180">Residuo a 180°C</label>
+                            <input type="text" id="residuo180" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="residuo600">Residuo a 600°C</label>
+                            <input type="text" id="residuo600" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="infiammabilita">Infiammabilità</label>
+                            <input type="text" id="infiammabilita" class="form-control" required>
+                        </div>
+                    </div>
+
                 </div>
-            </div>
-        </section>
+            </form>
+        </div>
+
+        <!-- Form 2: Informazioni Certificato -->
+        <div class="data-table">
+            <h3>Informazioni Certificato</h3>
+            <form id="infoCertificatoForm" class="raccolta-form">
+                <div class="form-group-grid">
+                    <!-- Prima colonna -->
+                    <div class="form-column">
+                        <div class="form-group">
+                            <label for="rapportoProva">Rapporto di prova n.</label>
+                            <input type="text" id="rapportoProva" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="descrizione">Descrizione</label>
+                            <textarea id="descrizione" class="form-control" rows="3" required></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Seconda colonna -->
+                    <div class="form-column">
+                        <div class="form-group">
+                            <label for="dataCampionamento">Data di campionamento</label>
+                            <input type="date" id="dataCampionamento" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dataStampa">Data stampa certificato</label>
+                            <input type="date" id="dataStampa" class="form-control" required>
+                        </div>
+                    </div>
+
+                    <!-- Terza colonna -->
+                    <div class="form-column">
+                        <div class="form-group">
+                            <label for="codiceEER">Codice EER</label>
+                            <input type="text" id="codiceEER" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="committente">Committente</label>
+                            <input type="text" id="committente" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="riferimentoVerbale">Riferimento verbale di campionamento</label>
+                            <input type="text" id="riferimentoVerbale" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="matrice">Matrice</label>
+                            <input type="text" id="matrice" class="form-control" required>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Nota informativa -->
+        <div class="info-box" style="margin-top: 1.5rem;">
+            <i class="fas fa-info-circle"></i>
+            <p>Per salvare i dati, utilizza il pulsante <strong>"Salva Tutto"</strong> nella barra degli strumenti sopra la tabella Excel.</p>
+        </div>
+    </div>
+</section>
+
 
         <!-- Sezione Associazione Sali-Metalli -->
         <section id="sali-metalli" class="section">

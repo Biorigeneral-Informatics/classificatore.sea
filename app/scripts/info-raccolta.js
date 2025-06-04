@@ -1,23 +1,8 @@
 // Gestione dei form della sezione raccolta
 class InfoRaccoltaManager {
     constructor() {
-        this.initializeButtons();
         this.initializeDropdowns();
         this.loadSavedData();
-    }
-
-    initializeButtons() {
-        // Inizializza i pulsanti di salvataggio e reset
-        const saveBtn = document.getElementById('salvaInfoRaccoltaBtn');
-        const resetBtn = document.getElementById('resetInfoRaccoltaBtn');
-
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.saveFormData());
-        }
-
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => this.resetForms());
-        }
     }
 
     // Gestione semplificata dei dropdown
@@ -124,29 +109,29 @@ class InfoRaccoltaManager {
     async saveFormData() {
         try {
             if (!this.validateForms()) {
-                showNotification('Completa tutti i campi obbligatori', 'warning');
-                return;
+                showNotification('Completa tutti i campi obbligatori dei form', 'warning');
+                return false;
             }
 
             const formData = this.getFormData();
             const result = await window.electronAPI.saveInfoRaccolta(formData);
 
             if (result.success) {
-                showNotification('Informazioni salvate con successo', 'success');
                 // Salva anche in sessionStorage per uso immediato
                 sessionStorage.setItem('infoRaccolta', JSON.stringify(formData));
-                // Aggiungi attività
-                addActivity('Info Raccolta', 'Informazioni raccolta salvate', 'fas fa-save');
                 
                 // Log per verificare se gasolio è stato salvato correttamente
                 console.log('Informazioni raccolta salvate:', formData);
                 console.log('Opzione gasolio:', formData.caratteristicheFisiche.gasolio);
+                
+                return true;
             } else {
                 throw new Error(result.message);
             }
         } catch (error) {
-            console.error('Errore nel salvataggio:', error);
-            showNotification('Errore nel salvataggio delle informazioni', 'error');
+            console.error('Errore nel salvataggio form:', error);
+            showNotification('Errore nel salvataggio delle informazioni del form', 'error');
+            return false;
         }
     }
 
