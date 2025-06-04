@@ -104,13 +104,25 @@ function updateClassificationFileSelector(fileList) {
         let displayName = fileName;
         if (timestamp) {
             const dateStr = timestamp[1];
-            const year = dateStr.substring(0, 4);
-            const month = dateStr.substring(4, 6);
-            const day = dateStr.substring(6, 8);
-            const hour = dateStr.substring(8, 10);
-            const minute = dateStr.substring(10, 12);
-            const second = dateStr.substring(12, 14);
-            displayName = `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+            const year = parseInt(dateStr.substring(0, 4));
+            const month = parseInt(dateStr.substring(4, 6)) - 1; // I mesi in JavaScript vanno da 0 a 11
+            const day = parseInt(dateStr.substring(6, 8));
+            const hour = parseInt(dateStr.substring(8, 10));
+            const minute = parseInt(dateStr.substring(10, 12));
+            const second = parseInt(dateStr.substring(12, 14));
+            
+            // Crea un oggetto Date e formattalo per l'Italia
+            const date = new Date(year, month, day, hour, minute, second);
+            displayName = date.toLocaleString('it-IT', {
+                timeZone: 'Europe/Rome',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
         }
         
         selectorHtml += `<option value="${fileName}">${displayName}</option>`;
@@ -150,13 +162,24 @@ function updateClassificationFileSelector(fileList) {
             let displayName = fileName;
             if (timestamp) {
                 const dateStr = timestamp[1];
-                const year = dateStr.substring(0, 4);
-                const month = dateStr.substring(4, 6);
-                const day = dateStr.substring(6, 8);
-                const hour = dateStr.substring(8, 10);
-                const minute = dateStr.substring(10, 12);
-                const second = dateStr.substring(12, 14);
-                displayName = `${day}/${month}/${year} ${hour}:${minute}:${second}`;
+                const year = parseInt(dateStr.substring(0, 4));
+                const month = parseInt(dateStr.substring(4, 6)) - 1;
+                const day = parseInt(dateStr.substring(6, 8));
+                const hour = parseInt(dateStr.substring(8, 10));
+                const minute = parseInt(dateStr.substring(10, 12));
+                const second = parseInt(dateStr.substring(12, 14));
+                
+                const date = new Date(year, month, day, hour, minute, second);
+                displayName = date.toLocaleString('it-IT', {
+                    timeZone: 'Europe/Rome',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                });
             }
             
             selectorHtml += `

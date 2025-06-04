@@ -13,6 +13,37 @@
 // Variabile globale per memorizzare tutti i metalli dal database
 let metalliDizionario = {};
 
+
+
+
+
+
+
+
+function generateItalianTimestamp() {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Rome',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const timestamp = parts.find(p => p.type === 'year').value +
+                     parts.find(p => p.type === 'month').value +
+                     parts.find(p => p.type === 'day').value +
+                     parts.find(p => p.type === 'hour').value +
+                     parts.find(p => p.type === 'minute').value +
+                     parts.find(p => p.type === 'second').value;
+    
+    return timestamp;
+}
+
 // Funzione per caricare tutti i metalli dal database
 async function loadMetalli() {
     try {
@@ -399,8 +430,7 @@ async function assegnaSaliMetalli() {
         // Salva i dati completi per il classificatore
         try {
             // Genera timestamp per il nome del file
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
+            const timestamp = generateItalianTimestamp();
             const fileName = `dati_campione_${timestamp}.json`;
             
             // Verifica quanti file ci sono già nella cartella
@@ -630,8 +660,7 @@ async function initSaliMetalli() {
 async function salvaFileConTimestamp(datiCampione) {
     try {
         // Genera timestamp per il nome del file
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
+        const timestamp = generateItalianTimestamp();
         const fileName = `dati_campione_${timestamp}.json`;
         
         // Verifica quanti file ci sono già nella cartella
