@@ -725,6 +725,271 @@ app.whenReady().then(async () => {
         return filePath;
       }
     });
+
+    // NUOVO: Handler per salvare progetto unificato
+    ipcMain.handle('save-progetto-raccolta', async (event, progettoData) => {
+        try {
+            const userDataPath = app.getPath('userData');
+            const progettoPath = path.join(userDataPath, 'progetto_completo.json');
+            
+            console.log(`Salvando progetto unificato in: ${progettoPath}`);
+            
+            // Gestione versione incrementale se file esiste già
+            let finalData = progettoData;
+            if (fs.existsSync(progettoPath)) {
+                try {
+                    const existingData = JSON.parse(fs.readFileSync(progettoPath, 'utf8'));
+                    if (existingData.id === progettoData.id) {
+                        // Stesso committente+data, incrementa versione
+                        finalData.versione = (existingData.versione || 1) + 1;
+                        finalData.id = `${progettoData.id}_v${finalData.versione}`;
+                        console.log(`Progetto esistente trovato, creata versione incrementale: ${finalData.id}`);
+                    }
+                } catch (e) {
+                    console.warn('Errore nel leggere progetto esistente, sovrascrivo:', e.message);
+                }
+            }
+            
+            // Salva il file JSON
+            fs.writeFileSync(progettoPath, JSON.stringify(finalData, null, 2));
+            
+            console.log(`Progetto unificato salvato con successo: ${finalData.id}`);
+            
+            return {
+                success: true,
+                message: 'Progetto unificato salvato con successo',
+                id: finalData.id,
+                path: progettoPath
+            };
+        } catch (error) {
+            console.error('Errore nel salvataggio del progetto unificato:', error);
+            return {
+                success: false,
+                message: `Errore nel salvataggio: ${error.message}`
+            };
+        }
+    });
+
+    // NUOVO: Handler per caricare progetto unificato
+    ipcMain.handle('load-progetto-raccolta', async () => {
+        try {
+            const userDataPath = app.getPath('userData');
+            const progettoPath = path.join(userDataPath, 'progetto_completo.json');
+            
+            if (fs.existsSync(progettoPath)) {
+                const data = fs.readFileSync(progettoPath, 'utf8');
+                const progetto = JSON.parse(data);
+                
+                console.log(`Progetto caricato: ${progetto.id}`);
+                return {
+                    success: true,
+                    data: progetto
+                };
+            } else {
+                return {
+                    success: false,
+                    message: 'Nessun progetto trovato'
+                };
+            }
+        } catch (error) {
+            console.error('Errore nel caricamento del progetto:', error);
+            return {
+                success: false,
+                message: `Errore nel caricamento: ${error.message}`
+            };
+        }
+    });
+
+    // NUOVO: Handler per verificare esistenza progetto
+    ipcMain.handle('has-progetto-raccolta', async () => {
+        try {
+            const userDataPath = app.getPath('userData');
+            const progettoPath = path.join(userDataPath, 'progetto_completo.json');
+            return fs.existsSync(progettoPath);
+        } catch (error) {
+            console.error('Errore nel controllo esistenza progetto:', error);
+            return false;
+        }
+    });
+
+    // NUOVO: Handler per eliminare progetto (sarà usato in Step 2)
+    ipcMain.handle('delete-progetto-raccolta', async () => {
+        try {
+            const userDataPath = app.getPath('userData');
+            const progettoPath = path.join(userDataPath, 'progetto_completo.json');
+            
+            if (fs.existsSync(progettoPath)) {
+                fs.unlinkSync(progettoPath);
+                console.log('Progetto temporaneo eliminato con successo');
+                return {
+                    success: true,
+                    message: 'Progetto eliminato con successo'
+                };
+            } else {
+                return {
+                    success: false,
+                    message: 'Nessun progetto da eliminare'
+                };
+            }
+        } catch (error) {
+            console.error('Errore nell\'eliminazione del progetto:', error);
+            return {
+                success: false,
+                message: `Errore nell'eliminazione: ${error.message}`
+            };
+        }
+    });
+    
+    // NUOVO: Handler per ottenere i file campione con info sui committenti
+    ipcMain.handle('get-campione-files-with-metadata', async () => {
+        try {
+            const campioneDir = path.join(app.getPath('userData'), 'campione_data');
+            
+            // Crea la directory se non esiste
+            if (!fs.existsSync(campioneDir)) {
+                fs.mkdirSync(campioneDir, { recursive: true });
+                return [];
+            }
+            
+            // Leggi tutti i file .json nella directory
+            const files = fs.readdirSync(campioneDir)
+                .filter(file => file.endsWith('.json'))
+                .map(fileName => {
+                    try {
+                        // Leggi il contenuto del file per estrarre i metadati
+                        const filePath = path.join(campioneDir, fileName);
+                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                        const data = JSON.parse(fileContent);
+                        
+                        // Estrai metadati se presenti
+                        const metadata = data._metadata || {};
+                        
+                        return {
+                            fileName,
+                            committente: metadata.committente || 'Committente Sconosciuto',
+                            dataCampionamento: metadata.dataCampionamento || 'Data non disponibile',
+                            idProgetto: metadata.idProgetto || 'ID non disponibile'
+                        };
+                    } catch (e) {
+                        console.warn(`Errore nel leggere metadati da ${fileName}:`, e.message);
+                        return {
+                            fileName,
+                            committente: 'Errore lettura',
+                            dataCampionamento: 'N/A',
+                            idProgetto: 'N/A'
+                        };
+                    }
+                })
+                .sort((a, b) => {
+                    // Ordina per timestamp (più recente per primo)
+                    const timestampA = a.fileName.match(/dati_campione_(\d{14})/)?.[1] || '0';
+                    const timestampB = b.fileName.match(/dati_campione_(\d{14})/)?.[1] || '0';
+                    return timestampB.localeCompare(timestampA);
+                });
+            
+            console.log(`Trovati ${files.length} file campione con metadati`);
+            return files;
+        } catch (error) {
+            console.error('Errore nel recupero dei file campione con metadati:', error);
+            return [];
+        }
+    });
+
+    // NUOVO: Handler per archiviare risultato classificazione
+    ipcMain.handle('archive-classification-result', async (event, fileName, classificationResult) => {
+        try {
+            const userDataPath = app.getPath('userData');
+            const campioneDir = path.join(userDataPath, 'campione_data');
+            const archiveDir = path.join(userDataPath, 'campione_data', 'archiviati');
+            
+            // Crea directory archiviati se non esiste
+            if (!fs.existsSync(archiveDir)) {
+                fs.mkdirSync(archiveDir, { recursive: true });
+                console.log(`Creata directory archiviati: ${archiveDir}`);
+            }
+            
+            // Percorso file originale
+            const originalPath = path.join(campioneDir, fileName);
+            
+            // Genera nome per il risultato archiviato
+            const timestamp = fileName.match(/dati_campione_(\d{14})/)?.[1] || Date.now().toString();
+            const resultFileName = `risultato_classificazione_${timestamp}.json`;
+            const resultPath = path.join(archiveDir, resultFileName);
+            
+            // Salva il risultato della classificazione in archiviati
+            fs.writeFileSync(resultPath, JSON.stringify(classificationResult, null, 2));
+            console.log(`Risultato classificazione salvato in: ${resultPath}`);
+            
+            // Rimuovi il file originale da campione_data (non da archiviati)
+            if (fs.existsSync(originalPath)) {
+                fs.unlinkSync(originalPath);
+                console.log(`File originale rimosso: ${originalPath}`);
+            }
+            
+            return {
+                success: true,
+                message: 'Classificazione archiviata con successo',
+                archivedFile: resultFileName
+            };
+        } catch (error) {
+            console.error('Errore nell\'archiviazione della classificazione:', error);
+            return {
+                success: false,
+                message: `Errore nell'archiviazione: ${error.message}`
+            };
+        }
+    });
+
+    // NUOVO: Handler per ottenere risultati archiviati
+    ipcMain.handle('get-archived-results', async () => {
+        try {
+            const archiveDir = path.join(app.getPath('userData'), 'campione_data', 'archiviati');
+            
+            if (!fs.existsSync(archiveDir)) {
+                return [];
+            }
+            
+            const files = fs.readdirSync(archiveDir)
+                .filter(file => file.endsWith('.json'))
+                .map(fileName => {
+                    try {
+                        const filePath = path.join(archiveDir, fileName);
+                        const fileContent = fs.readFileSync(filePath, 'utf8');
+                        const data = JSON.parse(fileContent);
+                        
+                        // Estrai metadati dal risultato
+                        const metadata = data.data?._metadata || {};
+                        
+                        return {
+                            fileName,
+                            committente: metadata.committente || 'Committente Sconosciuto',
+                            dataCampionamento: metadata.dataCampionamento || 'Data non disponibile',
+                            caratteristichePericolo: data.data?.caratteristiche_pericolo || [],
+                            timestampClassificazione: data.data?.timestamp_classificazione || metadata.timestampProgetto,
+                            filePath
+                        };
+                    } catch (e) {
+                        console.warn(`Errore nel leggere risultato archiviato ${fileName}:`, e.message);
+                        return null;
+                    }
+                })
+                .filter(result => result !== null)
+                .sort((a, b) => {
+                    // Ordina per timestamp di classificazione (più recente per primo)
+                    return new Date(b.timestampClassificazione || 0) - new Date(a.timestampClassificazione || 0);
+                });
+            
+            console.log(`Trovati ${files.length} risultati archiviati`);
+            return files;
+        } catch (error) {
+            console.error('Errore nel recupero dei risultati archiviati:', error);
+            return [];
+        }
+    });
+
+
+
+
     
     // Gestione lettura file
     ipcMain.handle('read-file', async (event, filePath) => {
@@ -1466,22 +1731,52 @@ ipcMain.handle('get-campione-files', async () => {
 });
 
 // Handler per eliminare un file campione
-ipcMain.handle('delete-campione-file', async (event, fileName) => {
+// MODIFICATO: Handler per eliminare file campione con avviso committente
+ipcMain.handle('delete-campione-file-with-warning', async (event, fileName) => {
     try {
         const campioneDir = path.join(app.getPath('userData'), 'campione_data');
         const filePath = path.join(campioneDir, fileName);
         
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            return { success: true };
-        } else {
-            return { success: false, message: 'File non trovato' };
+        if (!fs.existsSync(filePath)) {
+            return { 
+                success: false, 
+                message: 'File non trovato' 
+            };
         }
+        
+        // Leggi i metadati per l'avviso
+        let committente = 'Committente Sconosciuto';
+        let dataCampionamento = 'Data non disponibile';
+        
+        try {
+            const fileContent = fs.readFileSync(filePath, 'utf8');
+            const data = JSON.parse(fileContent);
+            const metadata = data._metadata || {};
+            
+            committente = metadata.committente || 'Committente Sconosciuto';
+            dataCampionamento = metadata.dataCampionamento || 'Data non disponibile';
+        } catch (e) {
+            console.warn('Impossibile leggere metadati per avviso eliminazione');
+        }
+        
+        // Elimina il file
+        fs.unlinkSync(filePath);
+        
+        return { 
+            success: true,
+            message: `File eliminato: ${fileName}`,
+            committente,
+            dataCampionamento
+        };
     } catch (error) {
         console.error('Errore nell\'eliminazione del file campione:', error);
-        return { success: false, message: error.message };
+        return { 
+            success: false, 
+            message: error.message 
+        };
     }
 });
+
 
 
 

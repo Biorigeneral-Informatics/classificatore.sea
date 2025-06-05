@@ -951,8 +951,10 @@ async function saveAllData() {
         
         console.log("Form salvati con successo");
 
-        // STEP 2: Salva i dati Excel
-        console.log("Step 2: Salvataggio dati Excel...");
+        // STEP 2: Ottieni i dati del form
+        const formData = window.infoRaccoltaManager.getFormData();
+        
+        // STEP 3: Ottieni i dati Excel dalla tabella
         const table = document.querySelector('.excel-data-table');
         if (!table) {
             console.error("Nessuna tabella Excel trovata nell'interfaccia");
@@ -962,71 +964,95 @@ async function saveAllData() {
 
         // Crea un array di oggetti con i dati aggiornati
         const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
-        const updatedData = [];
+        const datiExcel = [];
         
         table.querySelectorAll('tbody tr').forEach(row => {
             const rowData = {};
             row.querySelectorAll('td').forEach((cell, index) => {
                 rowData[headers[index]] = cell.textContent.trim();
             });
-            updatedData.push(rowData);
+            datiExcel.push(rowData);
         });
 
-        // Salva i dati in sessionStorage con chiave specifica per la sezione Raccolta
-        sessionStorage.setItem('raccoltaExcelData', JSON.stringify(updatedData));
+        // STEP 4: Funzione helper per pulire il nome committente
+        function pulisciNomeCommittente(nome) {
+            if (!nome) return 'SconosciutoCommittente';
+            return nome
+                .replace(/[^a-zA-Z0-9]/g, '') // Rimuovi caratteri speciali
+                .replace(/\s+/g, '') // Rimuovi spazi
+                .substring(0, 50); // Limita lunghezza
+        }
 
-        // Recupera i dati salvati dal sessionStorage
-        const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
-        const raccoltaData = JSON.parse(raccoltaDataStr);
-        console.log("Dati RACCOLTA da salvare:", raccoltaData);
+        // STEP 5: Crea l'identificativo univoco
+        const committente = formData.infoCertificato.committente || 'SconosciutoCommittente';
+        const dataCampionamento = formData.infoCertificato.dataCampionamento || new Date().toISOString().split('T')[0];
+        const committenteNormalizzato = pulisciNomeCommittente(committente);
+        const dataFormattata = dataCampionamento.replace(/-/g, ''); // YYYYMMDD
+        const identificativo = `${committenteNormalizzato}_${dataFormattata}`;
 
-        // Rimuovi markature di modifiche per pulizia visiva
-        document.querySelectorAll('.excel-data-table td.modified').forEach(cell => {
-            cell.classList.remove('modified');
-        });
+        // STEP 6: Crea l'oggetto progetto unificato
+        const progettoCompleto = {
+            id: identificativo,
+            timestamp: new Date().toISOString(),
+            caratteristicheFisiche: formData.caratteristicheFisiche,
+            infoCertificato: formData.infoCertificato,
+            datiExcel: datiExcel,
+            metalliCampione: {}, // Sarà popolato dopo l'elaborazione Python
+            versione: 1 // Per gestione versioni incrementali future
+        };
 
-        // STEP 3: Salva in Python e attendi il risultato
+        console.log("Progetto unificato creato:", progettoCompleto);
+
+        // STEP 7: Verifica esistenza Python e calcola metalli
         try {
-            console.log("Step 3: Invio dei dati RACCOLTA a Python...");
-            // Specifica esplicitamente 'raccolta' come tipo
-            const pythonResult = await window.electronAPI.saveExcelToPython(raccoltaData, 'raccolta');
-            console.log("Risultato Python dopo il salvataggio RACCOLTA:", pythonResult);
+            console.log("Step 7: Invio dei dati a Python per elaborazione metalli...");
+            const pythonResult = await window.electronAPI.saveExcelToPython(datiExcel, 'raccolta');
+            console.log("Risultato Python:", pythonResult);
             
-            if (pythonResult.success) {
-                // Verifica che metalli_campione esista nella risposta
-                if (pythonResult.metalli_campione && Object.keys(pythonResult.metalli_campione).length > 0) {
-                    // Salva in sessionStorage per uso nella sezione sali-metalli
-                    sessionStorage.setItem('metalliCampione', JSON.stringify(pythonResult.metalli_campione));
-                    console.log("Metalli campione salvati:", pythonResult.metalli_campione);
-                    
-                    // Mostra notifica specifica per i metalli
-                    showNotification('Metalli rilevati! Vai alla sezione Sali-Metalli per assegnare i sali.', 'info');
-                } else {
-                    console.warn("Nessun metallo trovato nei dati del campione o valori non numerici");
-                    showNotification('Dati salvati ma nessun metallo con valore numerico trovato nel campione', 'warning');
-                }
-                
-                // Aggiorna la sezione sali-metalli
-                await initSaliMetalli();
-                
-                // Notifica generale di successo
-                showNotification('Tutti i dati salvati con successo!', 'success');
-                
-                // Aggiungi attività
-                addActivity('Dati salvati', 'Excel e Form salvati insieme', 'fas fa-save');
+            if (pythonResult.success && pythonResult.metalli_campione) {
+                progettoCompleto.metalliCampione = pythonResult.metalli_campione;
+                console.log("Metalli campione aggiunti al progetto:", pythonResult.metalli_campione);
             } else {
-                // Gestione dell'errore di sostanze mancanti
-                if (pythonResult.sostanze_mancanti && pythonResult.sostanze_mancanti.length > 0) {
-                    console.error("Sostanze mancanti rilevate:", pythonResult.sostanze_mancanti);
+                console.warn("Nessun metallo trovato o errore Python:", pythonResult.message);
+                if (!pythonResult.success && pythonResult.sostanze_mancanti) {
                     showNotification(pythonResult.message, 'error', 4000);
-                } else {
-                    // Altri tipi di errori
-                    throw new Error(pythonResult.message || 'Errore nel salvataggio in Python');
+                    return; // Interrompi se ci sono sostanze mancanti
                 }
             }
         } catch (pythonError) {
             console.error("Errore nell'elaborazione Python:", pythonError);
             showNotification(pythonError.message, 'error', 4000);
+            return; // Interrompi se Python fallisce
+        }
+
+        // STEP 8: Salva il progetto unificato
+        console.log("Step 8: Salvataggio progetto unificato...");
+        const saveResult = await window.electronAPI.saveProgettoRaccolta(progettoCompleto);
+        
+        if (saveResult.success) {
+            // Aggiorna sessionStorage per retrocompatibilità con sali-metalli
+            sessionStorage.setItem('raccoltaExcelData', JSON.stringify(datiExcel));
+            if (progettoCompleto.metalliCampione && Object.keys(progettoCompleto.metalliCampione).length > 0) {
+                sessionStorage.setItem('metalliCampione', JSON.stringify(progettoCompleto.metalliCampione));
+            }
+            
+            // Rimuovi markature di modifiche per pulizia visiva
+            document.querySelectorAll('.excel-data-table td.modified').forEach(cell => {
+                cell.classList.remove('modified');
+            });
+
+            // Aggiorna la sezione sali-metalli
+            await initSaliMetalli();
+            
+            // Notifica generale di successo
+            showNotification('Progetto salvato con successo! Vai alla sezione Sali-Metalli per continuare.', 'success');
+            
+            // Aggiungi attività
+            addActivity('Progetto salvato', `Progetto "${identificativo}" creato`, 'fas fa-save');
+            
+            console.log("Progetto unificato salvato con successo!");
+        } else {
+            throw new Error(saveResult.message || 'Errore nel salvataggio del progetto');
         }
         
     } catch (error) {

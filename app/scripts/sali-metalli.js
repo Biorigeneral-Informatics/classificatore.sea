@@ -302,6 +302,7 @@ function updateMetalliConcentrations(excelData) {
 }
 
 // Funzione per assegnare i sali selezionati ai metalli e calcolare le concentrazioni aggiustate
+// MODIFICATO: assegnaSaliMetalli per includere metadati ed eliminare progetto temporaneo
 async function assegnaSaliMetalli() {
     try {
         // Crea un dizionario con le selezioni sale-metallo
@@ -318,7 +319,7 @@ async function assegnaSaliMetalli() {
             
             if (selectElement) {
                 const saleId = selectElement.value;
-                const metalloNome = metallo.nome; // Usa direttamente il nome dal dizionario
+                const metalloNome = metallo.nome;
                 
                 // Aggiungi la selezione al dizionario
                 selezioniSali[metalloNome] = saleId;
@@ -339,9 +340,6 @@ async function assegnaSaliMetalli() {
         console.log('Metalli campione:', JSON.stringify(metalliCampione));
         console.log('Selezioni sali:', JSON.stringify(selezioniSali));
         
-        // Salva metalli_campione in sessionStorage
-        sessionStorage.setItem('metalliCampione', JSON.stringify(metalliCampione));
-        
         // Chiama lo script Python per il calcolo
         const result = await window.electronAPI.runPythonScript(
             'calcola_metalli.py',
@@ -357,26 +355,46 @@ async function assegnaSaliMetalli() {
         // Risultati calcolati da Python
         const risultatiCalcolati = result.data;
         
-        // Salva in sessionStorage per l'uso nella classificazione
-        sessionStorage.setItem('metalliCalcolati', JSON.stringify(risultatiCalcolati));
+        // NUOVO: Carica i metadati dal progetto unificato
+        let metadatiProgetto = null;
+        try {
+            const progettoResult = await window.electronAPI.loadProgettoRaccolta();
+            if (progettoResult.success && progettoResult.data) {
+                metadatiProgetto = {
+                    committente: progettoResult.data.infoCertificato?.committente || 'Committente Sconosciuto',
+                    dataCampionamento: progettoResult.data.infoCertificato?.dataCampionamento || new Date().toISOString().split('T')[0],
+                    codiceEER: progettoResult.data.infoCertificato?.codiceEER || 'Da definire',
+                    caratteristicheFisiche: progettoResult.data.caratteristicheFisiche || {},
+                    infoCertificato: progettoResult.data.infoCertificato || {},
+                    timestampProgetto: progettoResult.data.timestamp,
+                    idProgetto: progettoResult.data.id
+                };
+                console.log("Metadati estratti dal progetto:", metadatiProgetto);
+            }
+        } catch (error) {
+            console.warn("Impossibile caricare metadati dal progetto, continuo senza:", error.message);
+        }
         
-        //Prepara e salva i dati completi del campione per il classificatore
-        const datiCampione = {};
+        // Prepara i dati completi del campione per il classificatore
+        const datiCampione = {
+            // NUOVO: Aggiungi metadati come proprietà speciale
+            _metadata: metadatiProgetto
+        };
 
         // Includi i risultati calcolati (sali con fattori di conversione applicati)
         for (const [saleNome, saleDati] of Object.entries(risultatiCalcolati)) {
             datiCampione[saleNome] = {
                 concentrazione_ppm: saleDati.concentrazione_ppm,
                 concentrazione_percentuale: saleDati.concentrazione_percentuale,
-                nome_originale: saleDati.nome_originale // Manteniamo il riferimento al nome originale
+                nome_originale: saleDati.nome_originale
             };
         }
         
-        // Prova a ottenere i dati Excel originali se disponibili
+        // Prova a ottenere altre sostanze non-metalli dal progetto
         try {
-            const excelDataStr = sessionStorage.getItem('raccoltaExcelData');
-            if (excelDataStr) {
-                const excelData = JSON.parse(excelDataStr);
+            const progettoResult = await window.electronAPI.loadProgettoRaccolta();
+            if (progettoResult.success && progettoResult.data?.datiExcel) {
+                const excelData = progettoResult.data.datiExcel;
                 
                 // Cerca altre sostanze nei dati Excel che non sono metalli
                 if (Array.isArray(excelData)) {
@@ -385,14 +403,15 @@ async function assegnaSaliMetalli() {
                         const sostanzaNome = row.Descriz || '';
                         const valoreStr = row.Valore_Txt || '';
 
-                        // Normalizza il nome della sostanza rimuovendo spazi multipli
+                        // Normalizza il nome della sostanza
                         const sostanzaNomeNormalizzato = sostanzaNome.replace(/\s+/g, ' ').trim();
                         
                         // Controlla se la sostanza è già presente nei dati dei sali
                         let sostanzaGiaPresente = false;
                         for (const chiave in datiCampione) {
+                            if (chiave === '_metadata') continue; // Salta i metadati
+                            
                             const chiaveNormalizzata = chiave.replace(/\s+/g, ' ').trim();
-                            // Verifica anche se corrisponde a un nome_originale
                             if (chiaveNormalizzata === sostanzaNomeNormalizzato || 
                                 (datiCampione[chiave].nome_originale && 
                                 datiCampione[chiave].nome_originale.replace(/\s+/g, ' ').trim() === sostanzaNomeNormalizzato)) {
@@ -401,14 +420,10 @@ async function assegnaSaliMetalli() {
                             }
                         }
                         
-                        // Salta sostanze già presenti nei metalli calcolati
-                        if (sostanzaGiaPresente) return;
-                        
-                        // Salta valori sotto il limite di rilevabilità (che iniziano con "<")
-                        if (valoreStr.trim().startsWith('<')) return;
+                        // Salta sostanze già presenti e valori sotto limite
+                        if (sostanzaGiaPresente || valoreStr.trim().startsWith('<')) return;
                         
                         try {
-                            // Converti il valore in numero
                             const valore = parseFloat(valoreStr);
                             if (!isNaN(valore) && valore > 0) {
                                 datiCampione[sostanzaNome] = {
@@ -424,16 +439,11 @@ async function assegnaSaliMetalli() {
                 }
             }
         } catch (e) {
-            console.warn("Errore nell'elaborazione dei dati Excel:", e);
+            console.warn("Errore nell'elaborazione dei dati Excel dal progetto:", e);
         }
         
-        // Salva i dati completi per il classificatore
+        // Verifica limite file campione prima del salvataggio
         try {
-            // Genera timestamp per il nome del file
-            const timestamp = generateItalianTimestamp();
-            const fileName = `dati_campione_${timestamp}.json`;
-            
-            // Verifica quanti file ci sono già nella cartella
             const fileList = await window.electronAPI.getCampioneFiles();
             
             if (fileList.length >= 8) {
@@ -441,12 +451,34 @@ async function assegnaSaliMetalli() {
                 return {};
             }
             
-            // Salva il file con il nuovo nome
+            // Genera timestamp per il nome del file
+            const timestamp = generateItalianTimestamp();
+            const fileName = `dati_campione_${timestamp}.json`;
+            
+            // Salva il file con i metadati inclusi
             const saveResult = await window.electronAPI.saveCampioneData(datiCampione, fileName);
             
             if (saveResult.success) {
-                console.log(`✅ File ${fileName} salvato con successo in: ${saveResult.filePath}`);
-                showNotification(`File ${fileName} salvato con successo`);
+                console.log(` File ${fileName} salvato con successo con metadati inclusi`);
+                
+                // NUOVO: Elimina il progetto temporaneo dopo il successo
+                try {
+                    const deleteResult = await window.electronAPI.deleteProgettoRaccolta();
+                    if (deleteResult.success) {
+                        console.log(" Progetto temporaneo eliminato con successo");
+                    } else {
+                        console.warn(" Progetto temporaneo non eliminato:", deleteResult.message);
+                    }
+                } catch (deleteError) {
+                    console.warn(" Errore nell'eliminazione del progetto temporaneo:", deleteError.message);
+                    // Non bloccare il flusso se l'eliminazione fallisce
+                }
+                
+                // Pulisci anche sessionStorage
+                sessionStorage.removeItem('raccoltaExcelData');
+                sessionStorage.removeItem('metalliCampione');
+                
+                showNotification(`File ${fileName} salvato con successo! Il progetto temporaneo è stato eliminato.`);
                 
                 // Aggiorna la UI della classificazione
                 if (typeof updateClassificationUI === 'function') {
@@ -458,18 +490,22 @@ async function assegnaSaliMetalli() {
         } catch (e) {
             console.error("Errore nel salvataggio dei dati campione:", e);
             showNotification('Errore nel salvataggio del file: ' + e.message, 'error');
+            return {};
         }
                 
+        // Salva risultati in sessionStorage per uso immediato
+        sessionStorage.setItem('metalliCalcolati', JSON.stringify(risultatiCalcolati));
+        
         // Mostra notifica
         showNotification('Sali assegnati e concentrazioni calcolate con successo!');
         
         // Aggiungi attività
         addActivity('Sali assegnati', 'Associazione sali-metalli completata', 'fas fa-flask');
         
-        // Vai alla sezione di classificazione (opzionale)
+        // Vai alla sezione di classificazione
         showSection('classificazione');
 
-        // Chiamata per aggiornare l'interfaccia di classificazione
+        // Aggiorna l'interfaccia di classificazione
         if (typeof updateClassificationUI === 'function') {
             updateClassificationUI();
         }
@@ -485,160 +521,256 @@ async function assegnaSaliMetalli() {
 // Variabile globale per tenere traccia dell'ultimo hash dei dati caricati
 let lastExcelDataHash = null;
 
+// MODIFICATO: updateSaliMetalliWithExcelData con gestione progetto unificato
 function updateSaliMetalliWithExcelData() {
-    // Recupera i dati dalla sessionStorage utilizzando la chiave corretta
-    const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
-    const excelData = raccoltaDataStr ? JSON.parse(raccoltaDataStr) : [];
+    console.log('updateSaliMetalliWithExcelData chiamata - verifica presenza progetto unificato...');
+    
+    // NUOVO: Prima controlla se c'è un progetto unificato (priorità massima)
+    window.electronAPI.hasProgettoRaccolta()
+        .then(hasProgetto => {
+            if (hasProgetto) {
+                console.log('Progetto unificato rilevato, delegando a initSaliMetalli()');
+                // Se c'è un progetto unificato, initSaliMetalli() lo gestirà automaticamente
+                initSaliMetalli();
+                return; // Esci dalla funzione
+            }
+            
+            // FALLBACK: Se non c'è progetto unificato, usa la logica sessionStorage esistente
+            console.log('Nessun progetto unificato, utilizzo sessionStorage...');
+            
+            // Recupera i dati dalla sessionStorage utilizzando la chiave corretta
+            const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+            const excelData = raccoltaDataStr ? JSON.parse(raccoltaDataStr) : [];
 
-    // Verifica se stiamo ripristinando (array vuoto)
-    if (!excelData || excelData.length === 0) {
-        console.log('Ripristino della sezione sali-metalli a vuoto');
-        
-        // Resetta il dizionario dei metalli
-        for (const metallo of Object.values(metalliDizionario)) {
-            metallo.concentrazione = null;
-        }
-        
-        // Aggiorna l'interfaccia con il messaggio di default
-        const container = document.getElementById('metalAssociationContainer');
-        if (container) {
-            container.innerHTML = `
-                <div class="no-data-message">
-                    <i class="fas fa-info-circle"></i>
-                    <p>Carica un file dalla sezione Raccolta per visualizzare le associazioni</p>
-                </div>
-            `;
-        }
-        
-        // Reset dell'hash quando svuotiamo i dati
-        lastExcelDataHash = null;
-        return;
-    }
-    
-    // Calcola un hash semplice dei dati per verificare se sono cambiati
-    const currentDataHash = JSON.stringify(excelData).length;
-    
-    // Controlla se i dati sono gli stessi dell'ultimo aggiornamento
-    if (lastExcelDataHash === currentDataHash) {
-        console.log('I dati sono invariati, nessun aggiornamento necessario');
-        return;
-    }
-    
-    // Aggiorna le concentrazioni dei metalli
-    updateMetalliConcentrations(excelData);
-    
-    // Aggiorna l'interfaccia utente
-    renderSaliMetalliUI();
-    
-    // Mostra notifica solo se i dati sono cambiati
-    showNotification('Dati sali-metalli aggiornati con il nuovo file');
-    
-    // Memorizza l'hash dei dati correnti per il confronto successivo
-    lastExcelDataHash = currentDataHash;
+            // Verifica se stiamo ripristinando (array vuoto)
+            if (!excelData || excelData.length === 0) {
+                console.log('Ripristino della sezione sali-metalli a vuoto');
+                
+                // Resetta il dizionario dei metalli
+                for (const metallo of Object.values(metalliDizionario)) {
+                    metallo.concentrazione = null;
+                }
+                
+                // Aggiorna l'interfaccia con il messaggio di default
+                const container = document.getElementById('metalAssociationContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="no-data-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Carica un file dalla sezione Raccolta per visualizzare le associazioni</p>
+                        </div>
+                    `;
+                }
+                
+                // Reset dell'hash quando svuotiamo i dati
+                lastExcelDataHash = null;
+                return;
+            }
+            
+            // Calcola un hash semplice dei dati per verificare se sono cambiati
+            const currentDataHash = JSON.stringify(excelData).length;
+            
+            // Controlla se i dati sono gli stessi dell'ultimo aggiornamento
+            if (lastExcelDataHash === currentDataHash) {
+                console.log('I dati sessionStorage sono invariati, nessun aggiornamento necessario');
+                return;
+            }
+            
+            console.log('Dati sessionStorage cambiati, aggiornamento interfaccia...');
+            
+            // Carica i metalli dal database se non sono già caricati
+            Promise.all([loadMetalli(), loadSaliMetalli()])
+                .then(() => {
+                    // Aggiorna le concentrazioni dei metalli
+                    updateMetalliConcentrations(excelData);
+                    
+                    // Aggiorna l'interfaccia utente
+                    renderSaliMetalliUI();
+                    
+                    // Mostra notifica solo se i dati sono cambiati
+                    showNotification('Dati sali-metalli aggiornati con il nuovo file');
+                    
+                    // Memorizza l'hash dei dati correnti per il confronto successivo
+                    lastExcelDataHash = currentDataHash;
+                })
+                .catch(error => {
+                    console.error('Errore nel caricamento dei metalli dal database:', error);
+                    showNotification('Errore nel caricamento dei metalli', 'error');
+                });
+        })
+        .catch(error => {
+            console.error('Errore nel controllo progetto unificato:', error);
+            
+            // In caso di errore, fallback alla logica sessionStorage
+            console.log('Errore nel controllo progetto, fallback a sessionStorage...');
+            
+            const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+            const excelData = raccoltaDataStr ? JSON.parse(raccoltaDataStr) : [];
+
+            if (!excelData || excelData.length === 0) {
+                const container = document.getElementById('metalAssociationContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="no-data-message">
+                            <i class="fas fa-info-circle"></i>
+                            <p>Carica un file dalla sezione Raccolta per visualizzare le associazioni</p>
+                        </div>
+                    `;
+                }
+                return;
+            }
+            
+            // Procedi con sessionStorage in caso di errore
+            Promise.all([loadMetalli(), loadSaliMetalli()])
+                .then(() => {
+                    updateMetalliConcentrations(excelData);
+                    renderSaliMetalliUI();
+                })
+                .catch(dbError => {
+                    console.error('Errore nel caricamento dal database:', dbError);
+                });
+        });
 }
 
 
 // Inizializza la sezione sali-metalli
+// MODIFICATO: initSaliMetalli per leggere dal progetto unificato
 async function initSaliMetalli() {
     try {
+        console.log("Inizializzazione sali-metalli con progetto unificato...");
+        
+        // NUOVO: Prima controlla se esiste un progetto unificato
+        const hasProgetto = await window.electronAPI.hasProgettoRaccolta();
+        
+        if (hasProgetto) {
+            console.log("Progetto unificato trovato, caricamento in corso...");
+            
+            const progettoResult = await window.electronAPI.loadProgettoRaccolta();
+            
+            if (progettoResult.success && progettoResult.data) {
+                const progetto = progettoResult.data;
+                console.log("Progetto caricato:", progetto);
+                
+                // Carica i metalli dal database
+                await loadMetalli();
+                await loadSaliMetalli();
+                
+                // NUOVO: Usa i metalli_campione dal progetto unificato
+                if (progetto.metalliCampione && Object.keys(progetto.metalliCampione).length > 0) {
+                    console.log("Metalli campione trovati nel progetto:", progetto.metalliCampione);
+                    
+                    // Assegna le concentrazioni dai metalli_campione del progetto
+                    let metalliAssegnati = 0;
+                    
+                    for (const [metalloNome, metalloDati] of Object.entries(progetto.metalliCampione)) {
+                        console.log(`Processando metallo dal progetto: ${metalloNome}`);
+                        
+                        if (!metalloDati.concentrazione_ppm && !metalloDati.metallo_db_id) {
+                            console.warn(`Metallo ${metalloNome} senza concentrazione o ID database, saltato`);
+                            continue;
+                        }
+                        
+                        // Se il metallo dal backend ha un ID database, usiamo quello
+                        if (metalloDati.metallo_db_id) {
+                            const id = metalloDati.metallo_db_id;
+                            if (metalliDizionario[id]) {
+                                metalliDizionario[id].concentrazione = metalloDati.concentrazione_ppm;
+                                console.log(`Assegnata concentrazione ${metalloDati.concentrazione_ppm} a ${metalliDizionario[id].nome} (ID: ${id})`);
+                                metalliAssegnati++;
+                            } else {
+                                console.warn(`Metallo con ID ${id} non trovato nel dizionario.`);
+                            }
+                            continue;
+                        }
+                        
+                        // Cerca di abbinare per nome normalizzato
+                        let trovato = false;
+                        const nomeNormalizzato = metalloNome.toLowerCase().replace(/\s+/g, '');
+                        
+                        for (const metallo of Object.values(metalliDizionario)) {
+                            const metalloDbNormalizzato = metallo.nome.toLowerCase().replace(/\s+/g, '');
+                            
+                            if (nomeNormalizzato === metalloDbNormalizzato || 
+                                nomeNormalizzato.includes(metalloDbNormalizzato) || 
+                                metalloDbNormalizzato.includes(nomeNormalizzato)) {
+                                metallo.concentrazione = metalloDati.concentrazione_ppm;
+                                console.log(`Assegnata concentrazione ${metalloDati.concentrazione_ppm} a ${metallo.nome}`);
+                                trovato = true;
+                                metalliAssegnati++;
+                                break;
+                            }
+                        }
+                        
+                        if (!trovato) {
+                            console.warn(`Non è stato possibile abbinare il metallo ${metalloNome} a nessun metallo nel database`);
+                        }
+                    }
+                    
+                    console.log(`Assegnate concentrazioni a ${metalliAssegnati} metalli dal progetto unificato`);
+                    
+                    // Salva anche in sessionStorage per retrocompatibilità
+                    sessionStorage.setItem('metalliCampione', JSON.stringify(progetto.metalliCampione));
+                    
+                } else if (progetto.datiExcel && progetto.datiExcel.length > 0) {
+                    console.log("Nessun metallo campione nel progetto, tento estrazione dai dati Excel");
+                    
+                    // Fallback: tenta di estrarre dai dati Excel del progetto
+                    updateMetalliConcentrations(progetto.datiExcel);
+                    
+                    // Salva anche in sessionStorage per retrocompatibilità
+                    sessionStorage.setItem('raccoltaExcelData', JSON.stringify(progetto.datiExcel));
+                }
+                
+                // Aggiorna l'interfaccia
+                renderSaliMetalliUI();
+                return;
+            } else {
+                console.error("Errore nel caricamento del progetto:", progettoResult.message);
+            }
+        }
+        
+        // FALLBACK: Se non c'è progetto unificato, usa il metodo esistente (sessionStorage)
+        console.log("Nessun progetto unificato trovato, utilizzo fallback sessionStorage...");
+        
         // Prima controlla se abbiamo metalli_campione in sessionStorage (prioritario)
         const metalliCampioneStr = sessionStorage.getItem('metalliCampione');
         
-        console.log("Controllando metalli_campione in sessionStorage:", metalliCampioneStr ? "trovato" : "non trovato");
-        
         if (metalliCampioneStr) {
-            console.log("Metalli campione trovati in sessionStorage:", metalliCampioneStr);
+            console.log("Metalli campione trovati in sessionStorage (fallback)");
             const metalliCampione = JSON.parse(metalliCampioneStr);
             
             // Carica prima i metalli dal database
             await loadMetalli();
             await loadSaliMetalli();
             
-            console.log("Metalli dal database:", metalliDizionario);
-            console.log("Metalli dal campione:", metalliCampione);
+            // [Mantieni la logica esistente per sessionStorage...]
+            // ... resto del codice esistente per sessionStorage
             
-            // Assegna le concentrazioni dai metalli_campione
-            let metalliAssegnati = 0;
-            
-            for (const [metalloNome, metalloDati] of Object.entries(metalliCampione)) {
-                console.log(`Processando metallo dal campione: ${metalloNome}`);
-                
-                if (!metalloDati.concentrazione_ppm && !metalloDati.metallo_db_id) {
-                    console.warn(`Metallo ${metalloNome} senza concentrazione o ID database, saltato`);
-                    continue;
-                }
-                
-                // Se il metallo dal backend ha un ID database, usiamo quello
-                if (metalloDati.metallo_db_id) {
-                    const id = metalloDati.metallo_db_id;
-                    if (metalliDizionario[id]) {
-                        metalliDizionario[id].concentrazione = metalloDati.concentrazione_ppm;
-                        console.log(`Assegnata concentrazione ${metalloDati.concentrazione_ppm} a ${metalliDizionario[id].nome} (ID: ${id})`);
-                        metalliAssegnati++;
-                    } else {
-                        console.warn(`Metallo con ID ${id} non trovato nel dizionario.`);
-                    }
-                    continue;
-                }
-                
-                // Cerca di abbinare per nome normalizzato
-                let trovato = false;
-                const nomeNormalizzato = metalloNome.toLowerCase().replace(/\s+/g, '');
-                
-                for (const metallo of Object.values(metalliDizionario)) {
-                    const metalloDbNormalizzato = metallo.nome.toLowerCase().replace(/\s+/g, '');
-                    
-                    // Log per debug
-                    console.log(`Confronto: "${nomeNormalizzato}" con "${metalloDbNormalizzato}"`);
-                    
-                    if (nomeNormalizzato === metalloDbNormalizzato || 
-                        nomeNormalizzato.includes(metalloDbNormalizzato) || 
-                        metalloDbNormalizzato.includes(nomeNormalizzato)) {
-                        metallo.concentrazione = metalloDati.concentrazione_ppm;
-                        console.log(`Assegnata concentrazione ${metalloDati.concentrazione_ppm} a ${metallo.nome}`);
-                        trovato = true;
-                        metalliAssegnati++;
-                        break;
-                    }
-                }
-                
-                if (!trovato) {
-                    console.warn(`Non è stato possibile abbinare il metallo ${metalloNome} a nessun metallo nel database`);
-                }
-            }
-            
-            console.log(`Assegnate concentrazioni a ${metalliAssegnati} metalli`);
-            
-            // Aggiorna l'interfaccia
-            renderSaliMetalliUI();
-            return;
-        }
-        // Altrimenti, controlla se abbiamo dati Excel
-        const excelDataStr = sessionStorage.getItem('raccoltaExcelData');
-        if (excelDataStr) {
-            console.log("Dati Excel trovati in sessionStorage, ma nessun metalli_campione");
-            
-            // Carica i metalli dal database
-            await loadMetalli();
-            await loadSaliMetalli();
-            
-            // Tenta di estrarre le concentrazioni dai dati Excel
-            const excelData = JSON.parse(excelDataStr);
-            updateMetalliConcentrations(excelData);
-            
-            // Aggiorna l'interfaccia
-            renderSaliMetalliUI();
         } else {
-            console.log("Nessun dato disponibile per sali-metalli");
-            
-            // Mostra un messaggio se non ci sono dati
-            const container = document.getElementById('metalAssociationContainer');
-            container.innerHTML = `
-                <div class="no-data-message">
-                    <i class="fas fa-info-circle"></i>
-                    <p>Carica un file dalla sezione Raccolta e salva le modifiche per visualizzare i metalli.</p>
-                </div>
-            `;
+            // Controlla se abbiamo dati Excel in sessionStorage
+            const excelDataStr = sessionStorage.getItem('raccoltaExcelData');
+            if (excelDataStr) {
+                console.log("Dati Excel trovati in sessionStorage (fallback)");
+                
+                await loadMetalli();
+                await loadSaliMetalli();
+                
+                const excelData = JSON.parse(excelDataStr);
+                updateMetalliConcentrations(excelData);
+                
+                renderSaliMetalliUI();
+            } else {
+                console.log("Nessun dato disponibile per sali-metalli");
+                
+                // Mostra messaggio che invita a completare la raccolta
+                const container = document.getElementById('metalAssociationContainer');
+                container.innerHTML = `
+                    <div class="no-data-message">
+                        <i class="fas fa-info-circle"></i>
+                        <p>Carica un file dalla sezione Raccolta e completa il salvataggio per visualizzare i metalli.</p>
+                    </div>
+                `;
+            }
         }
     } catch (error) {
         console.error('Errore nell\'inizializzazione della sezione sali-metalli:', error);

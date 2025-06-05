@@ -112,27 +112,42 @@ def carica_dati_campione(nome_file=None):
         
         # Carica il file JSON
         with open(json_path, 'r', encoding='utf-8') as f:
-            dati_reali = json.load(f)
+            dati_completi = json.load(f)
             
-        # Verifica che i dati siano validi
-        if not dati_reali or not isinstance(dati_reali, dict) or len(dati_reali) == 0:
-            print("File JSON caricato, ma non contiene dati validi")
-            print(f"Contenuto file: {dati_reali}")
-            return None
+        # NUOVO: Estrai metadati se presenti
+        metadati = None
+        dati_campione = dati_completi
+        
+        if isinstance(dati_completi, dict):
+            # Se il file contiene metadati, estraili
+            if '_metadata' in dati_completi:
+                metadati = dati_completi['_metadata']
+                
+                # Rimuovi i metadati dai dati del campione per l'elaborazione
+                dati_campione = {k: v for k, v in dati_completi.items() if k != '_metadata'}
+                
+                print(f"Metadati estratti: Committente={metadati.get('committente', 'N/A')}, "
+                      f"Data={metadati.get('dataCampionamento', 'N/A')}")
+            else:
+                print("Nessun metadato trovato nel file campione")
+        
+        # Verifica che i dati del campione siano validi
+        if not dati_campione or len(dati_campione) == 0:
+            print("File JSON caricato, ma non contiene dati di campione validi")
+            print(f"Contenuto file: {dati_completi}")
+            return None, None
             
-        print(f"Dati campione caricati con successo da {json_path}: {len(dati_reali)} sostanze trovate")
+        print(f"Dati campione caricati con successo da {json_path}: {len(dati_campione)} sostanze trovate")
+        print(f"Sostanze caricate: {list(dati_campione.keys())}")
         
-        # 🔧 NUOVO: Log delle sostanze caricate per debug
-        print(f"Sostanze caricate: {list(dati_reali.keys())}")
-        
-        return dati_reali
+        return dati_campione, metadati
             
     except Exception as e:
         print(f"Errore nel caricamento dei dati del campione: {str(e)}")
         import traceback
         print(f"Traceback completo:")
         traceback.print_exc()
-        return None
+        return None, None
     
 
 
@@ -2456,6 +2471,7 @@ def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
 def main():
     """
     Funzione principale del programma
+    MODIFICATO: Ora include i metadati nei risultati per l'aggregazione
     """
     try:
         # Verifica se è stato passato un nome file come argomento
@@ -2463,7 +2479,6 @@ def main():
         if len(sys.argv) > 1:
             nome_file = sys.argv[1]
             print(f"Classificazione richiesta per il file: {nome_file}")
-            #🔧 DEBUG path file caricato
             debug_file_path(nome_file)
         else:
             print("Nessun file specificato, usando il file di default")
@@ -2479,7 +2494,7 @@ def main():
                 "message": "Impossibile connettersi al database"
             })
 
-        # Carica frasi H
+        # Carica frasi H e EUH
         success_loading = database.carica_frasi_h()
         if not success_loading:
             return json.dumps({
@@ -2487,19 +2502,18 @@ def main():
                 "message": "Impossibile caricare i dati dal database"
             })
         
-        # Carica frasi EUH
         success_loading_euh = database.carica_frasi_euh()
         if not success_loading_euh:
             return json.dumps({
                 "success": False, 
-                "message": "Impossibile caricare le frasi EUH dal database. Le tabelle 'EUH' e 'sostanze' sono necessarie per la classificazione."
+                "message": "Impossibile caricare le frasi EUH dal database"
             })
 
         # Inizializza il classificatore
         classificatore = ClassificatoreRifiuti(database)
         
-        # Carica i dati reali del campione (con il file specificato o quello di default)
-        campione_dati = carica_dati_campione(nome_file)
+        # MODIFICATO: Carica i dati reali del campione CON i metadati
+        campione_dati, metadati = carica_dati_campione(nome_file)
         
         # Verifica che siano stati caricati dati
         if not campione_dati:
@@ -2524,15 +2538,20 @@ def main():
                 "message": "Errore durante la classificazione"
             })
         
+        # NUOVO: Aggiungi i metadati ai risultati per l'aggregazione
+        if metadati:
+            risultati['_metadata'] = metadati
+            print(f"Metadati inclusi nei risultati: Committente={metadati.get('committente', 'N/A')}")
+        else:
+            print("Nessun metadato da includere nei risultati")
+        
         # Genera un nome file per i risultati basato sul file di input
         if nome_file and nome_file != "dati_campione.json":
-            # Estrai il timestamp dal nome del file e usalo per i risultati
             timestamp_match = re.search(r'dati_campione_(\d{14})', nome_file)
             if timestamp_match:
                 timestamp = timestamp_match.group(1)
                 nome_risultati = f"risultati_classificazione_{timestamp}.json"
             else:
-                # Se non c'è timestamp, usa il nome del file
                 base_name = os.path.splitext(nome_file)[0]
                 nome_risultati = f"risultati_{base_name}.json"
         else:

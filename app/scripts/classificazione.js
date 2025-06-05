@@ -83,145 +83,147 @@ async function updateClassificationUI() {
 
 
 // Nuova funzione per creare il selettore di file e gestire il limite
+// MODIFICATO: updateClassificationFileSelector con info committente
 function updateClassificationFileSelector(fileList) {
     const fileInfoElement = document.getElementById('classificationFileInfo');
     
     if (!fileInfoElement) return;
     
-    // Crea il selettore di file
-    let selectorHtml = `
-        <div class="file-selector-container">
-            <h3>Seleziona file da classificare:</h3>
-            <div class="file-selector">
-                <select id="campioneFileSelect" class="form-control">
-                    <option value="">Seleziona un file...</option>
-    `;
-    
-    // Aggiungi le opzioni per ogni file
-    fileList.forEach(fileName => {
-        // Estrai timestamp dal nome del file per mostrare data/ora
-        const timestamp = fileName.match(/dati_campione_(\d{14})/);
-        let displayName = fileName;
-        if (timestamp) {
-            const dateStr = timestamp[1];
-            const year = parseInt(dateStr.substring(0, 4));
-            const month = parseInt(dateStr.substring(4, 6)) - 1; // I mesi in JavaScript vanno da 0 a 11
-            const day = parseInt(dateStr.substring(6, 8));
-            const hour = parseInt(dateStr.substring(8, 10));
-            const minute = parseInt(dateStr.substring(10, 12));
-            const second = parseInt(dateStr.substring(12, 14));
+    // NUOVO: Ottieni file con metadati
+    window.electronAPI.getCampioneFilesWithMetadata()
+        .then(filesWithMetadata => {
+            // Crea il selettore di file
+            let selectorHtml = `
+                <div class="file-selector-container">
+                    <h3>Seleziona file da classificare:</h3>
+                    <div class="file-selector">
+                        <select id="campioneFileSelect" class="form-control">
+                            <option value="">Seleziona un file...</option>
+            `;
             
-            // Crea un oggetto Date e formattalo per l'Italia
-            const date = new Date(year, month, day, hour, minute, second);
-            displayName = date.toLocaleString('it-IT', {
-                timeZone: 'Europe/Rome',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
+            // Aggiungi le opzioni per ogni file CON INFO COMMITTENTE
+            filesWithMetadata.forEach(fileInfo => {
+                const displayName = `${fileInfo.committente} - ${fileInfo.dataCampionamento} (${fileInfo.fileName})`;
+                selectorHtml += `<option value="${fileInfo.fileName}">${displayName}</option>`;
             });
-        }
-        
-        selectorHtml += `<option value="${fileName}">${displayName}</option>`;
-    });
-    
-    selectorHtml += `
-                </select>
-                <div class="file-selector-info">
-                    <p><strong>File disponibili:</strong> ${fileList.length}/8</p>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // MODIFICA: Mostra sempre la sezione per eliminare file se ci sono file disponibili
-    if (fileList.length > 0) {
-        // Aggiungi intestazione diversa in base al numero di file
-        const headerText = fileList.length >= 8 
-            ? '<i class="fas fa-exclamation-triangle"></i><span>Limite massimo raggiunto (8/8 file)</span>' 
-            : '<i class="fas fa-folder-open"></i><span>Gestione file campione</span>';
-        
-        const descriptionText = fileList.length >= 8
-            ? 'Per aggiungere nuovi file, elimina alcuni di quelli esistenti:'
-            : 'Puoi eliminare i file che non ti servono più:';
-        
-        selectorHtml += `
-            <div class="file-management-section">
-                <div class="section-header">
-                    ${headerText}
-                </div>
-                <p>${descriptionText}</p>
-                <div class="file-delete-list">
-        `;
-        
-        fileList.forEach(fileName => {
-            const timestamp = fileName.match(/dati_campione_(\d{14})/);
-            let displayName = fileName;
-            if (timestamp) {
-                const dateStr = timestamp[1];
-                const year = parseInt(dateStr.substring(0, 4));
-                const month = parseInt(dateStr.substring(4, 6)) - 1;
-                const day = parseInt(dateStr.substring(6, 8));
-                const hour = parseInt(dateStr.substring(8, 10));
-                const minute = parseInt(dateStr.substring(10, 12));
-                const second = parseInt(dateStr.substring(12, 14));
-                
-                const date = new Date(year, month, day, hour, minute, second);
-                displayName = date.toLocaleString('it-IT', {
-                    timeZone: 'Europe/Rome',
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                });
-            }
             
             selectorHtml += `
-                <div class="file-delete-item">
-                    <span class="file-name">${displayName}</span>
-                    <button class="btn btn-danger btn-sm" onclick="eliminaFileCampione('${fileName}')">
-                        <i class="fas fa-trash"></i> Elimina
-                    </button>
+                        </select>
+                        <div class="file-selector-info">
+                            <p><strong>File disponibili:</strong> ${filesWithMetadata.length}/8</p>
+                        </div>
+                    </div>
                 </div>
             `;
-        });
-        
-        selectorHtml += `
-                </div>
-            </div>
-        `;
-    }
-    
-    fileInfoElement.innerHTML = selectorHtml;
-    
-    // Aggiungi event listener al selettore
-    const select = document.getElementById('campioneFileSelect');
-    if (select) {
-        select.addEventListener('change', function() {
-            const selectedFile = this.value;
-            const startBtn = document.getElementById('startClassificationBtn');
             
-            if (selectedFile && startBtn) {
-                startBtn.disabled = false;
-                startBtn.style.opacity = '1';
-            } else if (startBtn) {
-                startBtn.disabled = true;
-                startBtn.style.opacity = '0.6';
+            // MODIFICATO: Sezione eliminazione con info committente
+            if (filesWithMetadata.length > 0) {
+                const headerText = filesWithMetadata.length >= 8 
+                    ? '<i class="fas fa-exclamation-triangle"></i><span>Limite massimo raggiunto (8/8 file)</span>' 
+                    : '<i class="fas fa-folder-open"></i><span>Gestione file campione</span>';
+                
+                const descriptionText = filesWithMetadata.length >= 8
+                    ? 'Per aggiungere nuovi file, elimina alcuni di quelli esistenti:'
+                    : 'Puoi eliminare i file che non ti servono più:';
+                
+                selectorHtml += `
+                    <div class="file-management-section">
+                        <div class="section-header">
+                            ${headerText}
+                        </div>
+                        <p>${descriptionText}</p>
+                        <div class="file-delete-list">
+                `;
+                
+                filesWithMetadata.forEach(fileInfo => {
+                    const displayName = `${fileInfo.committente} - ${fileInfo.dataCampionamento}`;
+                    
+                    selectorHtml += `
+                        <div class="file-delete-item">
+                            <span class="file-name">${displayName}</span>
+                            <button class="btn btn-danger btn-sm" onclick="eliminaFileCampioneConAvviso('${fileInfo.fileName}', '${fileInfo.committente}', '${fileInfo.dataCampionamento}')">
+                                <i class="fas fa-trash"></i> Elimina
+                            </button>
+                        </div>
+                    `;
+                });
+                
+                selectorHtml += `
+                        </div>
+                    </div>
+                `;
             }
+            
+            fileInfoElement.innerHTML = selectorHtml;
+            
+            // Aggiungi event listener al selettore (codice esistente)
+            const select = document.getElementById('campioneFileSelect');
+            if (select) {
+                select.addEventListener('change', function() {
+                    const selectedFile = this.value;
+                    const startBtn = document.getElementById('startClassificationBtn');
+                    
+                    if (selectedFile && startBtn) {
+                        startBtn.disabled = false;
+                        startBtn.style.opacity = '1';
+                    } else if (startBtn) {
+                        startBtn.disabled = true;
+                        startBtn.style.opacity = '0.6';
+                    }
+                });
+                
+                const startBtn = document.getElementById('startClassificationBtn');
+                if (startBtn) {
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = '0.6';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento file con metadati:', error);
+            // Fallback alla versione originale
+            fileInfoElement.innerHTML = '<p>Errore nel caricamento dei file</p>';
         });
+}
+
+// NUOVO: Funzione per eliminazione con avviso committente
+async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionamento) {
+    try {
+        // Mostra conferma con info committente
+        const conferma = confirm(
+            `Sei sicuro di voler eliminare questa classificazione?\n\n` +
+            `Committente: ${committente}\n` +
+            `Data campionamento: ${dataCampionamento}\n` +
+            `File: ${fileName}\n\n` +
+            `⚠️ ATTENZIONE: Questa azione eliminerà definitivamente la classificazione!`
+        );
         
-        // Disabilita inizialmente il pulsante se non c'è selezione
-        const startBtn = document.getElementById('startClassificationBtn');
-        if (startBtn) {
-            startBtn.disabled = true;
-            startBtn.style.opacity = '0.6';
+        if (!conferma) return;
+        
+        // Elimina il file con il nuovo handler
+        const result = await window.electronAPI.deleteCampioneFileWithWarning(fileName);
+        
+        if (result.success) {
+            showNotification(
+                `Classificazione eliminata: ${result.committente} (${result.dataCampionamento})`, 
+                'success'
+            );
+            
+            // Aggiorna l'interfaccia
+            updateClassificationUI();
+            
+            // Aggiungi attività
+            addActivity(
+                'Classificazione eliminata', 
+                `${result.committente} - ${result.dataCampionamento}`, 
+                'fas fa-trash'
+            );
+        } else {
+            throw new Error(result.message || 'Errore nell\'eliminazione del file');
         }
+    } catch (error) {
+        console.error('Errore nell\'eliminazione del file:', error);
+        showNotification('Errore nell\'eliminazione: ' + error.message, 'error');
     }
 }
 
@@ -295,7 +297,6 @@ async function avviaClassificazione() {
             startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Elaborazione...';
         }
         
-        // Esegui lo script Python del classificatore con il file selezionato
         const result = await window.electronAPI.runPythonScript('classificatore.py', [selectedFile]);
         
         // Riattiva il pulsante
@@ -309,6 +310,25 @@ async function avviaClassificazione() {
         }
         
         console.log('Risultato classificazione:', result);
+        
+        // NUOVO: Archivia automaticamente il risultato
+        try {
+            const archiveResult = await window.electronAPI.archiveClassificationResult(selectedFile, result);
+            
+            if (archiveResult.success) {
+                console.log(`Risultato archiviato: ${archiveResult.archivedFile}`);
+                showNotification(
+                    `Classificazione completata e archiviata: ${archiveResult.archivedFile}`, 
+                    'success'
+                );
+            } else {
+                console.warn('Errore nell\'archiviazione:', archiveResult.message);
+                // Non bloccare il flusso, continua comunque
+            }
+        } catch (archiveError) {
+            console.warn('Errore nell\'archiviazione automatica:', archiveError);
+            // Non bloccare il flusso
+        }
         
         // Salva i dati in sessionStorage per uso futuro
         sessionStorage.setItem('classificationResults', JSON.stringify(result.data));
@@ -324,18 +344,7 @@ async function avviaClassificazione() {
             goToReportsBtn.style.display = 'inline-block';
         }
         
-        // Genera report usando la versione corretta dalla dashboard.js
-        const reportName = await generateReportFromClassificationData(result.data);
-        
-        if (reportName) {
-            // Aggiungi attività
-            addActivity('Classificazione completata', `Report "${reportName}" generato dal file ${selectedFile}`, 'fas fa-check');
-            
-            // Mostra notifica di completamento
-            showNotification('Classificazione completata con successo! Vai alla sezione Reports per visualizzare i risultati.');
-        } else {
-            throw new Error('Errore nella generazione del report');
-        }
+        addActivity('Classificazione completata', `File archiviato: ${selectedFile}`, 'fas fa-check');
         
         return true;
     } catch (error) {
@@ -354,19 +363,44 @@ async function avviaClassificazione() {
 }
 
 // Versione corretta per generare report dal risultato della classificazione
+// MODIFICATO: generateReportFromClassificationData per gestire metadati
 async function generateReportFromClassificationData(classificationData) {
     try {
         if (!classificationData) {
             throw new Error('Nessun dato di classificazione disponibile');
         }
         
-        // Genera nome univoco per il report
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
-        const reportName = `Classificazione_${timestamp}`;
+        // NUOVO: Estrai metadati se presenti
+        const metadati = classificationData._metadata;
+        let reportName;
         
-        // Prepara i dati per il report
-        const reportData = [];
+        if (metadati && metadati.committente) {
+            // Genera nome basato su committente e data
+            const committente = metadati.committente.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
+            reportName = `${committente}_${timestamp}`;
+        } else {
+            // Fallback al sistema precedente
+            const now = new Date();
+            const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
+            reportName = `Classificazione_${timestamp}`;
+        }
+        
+        // Prepara i dati per il report INCLUDENDO i metadati
+        const reportData = {
+            // NUOVO: Metadati per aggregazione futura
+            _metadata: metadati || {
+                committente: 'Committente Sconosciuto',
+                dataCampionamento: new Date().toISOString().split('T')[0],
+                timestampClassificazione: new Date().toISOString()
+            },
+            
+            // Dati di classificazione esistenti
+            risultati_classificazione: [],
+            caratteristiche_pericolo: classificationData.caratteristiche_pericolo || [],
+            timestamp_elaborazione: new Date().toISOString()
+        };
         
         // Se i dati provengono dal classificatore, estraili correttamente
         if (classificationData.campione) {
@@ -375,9 +409,10 @@ async function generateReportFromClassificationData(classificationData) {
             
             // Crea un oggetto riassuntivo per ogni sostanza
             for (const [sostanza, info] of Object.entries(campione)) {
-                reportData.push({
+                reportData.risultati_classificazione.push({
                     'Sostanza': sostanza,
                     'Concentrazione (ppm)': info.concentrazione_ppm || 0,
+                    'Concentrazione (%)': info.concentrazione_percentuale || 0,
                     'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
                     'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
                     'CAS': info.cas || 'N/A'
@@ -385,16 +420,17 @@ async function generateReportFromClassificationData(classificationData) {
             }
             
             // Aggiungi una riga con il risultato complessivo
-            reportData.push({
+            reportData.risultati_classificazione.push({
                 'Sostanza': '** RISULTATO TOTALE **',
                 'Concentrazione (ppm)': '',
+                'Concentrazione (%)': '',
                 'Frasi H': '',
                 'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
                 'CAS': ''
             });
         } else if (Array.isArray(classificationData)) {
             // Se i dati sono già in formato tabellare, usali direttamente
-            reportData.push(...classificationData);
+            reportData.risultati_classificazione.push(...classificationData);
         }
         
         // Usa l'API dedicata per salvare il report
@@ -404,6 +440,7 @@ async function generateReportFromClassificationData(classificationData) {
             throw new Error('Errore nel salvataggio del report');
         }
         
+        console.log(`Report "${reportName}" salvato con metadati:`, metadati);
         showNotification(`Report "${reportName}" generato con successo!`);
         
         // Aggiorna la visualizzazione dei report
