@@ -306,10 +306,11 @@ async function createDemoReport() {
             }
         ];
         
-        // Genera nome univoco per il report
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
-        const reportName = `Demo_${timestamp}`;
+        // ==== SEZIONE MODIFICATA: Generazione nome demo ====
+        // Genera nome univoco per il report demo
+        const dataOraItaliana = generateItalianDateTime();
+        const reportName = `Demo_CAMP-DEMO_${dataOraItaliana}`;
+        // ==== FINE SEZIONE MODIFICATA ====
         
         // Salva il report demo
         await window.electronAPI.saveReport(`${reportName}.json`, demoData);
@@ -519,13 +520,22 @@ function loadReports() {
             reportsList.sort().reverse().forEach(report => {
                 const reportName = report.replace('.json', '');
                 
+                // ==== SEZIONE MODIFICATA: Estrazione numero campionamento ====
                 // NUOVO: Estrai numero campionamento e metadati
                 let numeroCampionamento = extractNumeroCampionamentoFromReportName(report);
                 let committente = 'Committente Sconosciuto';
                 let date = new Date().toLocaleString('it-IT');
                 
-                // Prova a leggere i metadati dal file (opzionale, per migliorare l'esperienza)
-                // Questo può essere fatto in modo asincrono se necessario
+                // Determina il titolo da mostrare
+                let displayTitle;
+                if (numeroCampionamento !== 'NUMERO_NON_TROVATO' && numeroCampionamento !== 'DEMO') {
+                    displayTitle = `${numeroCampionamento} - ${reportName}`;
+                } else if (numeroCampionamento === 'DEMO') {
+                    displayTitle = `DEMO - ${reportName}`;
+                } else {
+                    displayTitle = reportName;
+                }
+                // ==== FINE SEZIONE MODIFICATA ====
                 
             html += `
                 <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}" data-numero-campionamento="${numeroCampionamento.toLowerCase()}">
@@ -533,7 +543,7 @@ function loadReports() {
                         <i class="fas fa-file-alt"></i>
                     </div>
                     <div class="report-info">
-                        <h4>${numeroCampionamento} - ${reportName}</h4>
+                        <h4>${displayTitle}</h4>
                         <p>Generato il: ${date}</p>
                         <p>Tipo: JSON</p>
                         <div class="report-actions">
@@ -611,12 +621,18 @@ function setupReportFilters() {
         
         let visibleCount = 0;
         
+        // ==== SEZIONE MODIFICATA: Filtro per ricerca ====
         document.querySelectorAll('.report-card').forEach(card => {
             const reportName = card.getAttribute('data-name') || card.querySelector('h4')?.textContent.toLowerCase() || '';
+            const numeroCampionamento = card.getAttribute('data-numero-campionamento') || ''; // NUOVO
             const reportType = card.getAttribute('data-type') || '';
             
-            const matchesSearch = searchTerm === '' || reportName.includes(searchTerm);
+            // NUOVO: Ricerca sia nel nome che nel numero campionamento
+            const matchesSearch = searchTerm === '' || 
+                                 reportName.includes(searchTerm) || 
+                                 numeroCampionamento.includes(searchTerm);
             const matchesFormat = formatValue === 'all' || reportType === formatValue;
+            // ==== FINE SEZIONE MODIFICATA ====
             
             if (matchesSearch && matchesFormat) {
                 card.style.display = 'flex';
@@ -993,10 +1009,26 @@ async function generateClassificationReport(classificationData = null) {
             }
         }
         
-        // Genera nome univoco per il report
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
-        const reportName = `Classificazione_${timestamp}`;
+        // ==== SEZIONE MODIFICATA: Generazione nome report ====
+        let reportName;
+        const metadati = classificationData.metadati || classificationData.data?.metadati;
+        
+        if (metadati && metadati.infoCertificato?.numeroCampionamento) {
+            // NUOVO: Genera nome basato su numero campionamento
+            const numeroCampionamento = metadati.infoCertificato.numeroCampionamento;
+            const dataOraItaliana = generateItalianDateTime();
+            reportName = `risultato_classificazione_${numeroCampionamento}_${dataOraItaliana}`;
+        } else if (metadati && metadati.committente) {
+            // Fallback: usa committente se numero campionamento mancante
+            const committente = metadati.committente.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+            const dataOraItaliana = generateItalianDateTime();
+            reportName = `risultato_classificazione_${committente}_${dataOraItaliana}`;
+        } else {
+            // Fallback finale
+            const dataOraItaliana = generateItalianDateTime();
+            reportName = `risultato_classificazione_GENERICO_${dataOraItaliana}`;
+        }
+        // ==== FINE SEZIONE MODIFICATA ====
         
         // Prepara i dati per il report
         const reportData = [];
@@ -1030,18 +1062,7 @@ async function generateClassificationReport(classificationData = null) {
             reportData.push(...classificationData);
         }
         
-        // Ottieni il percorso della cartella reports
-        const reportsPath = await window.electronAPI.getReportsPath();
-        const reportFilePath = path.join(reportsPath, `${reportName}.json`);
-        
-        // Salva il report in formato JSON
-        const writeResult = await window.electronAPI.writeFile(reportFilePath, JSON.stringify(reportData, null, 2));
-        
-        if (!writeResult.success) {
-            throw new Error(writeResult.message || 'Errore nel salvataggio del report');
-        }
-        
-        // Salva anche come report ufficiale nell'API dedicata
+        // Salva il report
         await window.electronAPI.saveReport(`${reportName}.json`, reportData);
         
         showNotification(`Report "${reportName}" generato con successo!`);
