@@ -103,7 +103,7 @@ function updateClassificationFileSelector(fileList) {
             
             // Aggiungi le opzioni per ogni file CON INFO COMMITTENTE
             filesWithMetadata.forEach(fileInfo => {
-                const displayName = `${fileInfo.committente} - ${fileInfo.dataCampionamento} (${fileInfo.fileName})`;
+                const displayName = `${fileInfo.numeroCampionamento} - ${fileInfo.committente} - ${fileInfo.dataCampionamento}`;
                 selectorHtml += `<option value="${fileInfo.fileName}">${displayName}</option>`;
             });
             
@@ -141,7 +141,7 @@ function updateClassificationFileSelector(fileList) {
                     selectorHtml += `
                         <div class="file-delete-item">
                             <span class="file-name">${displayName}</span>
-                            <button class="btn btn-danger btn-sm" onclick="eliminaFileCampioneConAvviso('${fileInfo.fileName}', '${fileInfo.committente}', '${fileInfo.dataCampionamento}')">
+                            <button class="btn btn-danger btn-sm" onclick="eliminaFileCampioneConAvviso('${fileInfo.fileName}', '${fileInfo.committente}', '${fileInfo.dataCampionamento}', '${fileInfo.numeroCampionamento}')">
                                 <i class="fas fa-trash"></i> Elimina
                             </button>
                         </div>
@@ -187,11 +187,12 @@ function updateClassificationFileSelector(fileList) {
 }
 
 // NUOVO: Funzione per eliminazione con avviso committente
-async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionamento) {
+async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionamento, numeroCampionamento) {
     try {
         // Mostra conferma con info committente
         const conferma = confirm(
             `Sei sicuro di voler eliminare questa classificazione?\n\n` +
+            `Numero campionamento: ${numeroCampionamento}\n` +
             `Committente: ${committente}\n` +
             `Data campionamento: ${dataCampionamento}\n` +
             `File: ${fileName}\n\n` +
@@ -205,7 +206,7 @@ async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionam
         
         if (result.success) {
             showNotification(
-                `Classificazione eliminata: ${result.committente} (${result.dataCampionamento})`, 
+                `Classificazione eliminata: ${result.numeroCampionamento} - ${result.committente}`, 
                 'success'
             );
             
@@ -215,7 +216,7 @@ async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionam
             // Aggiungi attività
             addActivity(
                 'Classificazione eliminata', 
-                `${result.committente} - ${result.dataCampionamento}`, 
+                `${result.numeroCampionamento} - ${result.committente}`, 
                 'fas fa-trash'
             );
         } else {

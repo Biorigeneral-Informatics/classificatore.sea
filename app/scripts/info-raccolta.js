@@ -76,6 +76,7 @@ class InfoRaccoltaManager {
         // Raccoglie i dati dal Form 2: Informazioni Certificato
         const infoCertificato = {
             rapportoProva: document.getElementById('rapportoProva').value,
+            numeroCampionamento: document.getElementById('numeroCampionamento').value.trim(), // NUOVO CAMPO
             descrizione: document.getElementById('descrizione').value,
             dataCampionamento: document.getElementById('dataCampionamento').value,
             dataStampa: document.getElementById('dataStampa').value,
@@ -93,6 +94,14 @@ class InfoRaccoltaManager {
     }
 
     validateForms() {
+        // NUOVO: Validazione specifica per numero campionamento
+        const numeroCampionamento = document.getElementById('numeroCampionamento').value.trim();
+        if (!numeroCampionamento) {
+            showNotification('Il numero di campionamento è obbligatorio', 'error');
+            document.getElementById('numeroCampionamento').focus();
+            return false;
+        }
+
         // Valida Form 1
         const form1 = document.getElementById('caratteristicheFisicheForm');
         const form2 = document.getElementById('infoCertificatoForm');
@@ -103,13 +112,17 @@ class InfoRaccoltaManager {
         const isForm2Valid = Array.from(form2.querySelectorAll('input[required], textarea[required], select[required]'))
             .every(input => input.value.trim() !== '');
 
-        return isForm1Valid && isForm2Valid;
+        if (!isForm1Valid || !isForm2Valid) {
+            showNotification('Completa tutti i campi obbligatori dei form', 'warning');
+            return false;
+        }
+
+        return true;
     }
 
     async saveFormData() {
         try {
             if (!this.validateForms()) {
-                showNotification('Completa tutti i campi obbligatori dei form', 'warning');
                 return false;
             }
 
@@ -120,8 +133,9 @@ class InfoRaccoltaManager {
                 // Salva anche in sessionStorage per uso immediato
                 sessionStorage.setItem('infoRaccolta', JSON.stringify(formData));
                 
-                // Log per verificare se gasolio è stato salvato correttamente
+                // Log per verificare se i dati sono stati salvati correttamente
                 console.log('Informazioni raccolta salvate:', formData);
+                console.log('Numero campionamento:', formData.infoCertificato.numeroCampionamento);
                 console.log('Opzione gasolio:', formData.caratteristicheFisiche.gasolio);
                 
                 return true;
@@ -182,7 +196,7 @@ class InfoRaccoltaManager {
             }
         }
 
-        // Popola Form 2: Informazioni Certificato
+        // Popola Form 2: Informazioni Certificato (AGGIORNATO per includere numeroCampionamento)
         const ic = data.infoCertificato;
         if (ic) {
             Object.keys(ic).forEach(key => {

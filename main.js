@@ -6,6 +6,45 @@ const { spawn } = require('child_process');
 const os = require('os');
 const Database = require('better-sqlite3');
 
+
+function generateItalianDateTime() {
+    const now = new Date();
+    return now.toLocaleString('it-IT', {
+        timeZone: 'Europe/Rome',
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    }).replace(/[\/\s:]/g, '-').replace(/--/g, '_'); // 25-12-2024_14-30-25
+}
+
+// Funzione helper per estrarre numero campionamento dal nome file
+function extractNumeroCampionamentoFromFileName(fileName) {
+    // Prova formato nuovo: dati_campione_NUMERO_data.json
+    const newFormatMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
+    if (newFormatMatch) {
+        return newFormatMatch[1];
+    }
+    
+    // Fallback formato vecchio: dati_campione_timestamp.json
+    const oldFormatMatch = fileName.match(/dati_campione_(\d{14})/);
+    if (oldFormatMatch) {
+        return `LEGACY_${oldFormatMatch[1]}`;
+    }
+    
+    return 'NUMERO_NON_TROVATO';
+}
+
+
+
+
+
+
+
+
+
 // Funzione semplificata per inizializzare il database in userData
 function initializeDatabase() {
   const userDataPath = app.getPath('userData');
@@ -872,12 +911,13 @@ app.whenReady().then(async () => {
                         };
                     } catch (e) {
                         console.warn(`Errore nel leggere metadati da ${fileName}:`, e.message);
-                        return {
-                            fileName,
-                            committente: 'Errore lettura',
-                            dataCampionamento: 'N/A',
-                            idProgetto: 'N/A'
-                        };
+                      return {
+                          fileName,
+                          committente: metadata.committente || 'Committente Sconosciuto',
+                          dataCampionamento: metadata.dataCampionamento || 'Data non disponibile',
+                          numeroCampionamento: metadata.infoCertificato?.numeroCampionamento || extractNumeroCampionamentoFromFileName(fileName), // NUOVO
+                          idProgetto: metadata.idProgetto || 'ID non disponibile'
+                      };
                     }
                 })
                 .sort((a, b) => {
@@ -912,10 +952,31 @@ app.whenReady().then(async () => {
             const originalPath = path.join(campioneDir, fileName);
             
             // Genera nome per il risultato archiviato
-            const timestamp = fileName.match(/dati_campione_(\d{14})/)?.[1] || Date.now().toString();
-            const resultFileName = `risultato_classificazione_${timestamp}.json`;
+            // Estrai numero campionamento dal nome file o dai metadati
+            let numeroCampionamento = 'CAMP_MANCANTE';
+
+            // Prova a estrarre dal nome del file (nuovo formato)
+            const newFormatMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
+            if (newFormatMatch) {
+                numeroCampionamento = newFormatMatch[1];
+            } else {
+                // Prova a estrarre dai metadati del risultato di classificazione
+                const metadata = classificationResult.data?._metadata;
+                if (metadata?.infoCertificato?.numeroCampionamento) {
+                    numeroCampionamento = metadata.infoCertificato.numeroCampionamento;
+                } else {
+                    // Fallback: prova a estrarre dal vecchio formato timestamp
+                    const oldFormatMatch = fileName.match(/dati_campione_(\d{14})/);
+                    if (oldFormatMatch) {
+                        numeroCampionamento = `LEGACY_${oldFormatMatch[1]}`;
+                    }
+                }
+            }
+
+            const dataOraItaliana = generateItalianDateTime();
+            const resultFileName = `risultato_classificazione_${numeroCampionamento}_${dataOraItaliana}.json`;
             const resultPath = path.join(archiveDir, resultFileName);
-            
+                        
             // Salva il risultato della classificazione in archiviati
             fs.writeFileSync(resultPath, JSON.stringify(classificationResult, null, 2));
             console.log(`Risultato classificazione salvato in: ${resultPath}`);
@@ -1747,7 +1808,8 @@ ipcMain.handle('delete-campione-file-with-warning', async (event, fileName) => {
         // Leggi i metadati per l'avviso
         let committente = 'Committente Sconosciuto';
         let dataCampionamento = 'Data non disponibile';
-        
+        let numeroCampionamento = 'NUMERO_NON_TROVATO';
+
         try {
             const fileContent = fs.readFileSync(filePath, 'utf8');
             const data = JSON.parse(fileContent);
@@ -1755,8 +1817,10 @@ ipcMain.handle('delete-campione-file-with-warning', async (event, fileName) => {
             
             committente = metadata.committente || 'Committente Sconosciuto';
             dataCampionamento = metadata.dataCampionamento || 'Data non disponibile';
+            numeroCampionamento = metadata.infoCertificato?.numeroCampionamento || extractNumeroCampionamentoFromFileName(fileName); // NUOVO
         } catch (e) {
             console.warn('Impossibile leggere metadati per avviso eliminazione');
+            numeroCampionamento = extractNumeroCampionamentoFromFileName(fileName); // Fallback
         }
         
         // Elimina il file
@@ -1766,7 +1830,8 @@ ipcMain.handle('delete-campione-file-with-warning', async (event, fileName) => {
             success: true,
             message: `File eliminato: ${fileName}`,
             committente,
-            dataCampionamento
+            dataCampionamento,
+            numeroCampionamento // NUOVO
         };
     } catch (error) {
         console.error('Errore nell\'eliminazione del file campione:', error);

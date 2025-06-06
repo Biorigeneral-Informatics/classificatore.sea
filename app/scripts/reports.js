@@ -1,3 +1,63 @@
+// Aggiungere dopo i commenti iniziali, prima di initReports()
+function generateItalianDateTime() {
+    const now = new Date();
+    return now.toLocaleString('it-IT', {
+        timeZone: 'Europe/Rome',
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    }).replace(/[\/\s:]/g, '-').replace(/--/g, '_'); // 25-12-2024_14-30-25
+}
+
+// Funzione per estrarre numero campionamento dal nome del report
+function extractNumeroCampionamentoFromReportName(reportName) {
+    // Prova formato nuovo: risultato_classificazione_NUMERO_data.json
+    const newFormatMatch = reportName.match(/risultato_classificazione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
+    if (newFormatMatch) {
+        return newFormatMatch[1];
+    }
+    
+    // Fallback formato vecchio timestamp
+    const oldFormatMatch = reportName.match(/risultato_classificazione_(\d{14})/);
+    if (oldFormatMatch) {
+        return `LEGACY_${oldFormatMatch[1]}`;
+    }
+    
+    // Altri formati (Demo, ecc.)
+    if (reportName.startsWith('Demo_')) {
+        return 'DEMO';
+    }
+    
+    return 'NUMERO_NON_TROVATO';
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * Inizializza completamente la sezione Reports
  */
@@ -458,15 +518,22 @@ function loadReports() {
             // Ordina dal più recente
             reportsList.sort().reverse().forEach(report => {
                 const reportName = report.replace('.json', '');
-                const date = new Date().toLocaleString('it-IT');
+                
+                // NUOVO: Estrai numero campionamento e metadati
+                let numeroCampionamento = extractNumeroCampionamentoFromReportName(report);
+                let committente = 'Committente Sconosciuto';
+                let date = new Date().toLocaleString('it-IT');
+                
+                // Prova a leggere i metadati dal file (opzionale, per migliorare l'esperienza)
+                // Questo può essere fatto in modo asincrono se necessario
                 
             html += `
-                <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}">
+                <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}" data-numero-campionamento="${numeroCampionamento.toLowerCase()}">
                     <div class="report-icon">
                         <i class="fas fa-file-alt"></i>
                     </div>
                     <div class="report-info">
-                        <h4>${reportName}</h4>
+                        <h4>${numeroCampionamento} - ${reportName}</h4>
                         <p>Generato il: ${date}</p>
                         <p>Tipo: JSON</p>
                         <div class="report-actions">

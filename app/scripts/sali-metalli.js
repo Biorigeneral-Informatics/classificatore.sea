@@ -20,28 +20,18 @@ let metalliDizionario = {};
 
 
 
-function generateItalianTimestamp() {
+// Funzione per generare data/ora in formato italiano
+function generateItalianDateTime() {
     const now = new Date();
-    const formatter = new Intl.DateTimeFormat('en-CA', {
+    return now.toLocaleString('it-IT', {
         timeZone: 'Europe/Rome',
         year: 'numeric',
-        month: '2-digit',
+        month: '2-digit', 
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-    });
-    
-    const parts = formatter.formatToParts(now);
-    const timestamp = parts.find(p => p.type === 'year').value +
-                     parts.find(p => p.type === 'month').value +
-                     parts.find(p => p.type === 'day').value +
-                     parts.find(p => p.type === 'hour').value +
-                     parts.find(p => p.type === 'minute').value +
-                     parts.find(p => p.type === 'second').value;
-    
-    return timestamp;
+        second: '2-digit'
+    }).replace(/[\/\s:]/g, '-').replace(/--/g, '_'); // 25-12-2024_14-30-25
 }
 
 // Funzione per caricare tutti i metalli dal database
@@ -452,8 +442,9 @@ async function assegnaSaliMetalli() {
             }
             
             // Genera timestamp per il nome del file
-            const timestamp = generateItalianTimestamp();
-            const fileName = `dati_campione_${timestamp}.json`;
+            const numeroCampionamento = metadatiProgetto?.infoCertificato?.numeroCampionamento || 'CAMP_MANCANTE';
+            const dataOraItaliana = generateItalianDateTime();
+            const fileName = `dati_campione_${numeroCampionamento}_${dataOraItaliana}.json`;
             
             // Salva il file con i metadati inclusi
             const saveResult = await window.electronAPI.saveCampioneData(datiCampione, fileName);
@@ -792,8 +783,8 @@ async function initSaliMetalli() {
 async function salvaFileConTimestamp(datiCampione) {
     try {
         // Genera timestamp per il nome del file
-        const timestamp = generateItalianTimestamp();
-        const fileName = `dati_campione_${timestamp}.json`;
+        const dataOraItaliana = generateItalianDateTime();
+        const fileName = `dati_campione_GENERICO_${dataOraItaliana}.json`;
         
         // Verifica quanti file ci sono già nella cartella
         const fileList = await window.electronAPI.getCampioneFiles();
