@@ -83,13 +83,13 @@ async function updateClassificationUI() {
 
 
 // Nuova funzione per creare il selettore di file e gestire il limite
-// MODIFICATO: updateClassificationFileSelector con info committente
+// MODIFICATO: updateClassificationFileSelector con display codice EER - dataOra - committente
 function updateClassificationFileSelector(fileList) {
     const fileInfoElement = document.getElementById('classificationFileInfo');
     
     if (!fileInfoElement) return;
     
-    // NUOVO: Ottieni file con metadati
+    // NUOVO: Ottieni file con metadati basati su codice EER
     window.electronAPI.getCampioneFilesWithMetadata()
         .then(filesWithMetadata => {
             // Crea il selettore di file
@@ -101,9 +101,9 @@ function updateClassificationFileSelector(fileList) {
                             <option value="">Seleziona un file...</option>
             `;
             
-            // Aggiungi le opzioni per ogni file CON INFO COMMITTENTE
+            // MODIFICATO: Display con codice EER - dataOra - committente
             filesWithMetadata.forEach(fileInfo => {
-                const displayName = `${fileInfo.numeroCampionamento} - ${fileInfo.committente} - ${fileInfo.dataCampionamento}`;
+                const displayName = `${fileInfo.codiceEER} - ${fileInfo.dataOra} - ${fileInfo.committente}`;
                 selectorHtml += `<option value="${fileInfo.fileName}">${displayName}</option>`;
             });
             
@@ -116,7 +116,7 @@ function updateClassificationFileSelector(fileList) {
                 </div>
             `;
             
-            // MODIFICATO: Sezione eliminazione con info committente
+            // MODIFICATO: Sezione eliminazione con info codice EER
             if (filesWithMetadata.length > 0) {
                 const headerText = filesWithMetadata.length >= 8 
                     ? '<i class="fas fa-exclamation-triangle"></i><span>Limite massimo raggiunto (8/8 file)</span>' 
@@ -136,12 +136,12 @@ function updateClassificationFileSelector(fileList) {
                 `;
                 
                 filesWithMetadata.forEach(fileInfo => {
-                    const displayName = `${fileInfo.committente} - ${fileInfo.dataCampionamento}`;
+                    const displayName = `${fileInfo.codiceEER} - ${fileInfo.dataOra} - ${fileInfo.committente}`;
                     
                     selectorHtml += `
                         <div class="file-delete-item">
                             <span class="file-name">${displayName}</span>
-                            <button class="btn btn-danger btn-sm" onclick="eliminaFileCampioneConAvviso('${fileInfo.fileName}', '${fileInfo.committente}', '${fileInfo.dataCampionamento}', '${fileInfo.numeroCampionamento}')">
+                            <button class="btn btn-danger btn-sm" onclick="eliminaFileCampioneConAvviso('${fileInfo.fileName}', '${fileInfo.codiceEER}', '${fileInfo.dataOra}', '${fileInfo.committente}')">
                                 <i class="fas fa-trash"></i> Elimina
                             </button>
                         </div>
@@ -156,7 +156,7 @@ function updateClassificationFileSelector(fileList) {
             
             fileInfoElement.innerHTML = selectorHtml;
             
-            // Aggiungi event listener al selettore (codice esistente)
+            // Event listener esistente rimane invariato
             const select = document.getElementById('campioneFileSelect');
             if (select) {
                 select.addEventListener('change', function() {
@@ -181,20 +181,20 @@ function updateClassificationFileSelector(fileList) {
         })
         .catch(error => {
             console.error('Errore nel caricamento file con metadati:', error);
-            // Fallback alla versione originale
             fileInfoElement.innerHTML = '<p>Errore nel caricamento dei file</p>';
         });
 }
 
 // NUOVO: Funzione per eliminazione con avviso committente
-async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionamento, numeroCampionamento) {
+// MODIFICATO: Funzione per eliminazione con avviso usando codice EER
+async function eliminaFileCampioneConAvviso(fileName, codiceEER, dataOra, committente) {
     try {
-        // Mostra conferma con info committente
+        // Mostra conferma con info codice EER
         const conferma = confirm(
             `Sei sicuro di voler eliminare questa classificazione?\n\n` +
-            `Numero campionamento: ${numeroCampionamento}\n` +
+            `Codice EER: ${codiceEER}\n` +
+            `Data e ora: ${dataOra}\n` +
             `Committente: ${committente}\n` +
-            `Data campionamento: ${dataCampionamento}\n` +
             `File: ${fileName}\n\n` +
             `⚠️ ATTENZIONE: Questa azione eliminerà definitivamente la classificazione!`
         );
@@ -206,7 +206,7 @@ async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionam
         
         if (result.success) {
             showNotification(
-                `Classificazione eliminata: ${result.numeroCampionamento} - ${result.committente}`, 
+                `Classificazione eliminata: ${result.codiceEER} - ${result.committente}`, 
                 'success'
             );
             
@@ -216,7 +216,7 @@ async function eliminaFileCampioneConAvviso(fileName, committente, dataCampionam
             // Aggiungi attività
             addActivity(
                 'Classificazione eliminata', 
-                `${result.numeroCampionamento} - ${result.committente}`, 
+                `${result.codiceEER} - ${result.committente}`, 
                 'fas fa-trash'
             );
         } else {

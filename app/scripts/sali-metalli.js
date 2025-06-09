@@ -292,7 +292,7 @@ function updateMetalliConcentrations(excelData) {
 }
 
 // Funzione per assegnare i sali selezionati ai metalli e calcolare le concentrazioni aggiustate
-// MODIFICATO: assegnaSaliMetalli per includere metadati ed eliminare progetto temporaneo
+// MODIFICATO: assegnaSaliMetalli per usare codice EER nel nome file
 async function assegnaSaliMetalli() {
     try {
         // Crea un dizionario con le selezioni sale-metallo
@@ -353,7 +353,8 @@ async function assegnaSaliMetalli() {
                 metadatiProgetto = {
                     committente: progettoResult.data.infoCertificato?.committente || 'Committente Sconosciuto',
                     dataCampionamento: progettoResult.data.infoCertificato?.dataCampionamento || new Date().toISOString().split('T')[0],
-                    codiceEER: progettoResult.data.infoCertificato?.codiceEER || 'Da definire',
+                    codiceEER: progettoResult.data.infoCertificato?.codiceEER || 'EER_MANCANTE', // NUOVO
+                    numeroCampionamento: progettoResult.data.infoCertificato?.numeroCampionamento, // Mantieni per compatibilità
                     caratteristicheFisiche: progettoResult.data.caratteristicheFisiche || {},
                     infoCertificato: progettoResult.data.infoCertificato || {},
                     timestampProgetto: progettoResult.data.timestamp,
@@ -441,27 +442,37 @@ async function assegnaSaliMetalli() {
                 return {};
             }
             
-            // Genera timestamp per il nome del file
-            const numeroCampionamento = metadatiProgetto?.infoCertificato?.numeroCampionamento || 'CAMP_MANCANTE';
+            // MODIFICATO: Genera nome file con codice EER
+            const codiceEER = metadatiProgetto?.codiceEER || 'EER_MANCANTE';
+            const committente = metadatiProgetto?.committente || 'Committente_Sconosciuto';
             const dataOraItaliana = generateItalianDateTime();
-            const fileName = `dati_campione_${numeroCampionamento}_${dataOraItaliana}.json`;
+            
+            // Sanifica committente per nome file
+            const committenteSanificato = committente
+                .replace(/[^a-zA-Z0-9]/g, '')
+                .substring(0, 20);
+            
+            // NUOVO FORMATO: dati_campione_{codiceEER}_{dataOraItaliana}_{committente}.json
+            const fileName = `dati_campione_${codiceEER}_${dataOraItaliana}_${committenteSanificato}.json`;
+            
+            console.log(`📁 Generato nome file: ${fileName}`);
             
             // Salva il file con i metadati inclusi
             const saveResult = await window.electronAPI.saveCampioneData(datiCampione, fileName);
             
             if (saveResult.success) {
-                console.log(` File ${fileName} salvato con successo con metadati inclusi`);
+                console.log(`✅ File ${fileName} salvato con successo con metadati inclusi`);
                 
                 // NUOVO: Elimina il progetto temporaneo dopo il successo
                 try {
                     const deleteResult = await window.electronAPI.deleteProgettoRaccolta();
                     if (deleteResult.success) {
-                        console.log(" Progetto temporaneo eliminato con successo");
+                        console.log("🗑️ Progetto temporaneo eliminato con successo");
                     } else {
-                        console.warn(" Progetto temporaneo non eliminato:", deleteResult.message);
+                        console.warn("⚠️ Progetto temporaneo non eliminato:", deleteResult.message);
                     }
                 } catch (deleteError) {
-                    console.warn(" Errore nell'eliminazione del progetto temporaneo:", deleteError.message);
+                    console.warn("⚠️ Errore nell'eliminazione del progetto temporaneo:", deleteError.message);
                     // Non bloccare il flusso se l'eliminazione fallisce
                 }
                 

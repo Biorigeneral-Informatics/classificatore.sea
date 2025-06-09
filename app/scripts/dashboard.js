@@ -1464,3 +1464,62 @@ async function deleteFile(filePath) {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+// Funzione per estrarre codice EER dal nome file (per uso in dashboard.js)
+function extractCodiceEERFromFileName(fileName) {
+    // Prova formato nuovo: dati_campione_CODICE-EER_data_committente.json
+    const newFormatMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}_(.+?)\.json/);
+    if (newFormatMatch) {
+        return newFormatMatch[1]; // Restituisce il codice EER
+    }
+    
+    // Fallback formato vecchio con numero campionamento per compatibilità
+    const oldNumeroCampionamentoMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
+    if (oldNumeroCampionamentoMatch) {
+        return `LEGACY_${oldNumeroCampionamentoMatch[1]}`;
+    }
+    
+    // Fallback formato molto vecchio con timestamp
+    const oldFormatMatch = fileName.match(/dati_campione_(\d{14})/);
+    if (oldFormatMatch) {
+        return `TIMESTAMP_${oldFormatMatch[1]}`;
+    }
+    
+    return 'CODICE_EER_NON_TROVATO';
+}
+
+// Funzione per estrarre committente dal nome file
+function extractCommittenteFromFileName(fileName) {
+    // Formato: dati_campione_CODICE-EER_data_COMMITTENTE.json
+    const match = fileName.match(/dati_campione_.+?_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}_(.+?)\.json/);
+    if (match) {
+        return match[1].replace(/_/g, ' '); // Riconverti underscore in spazi
+    }
+    
+    return 'Committente_Sconosciuto';
+}
+
+// Funzione per estrarre data e ora dal nome file
+function extractDataOraFromFileName(fileName) {
+    // Estrai timestamp dal nome file
+    const match = fileName.match(/(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})/);
+    if (match) {
+        return match[1].replace(/_/g, ' '); // Formato: 25-12-2024 14-30-25
+    }
+    
+    return 'Data_Non_Disponibile';
+}
+
+// Rendi le funzioni disponibili globalmente
+window.extractCodiceEERFromFileName = extractCodiceEERFromFileName;
+window.extractCommittenteFromFileName = extractCommittenteFromFileName;
+window.extractDataOraFromFileName = extractDataOraFromFileName;

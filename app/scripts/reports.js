@@ -13,8 +13,8 @@ function generateItalianDateTime() {
 }
 
 // Funzione per estrarre numero campionamento dal nome del report
-function extractNumeroCampionamentoFromReportName(reportName) {
-    // Prova formato nuovo: risultato_classificazione_NUMERO_data.json
+function extractCodiceEERFromReportName(reportName) {
+    // Prova formato nuovo: risultato_classificazione_CODICE-EER_data.json
     const newFormatMatch = reportName.match(/risultato_classificazione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
     if (newFormatMatch) {
         return newFormatMatch[1];
@@ -31,7 +31,7 @@ function extractNumeroCampionamentoFromReportName(reportName) {
         return 'DEMO';
     }
     
-    return 'NUMERO_NON_TROVATO';
+    return 'CODICE_EER_NON_TROVATO';
 }
 
 
@@ -272,6 +272,7 @@ function initNotesSystemEventListeners() {
 /**
  * Crea un report demo per testare il sistema
  */
+// MODIFICATO: createDemoReport con nome basato su codice EER
 async function createDemoReport() {
     try {
         // Crea dati demo
@@ -306,11 +307,9 @@ async function createDemoReport() {
             }
         ];
         
-        // ==== SEZIONE MODIFICATA: Generazione nome demo ====
-        // Genera nome univoco per il report demo
+        // MODIFICATO: Generazione nome demo con codice EER
         const dataOraItaliana = generateItalianDateTime();
-        const reportName = `Demo_CAMP-DEMO_${dataOraItaliana}`;
-        // ==== FINE SEZIONE MODIFICATA ====
+        const reportName = `Demo_EER-DEMO_${dataOraItaliana}`;
         
         // Salva il report demo
         await window.electronAPI.saveReport(`${reportName}.json`, demoData);
@@ -473,6 +472,7 @@ function showCustomAlert(message, onConfirm, onCancel) {
 // Funzioni per la sezione Reports
 
 // Carica e visualizza i report disponibili
+// MODIFICATO: loadReports con display codice EER
 function loadReports() {
     try {
         console.log("Inizio caricamento reports");
@@ -520,57 +520,55 @@ function loadReports() {
             reportsList.sort().reverse().forEach(report => {
                 const reportName = report.replace('.json', '');
                 
-                // ==== SEZIONE MODIFICATA: Estrazione numero campionamento ====
-                // NUOVO: Estrai numero campionamento e metadati
-                let numeroCampionamento = extractNumeroCampionamentoFromReportName(report);
+                // MODIFICATO: Estrazione codice EER e metadati
+                let codiceEER = extractCodiceEERFromReportName(report);
                 let committente = 'Committente Sconosciuto';
                 let date = new Date().toLocaleString('it-IT');
                 
                 // Determina il titolo da mostrare
                 let displayTitle;
-                if (numeroCampionamento !== 'NUMERO_NON_TROVATO' && numeroCampionamento !== 'DEMO') {
-                    displayTitle = `${numeroCampionamento} - ${reportName}`;
-                } else if (numeroCampionamento === 'DEMO') {
+                if (codiceEER !== 'CODICE_EER_NON_TROVATO' && codiceEER !== 'DEMO') {
+                    displayTitle = `${codiceEER} - ${reportName}`;
+                } else if (codiceEER === 'DEMO') {
                     displayTitle = `DEMO - ${reportName}`;
                 } else {
                     displayTitle = reportName;
                 }
-                // ==== FINE SEZIONE MODIFICATA ====
                 
-            html += `
-                <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}" data-numero-campionamento="${numeroCampionamento.toLowerCase()}">
-                    <div class="report-icon">
-                        <i class="fas fa-file-alt"></i>
-                    </div>
-                    <div class="report-info">
-                        <h4>${displayTitle}</h4>
-                        <p>Generato il: ${date}</p>
-                        <p>Tipo: JSON</p>
-                        <div class="report-actions">
-                            <button class="action-btn" onclick="previewReport('${report}')" title="Anteprima">
-                                <i class="fas fa-eye"></i>
-                                <span>Anteprima</span>
-                            </button>
-                            <button class="action-btn" onclick="exportReport('${report}', 'excel')" title="Esporta Excel">
-                                <i class="fas fa-file-excel"></i>
-                                <span>Excel</span>
-                            </button>
-                            <button class="action-btn" onclick="exportReport('${report}', 'pdf')" title="Esporta PDF">
-                                <i class="fas fa-file-pdf"></i>
-                                <span>PDF</span>
-                            </button>
-                            <button class="action-btn" onclick="openNotes('${report}')" title="Note">
-                                <i class="fas fa-sticky-note"></i>
-                                <span>Note</span>
-                            </button>
-                            <button class="action-btn delete-btn" onclick="deleteReport('${report}')" title="Elimina">
-                                <i class="fas fa-trash"></i>
-                                <span>Elimina</span>
-                            </button>
+                html += `
+                    <div class="report-card" data-type="json" data-name="${reportName.toLowerCase()}" data-codice-eer="${codiceEER.toLowerCase()}">
+                        <div class="report-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="report-info">
+                            <h4>${displayTitle}</h4>
+                            <p>Generato il: ${date}</p>
+                            <p>Tipo: JSON</p>
+                            <div class="report-actions">
+                                <button class="action-btn" onclick="previewReport('${report}')" title="Anteprima">
+                                    <i class="fas fa-eye"></i>
+                                    <span>Anteprima</span>
+                                </button>
+                                <button class="action-btn" onclick="exportReport('${report}', 'excel')" title="Esporta Excel">
+                                    <i class="fas fa-file-excel"></i>
+                                    <span>Excel</span>
+                                </button>
+                                <button class="action-btn" onclick="exportReport('${report}', 'pdf')" title="Esporta PDF">
+                                    <i class="fas fa-file-pdf"></i>
+                                    <span>PDF</span>
+                                </button>
+                                <button class="action-btn" onclick="openNotes('${report}')" title="Note">
+                                    <i class="fas fa-sticky-note"></i>
+                                    <span>Note</span>
+                                </button>
+                                <button class="action-btn delete-btn" onclick="deleteReport('${report}')" title="Elimina">
+                                    <i class="fas fa-trash"></i>
+                                    <span>Elimina</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
             });
             
             // Aggiorna il container con i dati
@@ -605,6 +603,7 @@ function loadReports() {
 }
 
 // Funzione per inizializzare i filtri e la ricerca dei report
+// MODIFICATO: setupReportFilters con supporto ricerca codice EER
 function setupReportFilters() {
     const searchInput = document.getElementById('reportSearchInput');
     const formatFilter = document.getElementById('reportFormatFilter');
@@ -621,18 +620,17 @@ function setupReportFilters() {
         
         let visibleCount = 0;
         
-        // ==== SEZIONE MODIFICATA: Filtro per ricerca ====
+        // MODIFICATO: Filtro per ricerca che include codice EER
         document.querySelectorAll('.report-card').forEach(card => {
             const reportName = card.getAttribute('data-name') || card.querySelector('h4')?.textContent.toLowerCase() || '';
-            const numeroCampionamento = card.getAttribute('data-numero-campionamento') || ''; // NUOVO
+            const codiceEER = card.getAttribute('data-codice-eer') || ''; // NUOVO
             const reportType = card.getAttribute('data-type') || '';
             
-            // NUOVO: Ricerca sia nel nome che nel numero campionamento
+            // NUOVO: Ricerca sia nel nome che nel codice EER
             const matchesSearch = searchTerm === '' || 
                                  reportName.includes(searchTerm) || 
-                                 numeroCampionamento.includes(searchTerm);
+                                 codiceEER.includes(searchTerm);
             const matchesFormat = formatValue === 'all' || reportType === formatValue;
-            // ==== FINE SEZIONE MODIFICATA ====
             
             if (matchesSearch && matchesFormat) {
                 card.style.display = 'flex';
@@ -1002,86 +1000,107 @@ async function generateClassificationReport(classificationData = null) {
             }
             try {
                 classificationData = JSON.parse(dataStr);
-            } catch (e) {
-                console.error('Errore nel parsing dei dati di classificazione:', e);
-                showNotification('Formato dati non valido', 'error');
-                return null;
-            }
-        }
-        
-        // ==== SEZIONE MODIFICATA: Generazione nome report ====
-        let reportName;
-        const metadati = classificationData.metadati || classificationData.data?.metadati;
-        
-        if (metadati && metadati.infoCertificato?.numeroCampionamento) {
-            // NUOVO: Genera nome basato su numero campionamento
-            const numeroCampionamento = metadati.infoCertificato.numeroCampionamento;
-            const dataOraItaliana = generateItalianDateTime();
-            reportName = `risultato_classificazione_${numeroCampionamento}_${dataOraItaliana}`;
-        } else if (metadati && metadati.committente) {
-            // Fallback: usa committente se numero campionamento mancante
-            const committente = metadati.committente.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
-            const dataOraItaliana = generateItalianDateTime();
-            reportName = `risultato_classificazione_${committente}_${dataOraItaliana}`;
-        } else {
-            // Fallback finale
-            const dataOraItaliana = generateItalianDateTime();
-            reportName = `risultato_classificazione_GENERICO_${dataOraItaliana}`;
-        }
-        // ==== FINE SEZIONE MODIFICATA ====
-        
-        // Prepara i dati per il report
-        const reportData = [];
-        
-        // Se i dati provengono dal classificatore, estraili correttamente
-        if (classificationData.data && classificationData.data.campione) {
-            const campione = classificationData.data.campione;
-            const hp = classificationData.data.caratteristiche_pericolo || [];
-            
-            // Crea un oggetto riassuntivo per ogni sostanza
-            for (const [sostanza, info] of Object.entries(campione)) {
-                reportData.push({
-                    'Sostanza': sostanza,
-                    'Concentrazione (ppm)': info.concentrazione_ppm || 0,
-                    'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
-                    'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
-                    'CAS': info.cas || 'N/A'
-                });
-            }
-            
-            // Aggiungi una riga con il risultato complessivo
-            reportData.push({
-                'Sostanza': '** RISULTATO TOTALE **',
-                'Concentrazione (ppm)': '',
-                'Frasi H': '',
-                'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
-                'CAS': ''
-            });
-        } else if (Array.isArray(classificationData)) {
-            // Se i dati sono già in formato tabellare, usali direttamente
-            reportData.push(...classificationData);
-        }
-        
-        // Salva il report
-        await window.electronAPI.saveReport(`${reportName}.json`, reportData);
-        
-        showNotification(`Report "${reportName}" generato con successo!`);
-        
-        // Aggiorna la visualizzazione dei report
-        await loadReports();
-        
-        // Vai alla sezione report
-        showSection('report');
-        
-        // Aggiunge l'attività
-        addActivity('Report generato', reportName, 'fas fa-file-alt');
-        
-        return reportName;
-    } catch (error) {
-        console.error('Errore nella generazione del report:', error);
-        showNotification('Errore nella generazione del report: ' + error.message, 'error');
-        return null;
-    }
+                } catch (e) {
+               console.error('Errore nel parsing dei dati di classificazione:', e);
+               showNotification('Formato dati non valido', 'error');
+               return null;
+           }
+       }
+       
+       // MODIFICATO: Generazione nome report con codice EER
+       let reportName;
+       const metadati = classificationData.metadati || classificationData.data?._metadata;
+       
+       if (metadati && metadati.infoCertificato?.codiceEER) {
+           // NUOVO: Genera nome basato su codice EER
+           const codiceEER = metadati.infoCertificato.codiceEER;
+           const dataOraItaliana = generateItalianDateTime();
+           reportName = `risultato_classificazione_${codiceEER}_${dataOraItaliana}`;
+       } else if (metadati && metadati.infoCertificato?.numeroCampionamento) {
+           // Fallback: usa numero campionamento se codice EER mancante
+           const numeroCampionamento = metadati.infoCertificato.numeroCampionamento;
+           const dataOraItaliana = generateItalianDateTime();
+           reportName = `risultato_classificazione_${numeroCampionamento}_${dataOraItaliana}`;
+       } else if (metadati && metadati.committente) {
+           // Fallback: usa committente se entrambi mancanti
+           const committente = metadati.committente.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
+           const dataOraItaliana = generateItalianDateTime();
+           reportName = `risultato_classificazione_${committente}_${dataOraItaliana}`;
+       } else {
+           // Fallback finale
+           const dataOraItaliana = generateItalianDateTime();
+           reportName = `risultato_classificazione_GENERICO_${dataOraItaliana}`;
+       }
+       
+       // Prepara i dati per il report INCLUDENDO i metadati
+       const reportData = {
+           // NUOVO: Metadati per aggregazione futura
+           _metadata: metadati || {
+               committente: 'Committente Sconosciuto',
+               dataCampionamento: new Date().toISOString().split('T')[0],
+               timestampClassificazione: new Date().toISOString()
+           },
+           
+           // Dati di classificazione esistenti
+           risultati_classificazione: [],
+           caratteristiche_pericolo: classificationData.caratteristiche_pericolo || [],
+           timestamp_elaborazione: new Date().toISOString()
+       };
+       
+       // Se i dati provengono dal classificatore, estraili correttamente
+       if (classificationData.data && classificationData.data.campione) {
+           const campione = classificationData.data.campione;
+           const hp = classificationData.data.caratteristiche_pericolo || [];
+           
+           // Crea un oggetto riassuntivo per ogni sostanza
+           for (const [sostanza, info] of Object.entries(campione)) {
+               reportData.risultati_classificazione.push({
+                   'Sostanza': sostanza,
+                   'Concentrazione (ppm)': info.concentrazione_ppm || 0,
+                   'Concentrazione (%)': info.concentrazione_percentuale || 0,
+                   'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
+                   'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
+                   'CAS': info.cas || 'N/A'
+               });
+           }
+           
+           // Aggiungi una riga con il risultato complessivo
+           reportData.risultati_classificazione.push({
+               'Sostanza': '** RISULTATO TOTALE **',
+               'Concentrazione (ppm)': '',
+               'Concentrazione (%)': '',
+               'Frasi H': '',
+               'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
+               'CAS': ''
+           });
+       } else if (Array.isArray(classificationData)) {
+           // Se i dati sono già in formato tabellare, usali direttamente
+           reportData.risultati_classificazione.push(...classificationData);
+       }
+       
+       // Usa l'API dedicata per salvare il report
+       const saveResult = await window.electronAPI.saveReport(`${reportName}.json`, reportData);
+       
+       if (!saveResult) {
+           throw new Error('Errore nel salvataggio del report');
+       }
+       
+       console.log(`Report "${reportName}" salvato con metadati:`, metadati);
+       showNotification(`Report "${reportName}" generato con successo!`);
+       
+       // Aggiorna la visualizzazione dei report
+       if (typeof loadReports === 'function') {
+           setTimeout(() => {
+               loadReports();
+           }, 500);
+       }
+       
+       return reportName;
+   } catch (error) {
+       console.error('Errore nella generazione del report:', error);
+       showNotification('Errore nella generazione del report: ' + error.message, 'error');
+       return null;
+   }
 }
 
 

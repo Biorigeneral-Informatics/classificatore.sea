@@ -5,6 +5,16 @@ class InfoRaccoltaManager {
         this.loadSavedData();
     }
 
+    sanitizeCodeEER(codice) {
+    if (!codice) return '';
+    
+    return codice
+        .replace(/[\/\\:*?"<>|]/g, '') // Rimuovi caratteri problematici per nomi file
+        .replace(/\s+/g, '_') // Sostituisci spazi con underscore
+        .trim();
+    }
+
+
     // Gestione semplificata dei dropdown
     initializeDropdowns() {
         // Array con gli ID dei campi select che hanno un campo personalizzato
@@ -58,8 +68,8 @@ class InfoRaccoltaManager {
             // Altrimenti usa il valore del select
             return select ? select.value : "";
         };
-    
-        // Raccoglie i dati dal Form 1: Caratteristiche Fisiche
+
+        // Raccoglie i dati dal Form 1: Caratteristiche Fisiche (invariato)
         const caratteristicheFisiche = {
             colore: getFieldValue('colore'),
             odore: getFieldValue('odore'),
@@ -69,23 +79,27 @@ class InfoRaccoltaManager {
             residuo180: document.getElementById('residuo180').value,
             residuo600: document.getElementById('residuo600').value,
             infiammabilita: document.getElementById('infiammabilita').value,
-            // Aggiunta del valore gasolio
             gasolio: document.getElementById('gasolioCheckbox').checked
         };
-    
+
+        // MODIFICATO: Sanifica il codice EER
+        const codiceEERRaw = document.getElementById('codiceEER').value.trim();
+        const codiceEERSanificato = this.sanitizeCodeEER(codiceEERRaw);
+
         // Raccoglie i dati dal Form 2: Informazioni Certificato
         const infoCertificato = {
             rapportoProva: document.getElementById('rapportoProva').value,
-            numeroCampionamento: document.getElementById('numeroCampionamento').value.trim(), // NUOVO CAMPO
+            numeroCampionamento: document.getElementById('numeroCampionamento').value.trim(), // OPZIONALE
             descrizione: document.getElementById('descrizione').value,
             dataCampionamento: document.getElementById('dataCampionamento').value,
             dataStampa: document.getElementById('dataStampa').value,
-            codiceEER: document.getElementById('codiceEER').value,
+            codiceEER: codiceEERSanificato, // OBBLIGATORIO E SANIFICATO
+            codiceEEROriginale: codiceEERRaw, // Mantieni anche l'originale per riferimento
             committente: document.getElementById('committente').value,
             riferimentoVerbale: document.getElementById('riferimentoVerbale').value,
             matrice: document.getElementById('matrice').value
         };
-    
+
         return {
             caratteristicheFisiche,
             infoCertificato,
@@ -93,32 +107,43 @@ class InfoRaccoltaManager {
         };
     }
 
-    validateForms() {
-        // NUOVO: Validazione specifica per numero campionamento
-        const numeroCampionamento = document.getElementById('numeroCampionamento').value.trim();
-        if (!numeroCampionamento) {
-            showNotification('Il numero di campionamento è obbligatorio', 'error');
-            document.getElementById('numeroCampionamento').focus();
-            return false;
-        }
-
-        // Valida Form 1
-        const form1 = document.getElementById('caratteristicheFisicheForm');
-        const form2 = document.getElementById('infoCertificatoForm');
-
-        const isForm1Valid = Array.from(form1.querySelectorAll('input[required], select[required]'))
-            .every(input => input.value.trim() !== '');
-
-        const isForm2Valid = Array.from(form2.querySelectorAll('input[required], textarea[required], select[required]'))
-            .every(input => input.value.trim() !== '');
-
-        if (!isForm1Valid || !isForm2Valid) {
-            showNotification('Completa tutti i campi obbligatori dei form', 'warning');
-            return false;
-        }
-
-        return true;
+validateForms() {
+    // NUOVO: Validazione specifica per codice EER (sostituisce numero campionamento)
+    const codiceEER = document.getElementById('codiceEER').value.trim();
+    if (!codiceEER) {
+        showNotification('Il codice EER è obbligatorio', 'error');
+        document.getElementById('codiceEER').focus();
+        return false;
     }
+
+    // NUOVO: Sanificazione caratteri speciali per codice EER
+    const caratteriProblematici = /[\/\\:*?"<>|]/g;
+    if (caratteriProblematici.test(codiceEER)) {
+        showNotification('Il codice EER contiene caratteri non validi. Evitare: / \\ : * ? " < > |', 'error');
+        document.getElementById('codiceEER').focus();
+        return false;
+    }
+
+    // RIMOSSO: La validazione per numero campionamento (ora opzionale)
+    // Il numero campionamento rimane nel form ma non è più obbligatorio
+
+    // Valida Form 1 (rimane invariato)
+    const form1 = document.getElementById('caratteristicheFisicheForm');
+    const form2 = document.getElementById('infoCertificatoForm');
+
+    const isForm1Valid = Array.from(form1.querySelectorAll('input[required], select[required]'))
+        .every(input => input.value.trim() !== '');
+
+    const isForm2Valid = Array.from(form2.querySelectorAll('input[required], textarea[required], select[required]'))
+        .every(input => input.value.trim() !== '');
+
+    if (!isForm1Valid || !isForm2Valid) {
+        showNotification('Completa tutti i campi obbligatori dei form', 'warning');
+        return false;
+    }
+
+    return true;
+}
 
     async saveFormData() {
         try {

@@ -21,24 +21,50 @@ function generateItalianDateTime() {
 }
 
 // Funzione helper per estrarre numero campionamento dal nome file
-function extractNumeroCampionamentoFromFileName(fileName) {
-    // Prova formato nuovo: dati_campione_NUMERO_data.json
-    const newFormatMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
+function extractCodiceEERFromFileName(fileName) {
+    // Prova formato nuovo: dati_campione_CODICE-EER_data_committente.json
+    const newFormatMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}_(.+?)\.json/);
     if (newFormatMatch) {
-        return newFormatMatch[1];
+        return newFormatMatch[1]; // Restituisce il codice EER
     }
     
-    // Fallback formato vecchio: dati_campione_timestamp.json
+    // Fallback formato vecchio con numero campionamento per compatibilità
+    const oldNumeroCampionamentoMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
+    if (oldNumeroCampionamentoMatch) {
+        return `LEGACY_${oldNumeroCampionamentoMatch[1]}`;
+    }
+    
+    // Fallback formato molto vecchio con timestamp
     const oldFormatMatch = fileName.match(/dati_campione_(\d{14})/);
     if (oldFormatMatch) {
-        return `LEGACY_${oldFormatMatch[1]}`;
+        return `TIMESTAMP_${oldFormatMatch[1]}`;
     }
     
-    return 'NUMERO_NON_TROVATO';
+    return 'CODICE_EER_NON_TROVATO';
 }
 
 
+// NUOVA: Funzione per estrarre committente dal nome file
+function extractCommittenteFromFileName(fileName) {
+    // Formato: dati_campione_CODICE-EER_data_COMMITTENTE.json
+    const match = fileName.match(/dati_campione_.+?_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}_(.+?)\.json/);
+    if (match) {
+        return match[1].replace(/_/g, ' '); // Riconverti underscore in spazi
+    }
+    
+    return 'Committente_Sconosciuto';
+}
 
+// NUOVA: Funzione per estrarre data e ora dal nome file
+function extractDataOraFromFileName(fileName) {
+    // Estrai timestamp dal nome file
+    const match = fileName.match(/(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})/);
+    if (match) {
+        return match[1].replace(/_/g, ' '); // Formato: 25-12-2024 14-30-25
+    }
+    
+    return 'Data_Non_Disponibile';
+}
 
 
 
@@ -879,7 +905,7 @@ app.whenReady().then(async () => {
         }
     });
     
-    // NUOVO: Handler per ottenere i file campione con info sui committenti
+    // MODIFICATO: Handler per ottenere i file campione con info sui committenti usando codice EER
     ipcMain.handle('get-campione-files-with-metadata', async () => {
         try {
             const campioneDir = path.join(app.getPath('userData'), 'campione_data');
@@ -903,21 +929,29 @@ app.whenReady().then(async () => {
                         // Estrai metadati se presenti
                         const metadata = data._metadata || {};
                         
+                        // MODIFICATO: Estrai info usando codice EER
+                        const codiceEER = extractCodiceEERFromFileName(fileName);
+                        const committente = extractCommittenteFromFileName(fileName);
+                        const dataOra = extractDataOraFromFileName(fileName);
+                        
                         return {
                             fileName,
-                            committente: metadata.committente || 'Committente Sconosciuto',
+                            codiceEER: metadata.infoCertificato?.codiceEER || codiceEER,
+                            committente: metadata.committente || committente,
                             dataCampionamento: metadata.dataCampionamento || 'Data non disponibile',
+                            dataOra: dataOra,
                             idProgetto: metadata.idProgetto || 'ID non disponibile'
                         };
                     } catch (e) {
                         console.warn(`Errore nel leggere metadati da ${fileName}:`, e.message);
-                      return {
-                          fileName,
-                          committente: metadata.committente || 'Committente Sconosciuto',
-                          dataCampionamento: metadata.dataCampionamento || 'Data non disponibile',
-                          numeroCampionamento: metadata.infoCertificato?.numeroCampionamento || extractNumeroCampionamentoFromFileName(fileName), // NUOVO
-                          idProgetto: metadata.idProgetto || 'ID non disponibile'
-                      };
+                        return {
+                            fileName,
+                            codiceEER: extractCodiceEERFromFileName(fileName),
+                            committente: extractCommittenteFromFileName(fileName),
+                            dataCampionamento: 'Data non disponibile',
+                            dataOra: extractDataOraFromFileName(fileName),
+                            idProgetto: 'ID non disponibile'
+                        };
                     }
                 })
                 .sort((a, b) => {
@@ -935,7 +969,7 @@ app.whenReady().then(async () => {
         }
     });
 
-    // NUOVO: Handler per archiviare risultato classificazione
+    // MODIFICATO: Handler per archiviare risultato classificazione con codice EER
     ipcMain.handle('archive-classification-result', async (event, fileName, classificationResult) => {
         try {
             const userDataPath = app.getPath('userData');
@@ -951,32 +985,34 @@ app.whenReady().then(async () => {
             // Percorso file originale
             const originalPath = path.join(campioneDir, fileName);
             
-            // Genera nome per il risultato archiviato
-            // Estrai numero campionamento dal nome file o dai metadati
-            let numeroCampionamento = 'CAMP_MANCANTE';
+            // MODIFICATO: Genera nome per il risultato archiviato usando codice EER
+            let codiceEER = 'EER_MANCANTE';
 
-            // Prova a estrarre dal nome del file (nuovo formato)
-            const newFormatMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}\.json/);
-            if (newFormatMatch) {
-                numeroCampionamento = newFormatMatch[1];
+            // Prova a estrarre codice EER dal nome del file (nuovo formato)
+            const codiceEERMatch = fileName.match(/dati_campione_(.+?)_\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2}_(.+?)\.json/);
+            if (codiceEERMatch) {
+                codiceEER = codiceEERMatch[1];
             } else {
                 // Prova a estrarre dai metadati del risultato di classificazione
                 const metadata = classificationResult.data?._metadata;
-                if (metadata?.infoCertificato?.numeroCampionamento) {
-                    numeroCampionamento = metadata.infoCertificato.numeroCampionamento;
+                if (metadata?.infoCertificato?.codiceEER) {
+                    codiceEER = metadata.infoCertificato.codiceEER;
+                } else if (metadata?.infoCertificato?.numeroCampionamento) {
+                    // Fallback a numero campionamento per compatibilità
+                    codiceEER = `LEGACY_${metadata.infoCertificato.numeroCampionamento}`;
                 } else {
-                    // Fallback: prova a estrarre dal vecchio formato timestamp
+                    // Fallback formato molto vecchio con timestamp
                     const oldFormatMatch = fileName.match(/dati_campione_(\d{14})/);
                     if (oldFormatMatch) {
-                        numeroCampionamento = `LEGACY_${oldFormatMatch[1]}`;
+                        codiceEER = `TIMESTAMP_${oldFormatMatch[1]}`;
                     }
                 }
             }
 
             const dataOraItaliana = generateItalianDateTime();
-            const resultFileName = `risultato_classificazione_${numeroCampionamento}_${dataOraItaliana}.json`;
+            const resultFileName = `risultato_classificazione_${codiceEER}_${dataOraItaliana}.json`;
             const resultPath = path.join(archiveDir, resultFileName);
-                        
+                            
             // Salva il risultato della classificazione in archiviati
             fs.writeFileSync(resultPath, JSON.stringify(classificationResult, null, 2));
             console.log(`Risultato classificazione salvato in: ${resultPath}`);
@@ -1808,19 +1844,20 @@ ipcMain.handle('delete-campione-file-with-warning', async (event, fileName) => {
         // Leggi i metadati per l'avviso
         let committente = 'Committente Sconosciuto';
         let dataCampionamento = 'Data non disponibile';
-        let numeroCampionamento = 'NUMERO_NON_TROVATO';
+        let codiceEER = 'CODICE_EER_NON_TROVATO';
 
         try {
             const fileContent = fs.readFileSync(filePath, 'utf8');
             const data = JSON.parse(fileContent);
             const metadata = data._metadata || {};
             
-            committente = metadata.committente || 'Committente Sconosciuto';
+            committente = metadata.committente || extractCommittenteFromFileName(fileName);
             dataCampionamento = metadata.dataCampionamento || 'Data non disponibile';
-            numeroCampionamento = metadata.infoCertificato?.numeroCampionamento || extractNumeroCampionamentoFromFileName(fileName); // NUOVO
+            codiceEER = metadata.infoCertificato?.codiceEER || extractCodiceEERFromFileName(fileName);
         } catch (e) {
             console.warn('Impossibile leggere metadati per avviso eliminazione');
-            numeroCampionamento = extractNumeroCampionamentoFromFileName(fileName); // Fallback
+            codiceEER = extractCodiceEERFromFileName(fileName);
+            committente = extractCommittenteFromFileName(fileName);
         }
         
         // Elimina il file
@@ -1829,9 +1866,9 @@ ipcMain.handle('delete-campione-file-with-warning', async (event, fileName) => {
         return { 
             success: true,
             message: `File eliminato: ${fileName}`,
+            codiceEER,
             committente,
-            dataCampionamento,
-            numeroCampionamento // NUOVO
+            dataCampionamento
         };
     } catch (error) {
         console.error('Errore nell\'eliminazione del file campione:', error);
