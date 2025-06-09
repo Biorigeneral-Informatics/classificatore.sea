@@ -56,11 +56,37 @@ function extractCommittenteFromFileName(fileName) {
 }
 
 // NUOVA: Funzione per estrarre data e ora dal nome file
-function extractDataOraFromFileName(fileName) {
-    // Estrai timestamp dal nome file
+// CORRETTO: Funzione per estrarre data e ora dal nome file o metadati
+function extractDataOraFromFileName(fileName, metadata = null) {
+    // Prima prova a estrarre dal nome file (formato attuale)
     const match = fileName.match(/(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})/);
     if (match) {
         return match[1].replace(/_/g, ' '); // Formato: 25-12-2024 14-30-25
+    }
+    
+    // Se non trovato nel nome file, prova a costruire dai metadati
+    if (metadata && metadata.dataCampionamento) {
+        const dataCampionamento = new Date(metadata.dataCampionamento);
+        const dataFormattata = dataCampionamento.toLocaleDateString('it-IT', {
+            day: '2-digit',
+            month: '2-digit', 
+            year: 'numeric'
+        });
+        
+        // Se abbiamo anche timestamp del progetto, estrapolane l'orario
+        if (metadata.timestampProgetto) {
+            const timestampProgetto = new Date(metadata.timestampProgetto);
+            const orarioFormattato = timestampProgetto.toLocaleTimeString('it-IT', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }).replace(/:/g, '-');
+            
+            return `${dataFormattata} ${orarioFormattato}`;
+        }
+        
+        // Altrimenti usa solo la data
+        return `${dataFormattata} Ora-Non-Disponibile`;
     }
     
     return 'Data_Non_Disponibile';
@@ -906,68 +932,69 @@ app.whenReady().then(async () => {
     });
     
     // MODIFICATO: Handler per ottenere i file campione con info sui committenti usando codice EER
-    ipcMain.handle('get-campione-files-with-metadata', async () => {
-        try {
-            const campioneDir = path.join(app.getPath('userData'), 'campione_data');
-            
-            // Crea la directory se non esiste
-            if (!fs.existsSync(campioneDir)) {
-                fs.mkdirSync(campioneDir, { recursive: true });
-                return [];
-            }
-            
-            // Leggi tutti i file .json nella directory
-            const files = fs.readdirSync(campioneDir)
-                .filter(file => file.endsWith('.json'))
-                .map(fileName => {
-                    try {
-                        // Leggi il contenuto del file per estrarre i metadati
-                        const filePath = path.join(campioneDir, fileName);
-                        const fileContent = fs.readFileSync(filePath, 'utf8');
-                        const data = JSON.parse(fileContent);
-                        
-                        // Estrai metadati se presenti
-                        const metadata = data._metadata || {};
-                        
-                        // MODIFICATO: Estrai info usando codice EER
-                        const codiceEER = extractCodiceEERFromFileName(fileName);
-                        const committente = extractCommittenteFromFileName(fileName);
-                        const dataOra = extractDataOraFromFileName(fileName);
-                        
-                        return {
-                            fileName,
-                            codiceEER: metadata.infoCertificato?.codiceEER || codiceEER,
-                            committente: metadata.committente || committente,
-                            dataCampionamento: metadata.dataCampionamento || 'Data non disponibile',
-                            dataOra: dataOra,
-                            idProgetto: metadata.idProgetto || 'ID non disponibile'
-                        };
-                    } catch (e) {
-                        console.warn(`Errore nel leggere metadati da ${fileName}:`, e.message);
-                        return {
-                            fileName,
-                            codiceEER: extractCodiceEERFromFileName(fileName),
-                            committente: extractCommittenteFromFileName(fileName),
-                            dataCampionamento: 'Data non disponibile',
-                            dataOra: extractDataOraFromFileName(fileName),
-                            idProgetto: 'ID non disponibile'
-                        };
-                    }
-                })
-                .sort((a, b) => {
-                    // Ordina per timestamp (più recente per primo)
-                    const timestampA = a.fileName.match(/dati_campione_(\d{14})/)?.[1] || '0';
-                    const timestampB = b.fileName.match(/dati_campione_(\d{14})/)?.[1] || '0';
-                    return timestampB.localeCompare(timestampA);
-                });
-            
-            console.log(`Trovati ${files.length} file campione con metadati`);
-            return files;
-        } catch (error) {
-            console.error('Errore nel recupero dei file campione con metadati:', error);
-            return [];
-        }
-    });
+  // CORRETTO: Handler per ottenere i file campione con metadati completi
+  ipcMain.handle('get-campione-files-with-metadata', async () => {
+      try {
+          const campioneDir = path.join(app.getPath('userData'), 'campione_data');
+          
+          // Crea la directory se non esiste
+          if (!fs.existsSync(campioneDir)) {
+              fs.mkdirSync(campioneDir, { recursive: true });
+              return [];
+          }
+          
+          // Leggi tutti i file .json nella directory
+          const files = fs.readdirSync(campioneDir)
+              .filter(file => file.endsWith('.json'))
+              .map(fileName => {
+                  try {
+                      // Leggi il contenuto del file per estrarre i metadati
+                      const filePath = path.join(campioneDir, fileName);
+                      const fileContent = fs.readFileSync(filePath, 'utf8');
+                      const data = JSON.parse(fileContent);
+                      
+                      // Estrai metadati se presenti
+                      const metadata = data._metadata || {};
+                      
+                      // CORRETTO: Estrai info usando codice EER e passa metadati per data/ora
+                      const codiceEER = metadata.infoCertificato?.codiceEER || extractCodiceEERFromFileName(fileName);
+                      const committente = metadata.committente || extractCommittenteFromFileName(fileName);
+                      const dataOra = extractDataOraFromFileName(fileName, metadata); // Passa i metadati
+                      
+                      return {
+                          fileName,
+                          codiceEER: codiceEER,
+                          committente: committente,
+                          dataCampionamento: metadata.dataCampionamento || 'Data non disponibile',
+                          dataOra: dataOra,
+                          idProgetto: metadata.idProgetto || 'ID non disponibile'
+                      };
+                  } catch (e) {
+                      console.warn(`Errore nel leggere metadati da ${fileName}:`, e.message);
+                      return {
+                          fileName,
+                          codiceEER: extractCodiceEERFromFileName(fileName),
+                          committente: extractCommittenteFromFileName(fileName),
+                          dataCampionamento: 'Data non disponibile',
+                          dataOra: extractDataOraFromFileName(fileName),
+                          idProgetto: 'ID non disponibile'
+                      };
+                  }
+              })
+              .sort((a, b) => {
+                  // Ordina per timestamp (più recente per primo)
+                  const timestampA = a.fileName.match(/(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})/)?.[1] || '0';
+                  const timestampB = b.fileName.match(/(\d{2}-\d{2}-\d{4}_\d{2}-\d{2}-\d{2})/)?.[1] || '0';
+                  return timestampB.localeCompare(timestampA);
+              });
+          
+          console.log(`Trovati ${files.length} file campione con metadati completi`);
+          return files;
+      } catch (error) {
+          console.error('Errore nel recupero dei file campione con metadati:', error);
+          return [];
+      }
+  });
 
     // MODIFICATO: Handler per archiviare risultato classificazione con codice EER
     ipcMain.handle('archive-classification-result', async (event, fileName, classificationResult) => {
