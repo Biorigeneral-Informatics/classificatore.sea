@@ -1124,18 +1124,6 @@ app.whenReady().then(async () => {
         throw error;
       }
     });
-    
-    /* Gestione scrittura file OLD
-    ipcMain.handle('write-file', async (event, filePath, data) => {
-      try {
-        fs.writeFileSync(filePath, data);
-        return true;
-      } catch (error) {
-        console.error('Errore nella scrittura del file:', error);
-        throw error;
-      }
-    });*/
-
 
 
     // Ottieni informazioni su un file
@@ -1562,37 +1550,6 @@ ipcMain.handle('open-external', async (event, path) => {
   }
 });
 
-
-// Funzione per verificare i dati Excel senza salvarli
-ipcMain.handle('verifyExcelData', async (event, data, dataType) => {
-    try {
-        const tempFile = path.join(app.getPath('temp'), 'temp_verify_data.json');
-        
-        // Salva i dati in un file temporaneo
-        await fs.writeFile(tempFile, JSON.stringify(data), 'utf8');
-        
-        // Esegui la stessa verifica di process_excel ma senza salvare permanentemente
-        const raccoltaScript = path.join(__dirname, 'app', 'raccolta.py');
-        
-        // Esegui lo script Python con una nuova opzione "verify_only"
-        const result = execSync(`python "${raccoltaScript}" verify_excel "${tempFile}" ${dataType}`).toString();
-        
-        try {
-            // Elimina il file temporaneo
-            fs.unlinkSync(tempFile);
-        } catch (e) {
-            console.warn('Non è stato possibile eliminare il file temporaneo', e);
-        }
-        
-        return JSON.parse(result);
-    } catch (error) {
-        console.error('Errore nella verifica dei dati Excel:', error);
-        return {
-            success: false,
-            message: `Errore nella verifica dei dati: ${error.message}`
-        };
-    }
-});
 
 
 // CARTELLA ECHA DATABASE

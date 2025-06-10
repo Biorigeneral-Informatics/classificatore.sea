@@ -230,35 +230,6 @@ async function eliminaFileCampioneConAvviso(fileName, codiceEER, dataOra, commit
 
 
 
-// Funzione per eliminare un file campione
-async function eliminaFileCampione(fileName) {
-    try {
-        // Mostra conferma
-        const conferma = confirm(`Sei sicuro di voler eliminare il file "${fileName}"?`);
-        if (!conferma) return;
-        
-        // Elimina il file
-        const result = await window.electronAPI.deleteCampioneFile(fileName);
-        
-        if (result.success) {
-            showNotification(`File ${fileName} eliminato con successo`);
-            
-            // Aggiorna l'interfaccia
-            updateClassificationUI();
-            
-            // Aggiungi attività
-            addActivity('File eliminato', fileName, 'fas fa-trash');
-        } else {
-            throw new Error(result.message || 'Errore nell\'eliminazione del file');
-        }
-    } catch (error) {
-        console.error('Errore nell\'eliminazione del file:', error);
-        showNotification('Errore nell\'eliminazione del file: ' + error.message, 'error');
-    }
-}
-
-
-
 
 // Aggiorna le informazioni sul file nella sezione classificazione
 function updateClassificationFileInfo() {
@@ -277,6 +248,7 @@ function updateClassificationFileInfo() {
 }
 
 // Funzione per avviare il processo di classificazione
+// Funzione per avviare il processo di classificazione - CORRETTA
 async function avviaClassificazione() {
     try {
         // Ottieni il file selezionato
@@ -312,16 +284,12 @@ async function avviaClassificazione() {
         
         console.log('Risultato classificazione:', result);
         
-        // NUOVO: Archivia automaticamente il risultato
+        // CORREZIONE 1: Prima archivia il risultato (opzionale, per backup)
         try {
             const archiveResult = await window.electronAPI.archiveClassificationResult(selectedFile, result);
             
             if (archiveResult.success) {
                 console.log(`Risultato archiviato: ${archiveResult.archivedFile}`);
-                showNotification(
-                    `Classificazione completata e archiviata: ${archiveResult.archivedFile}`, 
-                    'success'
-                );
             } else {
                 console.warn('Errore nell\'archiviazione:', archiveResult.message);
                 // Non bloccare il flusso, continua comunque
@@ -331,8 +299,35 @@ async function avviaClassificazione() {
             // Non bloccare il flusso
         }
         
-        // Salva i dati in sessionStorage per uso futuro
-        sessionStorage.setItem('classificationResults', JSON.stringify(result.data));
+        // CORREZIONE 2: GENERA IL REPORT NELLA CARTELLA REPORTS
+        // Questa è la parte che mancava!
+        try {
+            console.log('Generazione report nella cartella reports...');
+            
+            // Salva i dati in sessionStorage per generateClassificationReport
+            sessionStorage.setItem('classificationResults', JSON.stringify(result));
+            
+            // Chiama la funzione per generare il report (definita in reports.js)
+            const reportName = await generateClassificationReport(result);
+            
+            if (reportName) {
+                console.log(`Report generato con successo: ${reportName}`);
+                showNotification(`Classificazione completata! Report salvato: ${reportName}`, 'success');
+                
+                // Aggiorna la visualizzazione dei report se la funzione è disponibile
+                if (typeof loadReports === 'function') {
+                    setTimeout(() => {
+                        loadReports();
+                    }, 500);
+                }
+            } else {
+                throw new Error('Errore nella generazione del report');
+            }
+        } catch (reportError) {
+            console.error('Errore nella generazione del report:', reportError);
+            // Non bloccare completamente, ma notifica l'errore
+            showNotification('Classificazione completata ma errore nella generazione del report: ' + reportError.message, 'warning');
+        }
         
         // Nascondi il pulsante "Avvia Classificazione"
         if (startBtn) {
@@ -345,7 +340,7 @@ async function avviaClassificazione() {
             goToReportsBtn.style.display = 'inline-block';
         }
         
-        addActivity('Classificazione completata', `File archiviato: ${selectedFile}`, 'fas fa-check');
+        addActivity('Classificazione completata', `File elaborato: ${selectedFile}`, 'fas fa-check');
         
         return true;
     } catch (error) {
@@ -360,102 +355,6 @@ async function avviaClassificazione() {
         }
         
         return false;
-    }
-}
-
-// Versione corretta per generare report dal risultato della classificazione
-// MODIFICATO: generateReportFromClassificationData per gestire metadati
-async function generateReportFromClassificationData(classificationData) {
-    try {
-        if (!classificationData) {
-            throw new Error('Nessun dato di classificazione disponibile');
-        }
-        
-        // NUOVO: Estrai metadati se presenti
-        const metadati = classificationData._metadata;
-        let reportName;
-        
-        if (metadati && metadati.committente) {
-            // Genera nome basato su committente e data
-            const committente = metadati.committente.replace(/[^a-zA-Z0-9]/g, '').substring(0, 20);
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
-            reportName = `${committente}_${timestamp}`;
-        } else {
-            // Fallback al sistema precedente
-            const now = new Date();
-            const timestamp = now.toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
-            reportName = `Classificazione_${timestamp}`;
-        }
-        
-        // Prepara i dati per il report INCLUDENDO i metadati
-        const reportData = {
-            // NUOVO: Metadati per aggregazione futura
-            _metadata: metadati || {
-                committente: 'Committente Sconosciuto',
-                dataCampionamento: new Date().toISOString().split('T')[0],
-                timestampClassificazione: new Date().toISOString()
-            },
-            
-            // Dati di classificazione esistenti
-            risultati_classificazione: [],
-            caratteristiche_pericolo: classificationData.caratteristiche_pericolo || [],
-            timestamp_elaborazione: new Date().toISOString()
-        };
-        
-        // Se i dati provengono dal classificatore, estraili correttamente
-        if (classificationData.campione) {
-            const campione = classificationData.campione;
-            const hp = classificationData.caratteristiche_pericolo || [];
-            
-            // Crea un oggetto riassuntivo per ogni sostanza
-            for (const [sostanza, info] of Object.entries(campione)) {
-                reportData.risultati_classificazione.push({
-                    'Sostanza': sostanza,
-                    'Concentrazione (ppm)': info.concentrazione_ppm || 0,
-                    'Concentrazione (%)': info.concentrazione_percentuale || 0,
-                    'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
-                    'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
-                    'CAS': info.cas || 'N/A'
-                });
-            }
-            
-            // Aggiungi una riga con il risultato complessivo
-            reportData.risultati_classificazione.push({
-                'Sostanza': '** RISULTATO TOTALE **',
-                'Concentrazione (ppm)': '',
-                'Concentrazione (%)': '',
-                'Frasi H': '',
-                'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
-                'CAS': ''
-            });
-        } else if (Array.isArray(classificationData)) {
-            // Se i dati sono già in formato tabellare, usali direttamente
-            reportData.risultati_classificazione.push(...classificationData);
-        }
-        
-        // Usa l'API dedicata per salvare il report
-        const saveResult = await window.electronAPI.saveReport(`${reportName}.json`, reportData);
-        
-        if (!saveResult) {
-            throw new Error('Errore nel salvataggio del report');
-        }
-        
-        console.log(`Report "${reportName}" salvato con metadati:`, metadati);
-        showNotification(`Report "${reportName}" generato con successo!`);
-        
-        // Aggiorna la visualizzazione dei report
-        if (typeof loadReports === 'function') {
-            setTimeout(() => {
-                loadReports();
-            }, 500);
-        }
-        
-        return reportName;
-    } catch (error) {
-        console.error('Errore nella generazione del report:', error);
-        showNotification('Errore nella generazione del report: ' + error.message, 'error');
-        return null;
     }
 }
 
@@ -496,4 +395,4 @@ window.updateClassificationFileInfo = updateClassificationFileInfo;
 window.avviaClassificazione = avviaClassificazione;
 window.generateReportFromClassificationData = generateReportFromClassificationData;
 window.openReportsFolder = openReportsFolder;
-window.eliminaFileCampione = eliminaFileCampione;
+window.eliminaFileCampioneConAvviso = eliminaFileCampioneConAvviso;

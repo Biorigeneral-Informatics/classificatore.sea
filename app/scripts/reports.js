@@ -347,84 +347,6 @@ async function createDemoReport() {
 ////////////////////////////////////////////////////////////////////////////
 
 
-// Aggiorna lista reports
-async function updateReportsList() {
-    try {
-        const reportsContainer = document.querySelector('.reports-container');
-        const noReportsMessage = document.querySelector('.no-reports-message');
-        
-        // Carica lista report
-        const reportsList = await window.electronAPI.getReportsList();
-        
-        // Aggiorna contatore
-        document.getElementById('reportsCount').textContent = reportsList.length;
-        
-        if (reportsList.length === 0) {
-            if (noReportsMessage) {
-                noReportsMessage.style.display = 'block';
-            }
-            reportsContainer.innerHTML = noReportsMessage ? '' : `
-                <div class="no-reports-message" style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                    <i class="fas fa-folder-open" style="font-size: 2rem; margin-bottom: 1rem;"></i>
-                    <p>Nessun Report Disponibile</p>
-                </div>
-            `;
-            return;
-        }
-        
-        // Nascondi messaggio
-        if (noReportsMessage) {
-            noReportsMessage.style.display = 'none';
-        }
-        
-        // Crea cards per ogni report
-        let html = '';
-        
-        // Ordina i report per data (dal più recente)
-        reportsList.sort().reverse().forEach(report => {
-            const reportName = report.replace('.json', '');
-            const date = new Date().toLocaleString('it-IT');
-            
-            html += `
-                <div class="report-card">
-                    <div class="report-icon">
-                        <i class="fas fa-file-alt"></i>
-                    </div>
-                    <div class="report-info">
-                        <h4>${reportName}</h4>
-                        <p>Generato il: ${date}</p>
-                        <div class="report-actions">
-                            <button class="action-btn" onclick="exportReport('${report}', 'excel')" title="Esporta Excel">
-                                <i class="fas fa-file-excel"></i>
-                                <span>Excel</span>
-                            </button>
-                            <button class="action-btn" onclick="exportReport('${report}', 'pdf')" title="Esporta PDF">
-                                <i class="fas fa-file-pdf"></i>
-                                <span>PDF</span>
-                            </button>
-                            <button class="action-btn" onclick="previewReport('${report}')" title="Anteprima">
-                                <i class="fas fa-eye"></i>
-                                <span>Anteprima</span>
-                            </button>
-                            <button class="action-btn delete-btn" onclick="deleteReport('${report}')" title="Elimina">
-                                <i class="fas fa-trash"></i>
-                                <span>Elimina</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        
-        reportsContainer.innerHTML = html;
-        
-    } catch (error) {
-        console.error('Errore nell\'aggiornamento della lista dei report:', error);
-        showNotification('Errore nell\'aggiornamento della lista dei report', 'error');
-    }
-}
-
-
 
 // ==== Funzioni di dialogo personalizzate ====
 
@@ -1103,18 +1025,6 @@ async function generateClassificationReport(classificationData = null) {
    }
 }
 
-
-
-    // Inizializzazione eventi per i bottoni della sezione report
-    document.getElementById('openReportsFolderBtn').addEventListener('click', async function() {
-        try {
-            const reportsPath = await window.electronAPI.getReportsPath();
-            await window.electronAPI.openFolder(reportsPath);
-        } catch (error) {
-            console.error('Errore nell\'apertura della cartella reports:', error);
-            showNotification('Errore nell\'apertura della cartella reports', 'error');
-        }
-    });
     
     // Crea un report demo per testare
     document.getElementById('createDemoReportBtn').addEventListener('click', async function() {
@@ -1261,36 +1171,6 @@ function updateNotesIndicators() {
         }
     });
 }
-
-// Aggiungi all'evento di caricamento dei report
-function initNotesSystem() {
-    // Listener per il bottone salva note
-    document.getElementById('saveNotesBtn').addEventListener('click', saveNotes);
-    
-    // Listener per chiudere il dialog delle note
-    document.getElementById('closeNotesBtn').addEventListener('click', function() {
-        document.getElementById('notesDialog').style.display = 'none';
-    });
-    
-    document.getElementById('closeNotesDialog').addEventListener('click', function() {
-        document.getElementById('notesDialog').style.display = 'none';
-    });
-    
-    // Chiudi il dialog quando si clicca al di fuori
-    document.getElementById('notesDialog').addEventListener('click', function(e) {
-        if (e.target === this) {
-            this.style.display = 'none';
-        }
-    });
-    
-    // Salva con Ctrl+Enter nel textarea
-    document.getElementById('reportNotes').addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'Enter') {
-            saveNotes();
-        }
-    });
-}
-
 
 
 // Funzioni per gestire le note preimpostate
