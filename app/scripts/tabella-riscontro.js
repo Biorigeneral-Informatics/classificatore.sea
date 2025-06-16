@@ -1207,27 +1207,24 @@ async function loadTabellaRiscontroSali() {
 }
 
 // Renderizza la tabella sali
-// Modifica renderTabellaRiscontroSali per aggiungere anche il bottone Salva nella riga
 function renderTabellaRiscontroSali(data) {
     const tbody = document.getElementById('saliTableBody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
-
-    if (data.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="8" class="empty-table-message">
-                    Nessun sale disponibile
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
+    
     data.forEach(item => {
         const row = document.createElement('tr');
         row.setAttribute('data-id', item.ID || item.id);
         
-        // Adattato allo schema del database con le colonne corrette
+        // Salva valori come attributi di dati per un recupero più sicuro
+        row.setAttribute('data-sali', item.Sali || '');
+        row.setAttribute('data-sinonimi', item.Sinonimi_Col_B_file_ECHA || '');
+        row.setAttribute('data-cas', item.CAS || '');
+        row.setAttribute('data-fattore', item.Fattore || '');
+        row.setAttribute('data-metallo', item.Metallo || '');
+        row.setAttribute('data-default', item.Default || 0);
+        
         row.innerHTML = `
             <td>${item.ID || item.id}</td>
             <td class="sali-cell">${item.Sali || ''}</td>
@@ -1235,15 +1232,14 @@ function renderTabellaRiscontroSali(data) {
             <td class="cas-cell">${item.CAS || ''}</td>
             <td class="fattore-cell">${item.Fattore || ''}</td>
             <td class="metallo-cell">${item.Metallo || ''}</td>
-            <td class="default-cell">${item.Default || 0}</td>
+            <td class="default-cell">
+                <input type="checkbox" 
+                       ${(item.Default == 1) ? 'checked' : ''} 
+                       class="default-checkbox" 
+                       onchange="aggiornaDefaultSale(${item.ID || item.id}, this.checked)">
+            </td>
             <td class="actions-cell">
-                <button class="btn btn-sm btn-primary edit-btn" onclick="attivaModeModificaSale(${item.ID || item.id})">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-success save-btn" onclick="salvaSaleSingolo(${item.ID || item.id})" style="display:none;">
-                    <i class="fas fa-save"></i>
-                </button>
-                <button class="btn btn-sm btn-danger delete-btn">
+                <button class="btn btn-sm btn-danger delete-btn" onclick="eliminaSale(${item.ID || item.id})">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -1253,13 +1249,54 @@ function renderTabellaRiscontroSali(data) {
     
     // Reset dello stato di modifica
     saliInEditMode = false;
-    document.getElementById('salvaSaliBtn').style.display = 'none';
     
     // Rimuovi eventuali classi di modifica dalla tabella
-    document.getElementById('saliTable').classList.remove('edit-mode');
+    const table = document.getElementById('saliTable');
+    if (table) {
+        table.classList.remove('edit-mode');
+    }
     
     // Aggiorna la lista dei sali modificati
     saliModificati = [];
+}
+
+// 2. Nuova funzione per aggiornare il default di un sale
+async function aggiornaDefaultSale(id, isChecked) {
+    try {
+        const defaultValue = isChecked ? 1 : 0;
+        
+        // Aggiorna il database
+        const result = await window.electronAPI.executeSQLite(
+            'UPDATE sali SET "Default" = ? WHERE ID = ?',
+            [defaultValue, id]
+        );
+        
+        if (!result.success) {
+            throw new Error(`Errore nell'aggiornamento: ${result.message}`);
+        }
+        
+        // Aggiorna l'attributo data-default della riga
+        const row = document.querySelector(`#saliTableBody tr[data-id="${id}"]`);
+        if (row) {
+            row.setAttribute('data-default', defaultValue);
+        }
+        
+        // Notifica all'utente
+        showNotification(`Sale ${isChecked ? 'impostato come' : 'rimosso da'} default`);
+        
+        // Aggiungi attività
+        addActivity('Default sale aggiornato', `Sale ID: ${id} - Default: ${isChecked ? 'Sì' : 'No'}`, 'fas fa-toggle-on');
+        
+    } catch (error) {
+        console.error('Errore nell\'aggiornamento del default:', error);
+        showNotification('Errore nell\'aggiornamento: ' + error.message, 'error');
+        
+        // Ripristina lo stato precedente del checkbox in caso di errore
+        const checkbox = document.querySelector(`#saliTableBody tr[data-id="${id}"] .default-checkbox`);
+        if (checkbox) {
+            checkbox.checked = !isChecked;
+        }
+    }
 }
 
 // Attiva la modalità di modifica per un sale specifico
@@ -1678,22 +1715,12 @@ function getSostanzaValue(item, field, defaultValue = '') {
 // Renderizza la tabella sostanze
 function renderTabellaRiscontroSostanze(data) {
     const tbody = document.getElementById('sostanzeTableBody');
+    if (!tbody) return;
+    
     tbody.innerHTML = '';
-
-    if (!data || data.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="empty-table-message">
-                    Nessuna sostanza disponibile
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
+    
     data.forEach(item => {
-        // Ottieni i valori in modo sicuro
-        const ID = getSostanzaValue(item, 'ID', item.id || '');
+        const ID = getSostanzaValue(item, 'ID');
         const Nome = getSostanzaValue(item, 'Nome');
         const CAS = getSostanzaValue(item, 'CAS');
         const Categoria = getSostanzaValue(item, 'Categoria');
@@ -1712,13 +1739,7 @@ function renderTabellaRiscontroSostanze(data) {
             <td class="cas-cell">${CAS}</td>
             <td class="categoria-cell">${Categoria}</td>
             <td class="actions-cell">
-                <button class="btn btn-sm btn-primary edit-btn" onclick="attivaModeModificaSostanza(${ID})">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-success save-btn" onclick="salvaSostanzaSingola(${ID})" style="display:none;">
-                    <i class="fas fa-save"></i>
-                </button>
-                <button class="btn btn-sm btn-danger delete-btn" data-id="${ID}">
+                <button class="btn btn-sm btn-danger delete-btn" onclick="eliminaSostanza(${ID})">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
