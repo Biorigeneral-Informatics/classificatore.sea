@@ -1,7 +1,7 @@
 {
   "name": "waste-guard",
   "productName": "WasteGuard",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Sistema di classificazione rifiuti",
   "main": "main.js",
   "scripts": {
