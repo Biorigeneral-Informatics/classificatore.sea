@@ -5,6 +5,7 @@ const Store = require('electron-store');
 const { spawn } = require('child_process');
 const os = require('os');
 const Database = require('better-sqlite3');
+const { autoUpdater } = require('electron-updater');
 
 
 function generateItalianDateTime() {
@@ -143,6 +144,46 @@ function initializeDatabase() {
   
   return userDbPath;
 }
+
+
+// Configurazione auto-updater
+function configureAutoUpdater() {
+  // Configurazione per repository private
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'Biorigeneral-Informatics',           // Sostituisci con il tuo username GitHub
+    repo: 'classificatore.sea',          // Sostituisci con il nome del tuo repository
+    private: true
+  });
+  
+  autoUpdater.checkForUpdatesAndNotify();
+  
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Controllo aggiornamenti...');
+  });
+  
+  autoUpdater.on('update-available', () => {
+    console.log('Aggiornamento disponibile');
+  });
+  
+  autoUpdater.on('update-not-available', () => {
+    console.log('Nessun aggiornamento disponibile');
+  });
+  
+  autoUpdater.on('error', (err) => {
+    console.log('Errore nell\'aggiornamento:', err);
+  });
+  
+  autoUpdater.on('download-progress', (progressObj) => {
+    console.log(`Scaricamento: ${progressObj.percent}%`);
+  });
+  
+  autoUpdater.on('update-downloaded', () => {
+    console.log('Aggiornamento scaricato');
+    autoUpdater.quitAndInstall();
+  });
+}
+
 
 // Inizializza il database e imposta il percorso
 const DB_PATH = initializeDatabase();
@@ -576,6 +617,12 @@ function createApplicationMenu() {
           }
         },
         {
+          label: 'Controlla aggiornamenti',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify();
+          }
+        },
+        {
           label: 'Informazioni',
           click: () => {
             if (mainWindow) {
@@ -720,6 +767,8 @@ app.whenReady().then(async () => {
     
     ensureDirectoriesExist();
     createLoginWindow();
+      configureAutoUpdater(); 
+
 
     //------- inizio ipcMain.On -----------//
 
