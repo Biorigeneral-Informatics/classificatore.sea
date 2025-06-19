@@ -1,13 +1,14 @@
 {
   "name": "waste-guard",
   "productName": "WasteGuard",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sistema di classificazione rifiuti",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
+    "release": "electron-builder --publish=always",
     "postinstall": "electron-builder install-app-deps"
   },
   "author": "Biorigeneral Informatics",
@@ -30,6 +31,11 @@
     "directories": {
       "output": "build"
     },
+    "publish": {
+    "provider": "github",
+    "owner": "Biorigeneral-Informatics",
+    "repo": "classificatore.sea"
+  },
     "forceCodeSigning": false,
     "files": [
       "main.js",
