@@ -153,7 +153,7 @@ function configureAutoUpdater() {
     provider: 'github',
     owner: 'Biorigeneral-Informatics',           // Sostituisci con il tuo username GitHub
     repo: 'classificatore.sea',          // Sostituisci con il nome del tuo repository
-    private: true
+    private: false
   });
   
   autoUpdater.checkForUpdatesAndNotify();
