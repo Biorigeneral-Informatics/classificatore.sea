@@ -74,7 +74,7 @@ function getBasename(filePath) {
 // Aggiorna la versione dell'applicazione
 function updateAppVersion() {
     const appVersionElements = document.querySelectorAll('#appVersion, #aboutAppVersion');
-    const version = window.appInfo?.appVersion || '1.0.0';
+    const version = window.appInfo?.appVersion || '1.0.3';
     
     appVersionElements.forEach(el => {
         if (el.id === 'aboutAppVersion') {
