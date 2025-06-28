@@ -1417,37 +1417,37 @@ function initUpdateSystem() {
   
   if (checkUpdateBtn) {
     checkUpdateBtn.addEventListener('click', async () => {
-      checkUpdateBtn.disabled = true;
-      checkUpdateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Controllo...';
-      
-      if (updateStatus) {
+    checkUpdateBtn.disabled = true;
+    checkUpdateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Controllo...';
+    
+    if (updateStatus) {
         updateStatus.textContent = 'Controllo aggiornamenti in corso...';
         updateStatus.className = 'update-status checking';
-      }
-      
-      try {
+    }
+    
+    try {
         const result = await window.electronAPI.checkForUpdates();
         
         if (result.success) {
-          if (updateStatus) {
-            updateStatus.textContent = 'Controllo completato. Se disponibile, l\'aggiornamento verrà mostrato automaticamente.';
+        if (updateStatus) {
+            updateStatus.textContent = result.message || 'Controllo completato.';
             updateStatus.className = 'update-status available';
-          }
+        }
         } else {
-          if (updateStatus) {
+        if (updateStatus) {
             updateStatus.textContent = 'Errore nel controllo: ' + result.error;
             updateStatus.className = 'update-status error';
-          }
         }
-      } catch (error) {
+        }
+    } catch (error) {
         if (updateStatus) {
-          updateStatus.textContent = 'Errore imprevisto: ' + error.message;
-          updateStatus.className = 'update-status error';
+        updateStatus.textContent = 'Errore imprevisto: ' + error.message;
+        updateStatus.className = 'update-status error';
         }
-      }
-      
-      checkUpdateBtn.disabled = false;
-      checkUpdateBtn.innerHTML = '<i class="fas fa-download"></i> Controlla Aggiornamenti';
+    }
+    
+    checkUpdateBtn.disabled = false;
+    checkUpdateBtn.innerHTML = '<i class="fas fa-download"></i> Controlla Aggiornamenti';
     });
   }
   

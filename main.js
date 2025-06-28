@@ -2118,8 +2118,12 @@ ipcMain.handle('execute-sqlite', async (event, query, params, dbName) => {
 // Handler per controllo manuale aggiornamenti
 ipcMain.handle('check-for-updates', async () => {
   try {
-    const result = await autoUpdater.checkForUpdates();
-    return { success: true, data: result };
+    await autoUpdater.checkForUpdates();
+    // Non restituire l'oggetto result, lascia che gli eventi gestiscano tutto
+    return { 
+      success: true, 
+      message: "Controllo aggiornamenti avviato. Verrai notificato se disponibili." 
+    };
   } catch (error) {
     console.error('Errore controllo aggiornamenti:', error);
     return { success: false, error: error.message };
