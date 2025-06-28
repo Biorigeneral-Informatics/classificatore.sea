@@ -98,6 +98,28 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getInfoRaccolta: () => ipcRenderer.invoke('get-info-raccolta'),
   hasInfoRaccolta: () => ipcRenderer.invoke('has-info-raccolta'),
   clearInfoRaccolta: () => ipcRenderer.invoke('clear-info-raccolta'),
+
+
+  // API per aggiornamenti (aggiungere nel contextBridge)
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  checkGitHubVersion: () => ipcRenderer.invoke('check-github-version'),
+
+  // Listeners per eventi di aggiornamento
+  onUpdateDownloading: (callback) => {
+    ipcRenderer.on('update-downloading', callback);
+    return () => ipcRenderer.removeListener('update-downloading', callback);
+  },
+  onDownloadProgress: (callback) => {
+    ipcRenderer.on('download-progress', callback);
+    return () => ipcRenderer.removeListener('download-progress', callback);
+  },
+  removeAllUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('update-downloading');
+    ipcRenderer.removeAllListeners('download-progress');
+  }
+
+
 });
 
 // Esposizione di alcune variabili di Node per utilizzo nel renderer
