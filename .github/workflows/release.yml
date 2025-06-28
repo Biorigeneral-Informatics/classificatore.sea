@@ -23,6 +23,12 @@ jobs:
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        files: build/*.exe
+        files: |
+          build/*.exe
+          build/latest*.yml
+          build/*.dmg
+          build/*.AppImage
+          build/*.deb
+          build/*.rpm
       env:
         GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
