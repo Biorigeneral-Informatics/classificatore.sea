@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     initNavigation();
     initSidebar();
     initThemeToggle();
-    updateAppVersion();
+    await updateAppVersion();
     
     // Carica dati salvati
     await loadSavedData();
@@ -75,17 +75,32 @@ function getBasename(filePath) {
 // ==== Funzioni di inizializzazione ====
 
 // Aggiorna la versione dell'applicazione
-function updateAppVersion() {
+async function updateAppVersion() {
     const appVersionElements = document.querySelectorAll('#appVersion, #aboutAppVersion');
-    const version = window.appInfo?.appVersion || '1.0.3';
     
-    appVersionElements.forEach(el => {
-        if (el.id === 'aboutAppVersion') {
-            el.textContent = `Versione ${version}`;
-        } else {
-            el.textContent = `WasteGuard ${version}`;
-        }
-    });
+    try {
+        // Ottieni la versione dal main process
+        const version = await window.appInfo.getAppVersion();
+        
+        appVersionElements.forEach(el => {
+            if (el.id === 'aboutAppVersion') {
+                el.textContent = `Versione ${version}`;
+            } else {
+                el.textContent = `WasteGuard ${version}`;
+            }
+        });
+    } catch (error) {
+        console.error('Errore nel recupero della versione:', error);
+        
+        // Fallback alla versione hardcoded
+        appVersionElements.forEach(el => {
+            if (el.id === 'aboutAppVersion') {
+                el.textContent = `Versione 1.0.3`;
+            } else {
+                el.textContent = `WasteGuard 1.0.3`;
+            }
+        });
+    }
 }
 
 // Inizializza la navigazione tra le sezioni

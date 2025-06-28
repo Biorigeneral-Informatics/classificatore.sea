@@ -2126,9 +2126,17 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
-// Handler per ottenere la versione corrente
+// Handler per ottenere la versione corrente dal package.json
 ipcMain.handle('get-app-version', () => {
-  return app.getVersion();
+  try {
+    // Leggi direttamente dal package.json
+    const packageJsonPath = path.join(__dirname, 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    return packageJson.version;
+  } catch (error) {
+    console.error('Errore lettura versione da package.json:', error);
+    return app.getVersion(); // Fallback a Electron API
+  }
 });
 
 // Handler per controllo versione latest su GitHub (fallback)

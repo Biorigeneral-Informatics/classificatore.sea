@@ -124,6 +124,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 // Esposizione di alcune variabili di Node per utilizzo nel renderer
 contextBridge.exposeInMainWorld('appInfo', {
-  appVersion: process.env.npm_package_version || '1.0.0',
+  // Non usare più process.env che non funziona nel build
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   platform: process.platform
 });
