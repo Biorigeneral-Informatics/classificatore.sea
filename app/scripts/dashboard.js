@@ -2,6 +2,9 @@
 //==================================================================================================
 
 document.addEventListener('DOMContentLoaded', async function() {
+
+    initUpdateSystem();
+
     // Inizializza interfaccia
     initNavigation();
     initSidebar();
@@ -1385,4 +1388,109 @@ function extractDataOraFromFileName(fileName) {
     }
     
     return 'Data_Non_Disponibile';
+}
+
+
+
+
+
+
+// Sistema di aggiornamento - Autoupdater
+function initUpdateSystem() {
+  const checkUpdateBtn = document.getElementById('checkUpdateBtn');
+  const updateStatus = document.getElementById('updateStatus');
+  
+  if (checkUpdateBtn) {
+    checkUpdateBtn.addEventListener('click', async () => {
+      checkUpdateBtn.disabled = true;
+      checkUpdateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Controllo...';
+      
+      if (updateStatus) {
+        updateStatus.textContent = 'Controllo aggiornamenti in corso...';
+        updateStatus.className = 'update-status checking';
+      }
+      
+      try {
+        const result = await window.electronAPI.checkForUpdates();
+        
+        if (result.success) {
+          if (updateStatus) {
+            updateStatus.textContent = 'Controllo completato. Se disponibile, l\'aggiornamento verrà mostrato automaticamente.';
+            updateStatus.className = 'update-status available';
+          }
+        } else {
+          if (updateStatus) {
+            updateStatus.textContent = 'Errore nel controllo: ' + result.error;
+            updateStatus.className = 'update-status error';
+          }
+        }
+      } catch (error) {
+        if (updateStatus) {
+          updateStatus.textContent = 'Errore imprevisto: ' + error.message;
+          updateStatus.className = 'update-status error';
+        }
+      }
+      
+      checkUpdateBtn.disabled = false;
+      checkUpdateBtn.innerHTML = '<i class="fas fa-download"></i> Controlla Aggiornamenti';
+    });
+  }
+  
+  // Listener per download in corso
+  window.electronAPI.onUpdateDownloading(() => {
+    showUpdateDownloadModal();
+  });
+  
+  // Listener per progress del download
+  window.electronAPI.onDownloadProgress((event, progress) => {
+    updateDownloadProgress(progress);
+  });
+}
+
+function showUpdateDownloadModal() {
+  // Rimuovi modal esistente se presente
+  const existingModal = document.getElementById('updateModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  const modal = document.createElement('div');
+  modal.className = 'modal-overlay';
+  modal.id = 'updateModal';
+  modal.innerHTML = `
+    <div class="modal-content">
+      <h3><i class="fas fa-download"></i> Download Aggiornamento</h3>
+      <p>Scaricamento della nuova versione in corso...</p>
+      <div class="progress-container">
+        <div class="progress-bar">
+          <div class="progress-fill" id="updateProgress" style="width: 0%"></div>
+        </div>
+        <span id="progressText">0%</span>
+      </div>
+      <small><i class="fas fa-info-circle"></i> Non chiudere l'applicazione durante il download</small>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+}
+
+function updateDownloadProgress(progress) {
+  const progressFill = document.getElementById('updateProgress');
+  const progressText = document.getElementById('progressText');
+  
+  if (progressFill && progressText) {
+    const percent = Math.round(progress.percent);
+    progressFill.style.width = percent + '%';
+    progressText.textContent = percent + '%';
+    
+    // Chiudi modal quando completato
+    if (percent >= 100) {
+      setTimeout(() => {
+        const modal = document.getElementById('updateModal');
+        if (modal) {
+          modal.remove();
+        }
+      }, 2000);
+    }
+  }
 }

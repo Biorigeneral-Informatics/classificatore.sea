@@ -8,6 +8,7 @@ const Database = require('better-sqlite3');
 const { autoUpdater } = require('electron-updater');
 
 
+
 function generateItalianDateTime() {
     const now = new Date();
     return now.toLocaleString('it-IT', {
@@ -146,24 +147,32 @@ function initializeDatabase() {
 }
 
 
-// Configurazione auto-updater
+// Configurazione auto-updater migliorata
 function configureAutoUpdater() {
-  // Configurazione per repository private
   autoUpdater.setFeedURL({
     provider: 'github',
-    owner: 'Biorigeneral-Informatics',           // Sostituisci con il tuo username GitHub
-    repo: 'classificatore.sea',          // Sostituisci con il nome del tuo repository
+    owner: 'Biorigeneral-Informatics',
+    repo: 'classificatore.sea',
     private: true
   });
   
-  autoUpdater.checkForUpdatesAndNotify();
+  // Controllo automatico ogni ora
+  setInterval(() => {
+    autoUpdater.checkForUpdates();
+  }, 60 * 60 * 1000); // 1 ora
+  
+  // Controllo iniziale (con delay per evitare conflitti all'avvio)
+  setTimeout(() => {
+    autoUpdater.checkForUpdates();
+  }, 10000); // 10 secondi dopo l'avvio
   
   autoUpdater.on('checking-for-update', () => {
     console.log('Controllo aggiornamenti...');
   });
   
-  autoUpdater.on('update-available', () => {
-    console.log('Aggiornamento disponibile');
+  autoUpdater.on('update-available', (info) => {
+    console.log('Aggiornamento disponibile:', info);
+    showUpdateDialog(info);
   });
   
   autoUpdater.on('update-not-available', () => {
@@ -176,11 +185,62 @@ function configureAutoUpdater() {
   
   autoUpdater.on('download-progress', (progressObj) => {
     console.log(`Scaricamento: ${progressObj.percent}%`);
+    if (mainWindow) {
+      mainWindow.webContents.send('download-progress', progressObj);
+    }
   });
   
-  autoUpdater.on('update-downloaded', () => {
-    console.log('Aggiornamento scaricato');
-    autoUpdater.quitAndInstall();
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Aggiornamento scaricato:', info);
+    showInstallDialog(info);
+  });
+}
+
+// Funzione per mostrare il dialogo di aggiornamento disponibile
+function showUpdateDialog(updateInfo) {
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Aggiornamento Disponibile - WasteGuard',
+    message: `È disponibile una nuova versione: ${updateInfo.version}`,
+    detail: `Versione corrente: ${app.getVersion()}\nNuova versione: ${updateInfo.version}\n\nVuoi scaricare e installare la nuova versione?`,
+    buttons: ['Scarica Ora', 'Più Tardi'],
+    defaultId: 0,
+    cancelId: 1,
+    icon: null
+  }).then(result => {
+    if (result.response === 0) {
+      autoUpdater.downloadUpdate();
+      
+      if (mainWindow) {
+        mainWindow.webContents.send('update-downloading');
+      }
+      
+      // Mostra notifica di inizio download
+      dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Download in corso',
+        message: 'Il download dell\'aggiornamento è iniziato.',
+        detail: 'Continua a usare l\'applicazione normalmente. Ti avviseremo quando sarà pronto.',
+        buttons: ['OK']
+      });
+    }
+  });
+}
+
+// Funzione per mostrare il dialogo di installazione
+function showInstallDialog(updateInfo) {
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: 'Aggiornamento Pronto - WasteGuard',
+    message: `Aggiornamento alla versione ${updateInfo.version} scaricato con successo!`,
+    detail: 'L\'applicazione verrà riavviata per completare l\'installazione. Tutti i tuoi dati verranno conservati.',
+    buttons: ['Installa Ora', 'Installa al Prossimo Avvio'],
+    defaultId: 0,
+    cancelId: 1
+  }).then(result => {
+    if (result.response === 0) {
+      autoUpdater.quitAndInstall();
+    }
   });
 }
 
@@ -644,6 +704,9 @@ function createApplicationMenu() {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+
+  configureAutoUpdater();
+
 }
 
 // Funzione per controllare le dipendenze Python
@@ -2050,6 +2113,40 @@ ipcMain.handle('execute-sqlite', async (event, query, params, dbName) => {
     };
   }
 });
+
+
+// Handler per controllo manuale aggiornamenti
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Errore controllo aggiornamenti:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Handler per ottenere la versione corrente
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
+// Handler per controllo versione latest su GitHub (fallback)
+ipcMain.handle('check-github-version', async () => {
+  try {
+    const fetch = require('electron-fetch').default;
+    const response = await fetch('https://api.github.com/repos/Biorigeneral-Informatics/classificatore.sea/releases/latest');
+    const data = await response.json();
+    return { success: true, latestVersion: data.tag_name, currentVersion: app.getVersion() };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+
+
+
+
 
 // -------------- fine mainHandle ------------- //
 // -------------  FINE SEZIONE HANDLE -------------//
