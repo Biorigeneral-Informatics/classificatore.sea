@@ -40,13 +40,7 @@
             <li><a href="#report" data-section="report"><i class="fas fa-file-alt"></i> <span>Report</span></a></li>
         </ul>
        
-        <!-- Aggiungere questo blocco nella sidebar o dove preferisci -->
-        <div class="update-section">
-        <button id="checkUpdateBtn" class="btn btn-outline-primary btn-sm">
-            <i class="fas fa-download"></i> Controlla Aggiornamenti
-        </button>
-        <div id="updateStatus" class="update-status mt-2"></div>
-        </div>
+        
 
         <!-- Contenitore tema e crediti -->
         <div class="theme-container">
@@ -91,11 +85,15 @@
                         <p id="errorsCount">0</p>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <i class="fas fa-clock"></i>
+                <!-- Sostituisci il riquadro "In Attesa" con questo -->
+                <div class="stat-card update-card">
+                    <i class="fas fa-download"></i>
                     <div class="stat-info">
-                        <h4>In Attesa</h4>
-                        <p id="pendingStatus">NO</p>
+                        <h4>Controllo Aggiornamenti</h4>
+                        <button id="checkUpdateBtn" class="btn btn-primary btn-sm">
+                            <i class="fas fa-sync-alt"></i> Verifica Aggiornamenti
+                        </button>
+                        <div id="updateStatus" class="update-status mt-2"></div>
                     </div>
                 </div>
                 
@@ -141,7 +139,7 @@
             </div>
 
             <div class="data-table">
-                <h3>File Salvati Versione 0.0.6 Corretta</h3>
+                <h3>File Salvati Versione 0.0.7 Corretta</h3>
                 <div id="savedFilesContainer">
                     <!-- La tabella dei file salvati verrà caricata dinamicamente qui -->
                     <table style="width: 100%;">

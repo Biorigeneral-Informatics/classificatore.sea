@@ -206,18 +206,6 @@ function configureAutoUpdater() {
     console.log('✅ Aggiornamento scaricato:', info);
     showInstallDialog(info);
   });
-  
-  // Controllo automatico ogni ora (solo in produzione)
-  if (app.isPackaged) {
-    setInterval(() => {
-      autoUpdater.checkForUpdates();
-    }, 60 * 60 * 1000);
-    
-    // Controllo iniziale con delay
-    setTimeout(() => {
-      autoUpdater.checkForUpdates();
-    }, 10000);
-  }
 }
 
 // MIGLIORATO: Dialog di download con più informazioni

@@ -3807,75 +3807,324 @@ button:disabled:hover {
 
 
 
-/* Stili per sistema aggiornamenti */
-.update-section {
-  margin: 1rem 0;
-  padding: 1rem;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  background: #f9f9f9;
-}
+/* ===============================================
+   STILI MODAL AGGIORNAMENTO MIGLIORATI
+   =============================================== */
 
-.update-status {
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.update-status.checking {
-  color: #2196F3;
-}
-
-.update-status.available {
-  color: #4CAF50;
-  font-weight: bold;
-}
-
-.update-status.error {
-  color: #f44336;
-}
-
-.modal-overlay {
+.update-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 10000;
+  animation: fadeIn 0.3s ease;
 }
 
-.modal-content {
-  background: white;
+.update-modal-content {
+  background: var(--card-bg);
+  color: var(--text-color);
   padding: 2rem;
-  border-radius: 8px;
-  max-width: 400px;
+  border-radius: 16px;
+  max-width: 480px;
+  width: 90%;
+  max-height: 90vh;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.3),
+    0 8px 20px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  animation: slideIn 0.3s ease;
+}
+
+.update-modal-header {
   text-align: center;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
 }
 
-.progress-container {
-  margin: 1rem 0;
+.update-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  animation: pulse 2s ease-in-out infinite;
 }
 
-.progress-bar {
+.update-icon i {
+  font-size: 1.8rem;
+  color: white;
+}
+
+.update-modal-header h3 {
+  color: var(--text-color);
+  margin: 0 0 0.5rem 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.update-modal-header p {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.update-progress-section {
+  margin-bottom: 1.5rem;
+}
+
+.update-progress-container {
+  background: var(--surface-card);
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.update-progress-bar {
   width: 100%;
-  height: 20px;
-  background: #f0f0f0;
-  border-radius: 10px;
+  height: 8px;
+  background: var(--surface-ground);
+  border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1rem;
+  position: relative;
 }
 
-.progress-fill {
+.update-progress-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.update-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4CAF50, #45a049);
+  background: linear-gradient(
+    90deg,
+    var(--primary),
+    var(--primary-light),
+    var(--primary)
+  );
+  border-radius: 4px;
   transition: width 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.update-progress-text {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
 }
 
 #progressText {
-  font-weight: bold;
-  color: #333;
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 1rem;
+}
+
+#downloadSpeed {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.update-download-details {
+  text-align: center;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.update-modal-footer {
+  background: var(--surface-ground);
+  margin: -2rem -2rem -2rem -2rem;
+  margin-top: 1rem;
+  padding: 1rem 2rem;
+  border-radius: 0 0 16px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.update-warning {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.update-warning i {
+  color: var(--warning);
+}
+
+/* Card aggiornamenti nella Home */
+.update-card {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  color: white;
+  border: none !important;
+}
+
+.update-card i {
+  color: white;
+  opacity: 0.9;
+}
+
+.update-card .stat-info h4 {
+  color: white;
+  margin-bottom: 0.75rem;
+}
+
+.update-card .btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.update-card .btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.update-status {
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.update-status.checking {
+  background: rgba(33, 150, 243, 0.2);
+  border-color: rgba(33, 150, 243, 0.3);
+  color: #e3f2fd;
+}
+
+.update-status.available {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: rgba(76, 175, 80, 0.3);
+  color: #e8f5e8;
+}
+
+.update-status.error {
+  background: rgba(244, 67, 54, 0.2);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #ffebee;
+}
+
+/* Animazioni */
+@keyframes fadeIn {
+  from { 
+    opacity: 0; 
+  }
+  to { 
+    opacity: 1; 
+  }
+}
+
+@keyframes slideIn {
+  from { 
+    opacity: 0; 
+    transform: translateY(-20px) scale(0.95); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0) scale(1); 
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { 
+    transform: scale(1); 
+  }
+  50% { 
+    transform: scale(1.05); 
+  }
+}
+
+@keyframes shimmer {
+  0% { 
+    transform: translateX(-100%); 
+  }
+  100% { 
+    transform: translateX(100%); 
+  }
+}
+
+/* Dark mode support */
+[data-theme="dark"] .update-modal-content {
+  background: #1a1a1a;
+  border-color: #333;
+}
+
+[data-theme="dark"] .update-progress-container {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+[data-theme="dark"] .update-progress-bar {
+  background: #333;
+}
+
+[data-theme="dark"] .update-modal-footer {
+  background: #2a2a2a;
+  border-color: #444;
+}
+
+[data-theme="dark"] .update-download-details {
+  border-color: #444;
+}
+
+
+
+
+.update-icon.error {
+  background: linear-gradient(135deg, var(--danger), #e57373);
+}
+
+.update-error-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.2);
+  border-radius: 8px;
+}
+
+.update-error-message {
+  color: var(--danger);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.update-error-details {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-family: 'Courier New', monospace;
+  background: var(--surface-ground);
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+  max-height: 100px;
+  overflow-y: auto;
 }

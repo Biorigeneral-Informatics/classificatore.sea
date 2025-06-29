@@ -1467,7 +1467,59 @@ function initUpdateSystem() {
     console.log('Progress ricevuto:', progress);
     updateDownloadProgress(progress);
   });
+
+
+  // FIX: Listener per errori di aggiornamento
+window.electronAPI.onUpdateError((event, error) => {
+  console.error('❌ Errore aggiornamento ricevuto:', error);
+  showUpdateErrorModal(error);
+});
+
 }
+
+
+
+
+// NUOVA funzione per mostrare errori
+function showUpdateErrorModal(error) {
+  const existingModal = document.getElementById('updateModal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+  
+  const modal = document.createElement('div');
+  modal.className = 'update-modal-overlay';
+  modal.id = 'updateModal';
+  modal.innerHTML = `
+    <div class="update-modal-content">
+      <div class="update-modal-header">
+        <div class="update-icon error">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <h3>Errore Aggiornamento</h3>
+        <p>Si è verificato un problema durante l'aggiornamento</p>
+      </div>
+      
+      <div class="update-error-section">
+        <div class="update-error-message">
+          ${error.message || 'Errore sconosciuto'}
+        </div>
+        ${error.details ? `<div class="update-error-details">${error.details}</div>` : ''}
+      </div>
+      
+      <div class="update-modal-footer">
+        <button class="btn btn-primary" onclick="this.closest('.update-modal-overlay').remove()">
+          <i class="fas fa-check"></i> OK
+        </button>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+}
+
+
+
 
 function showUpdateDownloadModal() {
   // Rimuovi modal esistente se presente
@@ -1477,20 +1529,37 @@ function showUpdateDownloadModal() {
   }
   
   const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
+  modal.className = 'update-modal-overlay';
   modal.id = 'updateModal';
   modal.innerHTML = `
-    <div class="modal-content">
-      <h3><i class="fas fa-download"></i> Download Aggiornamento</h3>
-      <p>Scaricamento della nuova versione in corso...</p>
-      <div class="progress-container">
-        <div class="progress-bar">
-          <div class="progress-fill" id="updateProgress"></div>
+    <div class="update-modal-content">
+      <div class="update-modal-header">
+        <div class="update-icon">
+          <i class="fas fa-download"></i>
         </div>
-        <span id="progressText">0%</span>
+        <h3>Download Aggiornamento</h3>
+        <p>Scaricamento della nuova versione in corso...</p>
       </div>
-      <div id="downloadStatus" class="download-status"></div>
-      <small><i class="fas fa-info-circle"></i> Non chiudere l'applicazione durante il download</small>
+      
+      <div class="update-progress-section">
+        <div class="update-progress-container">
+          <div class="update-progress-bar">
+            <div class="update-progress-fill" id="updateProgress"></div>
+          </div>
+          <div class="update-progress-text">
+            <span id="progressText">0%</span>
+            <span id="downloadSpeed"></span>
+          </div>
+        </div>
+        <div id="downloadDetails" class="update-download-details"></div>
+      </div>
+      
+      <div class="update-modal-footer">
+        <div class="update-warning">
+          <i class="fas fa-info-circle"></i>
+          <span>Non chiudere l'applicazione durante il download</span>
+        </div>
+      </div>
     </div>
   `;
   
@@ -1503,19 +1572,24 @@ function showUpdateDownloadModal() {
 function updateDownloadProgress(progress) {
   const progressFill = document.getElementById('updateProgress');
   const progressText = document.getElementById('progressText');
-  const downloadStatus = document.getElementById('downloadStatus');
+  const downloadSpeed = document.getElementById('downloadSpeed');
+  const downloadDetails = document.getElementById('downloadDetails');
   
   if (progressFill && progressText) {
     const percent = Math.round(progress.percent || 0);
     progressFill.style.width = percent + '%';
     progressText.textContent = percent + '%';
     
-    // Aggiorna status con informazioni dettagliate
-    if (downloadStatus && progress.bytesPerSecond) {
+    // Aggiorna informazioni dettagliate
+    if (progress.bytesPerSecond && downloadSpeed) {
       const speed = (progress.bytesPerSecond / 1024 / 1024).toFixed(2);
+      downloadSpeed.textContent = `${speed} MB/s`;
+    }
+    
+    if (progress.transferred && progress.total && downloadDetails) {
       const transferred = (progress.transferred / 1024 / 1024).toFixed(2);
       const total = (progress.total / 1024 / 1024).toFixed(2);
-      downloadStatus.textContent = `${transferred}MB / ${total}MB - ${speed}MB/s`;
+      downloadDetails.textContent = `${transferred} MB / ${total} MB`;
     }
     
     // Chiudi modal quando completato
