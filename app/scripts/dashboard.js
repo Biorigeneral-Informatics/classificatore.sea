@@ -1417,47 +1417,54 @@ function initUpdateSystem() {
   
   if (checkUpdateBtn) {
     checkUpdateBtn.addEventListener('click', async () => {
-    checkUpdateBtn.disabled = true;
-    checkUpdateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Controllo...';
-    
-    if (updateStatus) {
+      checkUpdateBtn.disabled = true;
+      checkUpdateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Controllo...';
+      
+      if (updateStatus) {
         updateStatus.textContent = 'Controllo aggiornamenti in corso...';
         updateStatus.className = 'update-status checking';
-    }
-    
-    try {
+      }
+      
+      try {
         const result = await window.electronAPI.checkForUpdates();
         
         if (result.success) {
-        if (updateStatus) {
+          if (updateStatus) {
             updateStatus.textContent = result.message || 'Controllo completato.';
             updateStatus.className = 'update-status available';
-        }
+          }
         } else {
-        if (updateStatus) {
+          if (updateStatus) {
             updateStatus.textContent = 'Errore nel controllo: ' + result.error;
             updateStatus.className = 'update-status error';
+          }
         }
-        }
-    } catch (error) {
+      } catch (error) {
         if (updateStatus) {
-        updateStatus.textContent = 'Errore imprevisto: ' + error.message;
-        updateStatus.className = 'update-status error';
+          updateStatus.textContent = 'Errore imprevisto: ' + error.message;
+          updateStatus.className = 'update-status error';
         }
-    }
-    
-    checkUpdateBtn.disabled = false;
-    checkUpdateBtn.innerHTML = '<i class="fas fa-download"></i> Controlla Aggiornamenti';
+      }
+      
+      checkUpdateBtn.disabled = false;
+      checkUpdateBtn.innerHTML = '<i class="fas fa-download"></i> Controlla Aggiornamenti';
     });
+  }
+  
+  // FIX: Rimuovi i listener esistenti prima di aggiungere i nuovi
+  if (window.electronAPI.removeAllUpdateListeners) {
+    window.electronAPI.removeAllUpdateListeners();
   }
   
   // Listener per download in corso
   window.electronAPI.onUpdateDownloading(() => {
+    console.log('Download iniziato - mostrando modal');
     showUpdateDownloadModal();
   });
   
-  // Listener per progress del download
+  // FIX: Listener per progress del download
   window.electronAPI.onDownloadProgress((event, progress) => {
+    console.log('Progress ricevuto:', progress);
     updateDownloadProgress(progress);
   });
 }
@@ -1478,25 +1485,38 @@ function showUpdateDownloadModal() {
       <p>Scaricamento della nuova versione in corso...</p>
       <div class="progress-container">
         <div class="progress-bar">
-          <div class="progress-fill" id="updateProgress" style="width: 0%"></div>
+          <div class="progress-fill" id="updateProgress"></div>
         </div>
         <span id="progressText">0%</span>
       </div>
+      <div id="downloadStatus" class="download-status"></div>
       <small><i class="fas fa-info-circle"></i> Non chiudere l'applicazione durante il download</small>
     </div>
   `;
   
   document.body.appendChild(modal);
+  
+  // Inizializza progress a 0%
+  updateDownloadProgress({ percent: 0 });
 }
 
 function updateDownloadProgress(progress) {
   const progressFill = document.getElementById('updateProgress');
   const progressText = document.getElementById('progressText');
+  const downloadStatus = document.getElementById('downloadStatus');
   
   if (progressFill && progressText) {
-    const percent = Math.round(progress.percent);
+    const percent = Math.round(progress.percent || 0);
     progressFill.style.width = percent + '%';
     progressText.textContent = percent + '%';
+    
+    // Aggiorna status con informazioni dettagliate
+    if (downloadStatus && progress.bytesPerSecond) {
+      const speed = (progress.bytesPerSecond / 1024 / 1024).toFixed(2);
+      const transferred = (progress.transferred / 1024 / 1024).toFixed(2);
+      const total = (progress.total / 1024 / 1024).toFixed(2);
+      downloadStatus.textContent = `${transferred}MB / ${total}MB - ${speed}MB/s`;
+    }
     
     // Chiudi modal quando completato
     if (percent >= 100) {

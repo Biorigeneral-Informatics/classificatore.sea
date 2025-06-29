@@ -147,81 +147,112 @@ function initializeDatabase() {
 }
 
 
-// Configurazione auto-updater migliorata
+// Configurazione auto-updater migliorata con gestione errori
 function configureAutoUpdater() {
+  // Configurazione GitHub
   autoUpdater.setFeedURL({
     provider: 'github',
-    owner: 'Biorigeneral-Informatics',           // Sostituisci con il tuo username GitHub
-    repo: 'classificatore.sea',          // Sostituisci con il nome del tuo repository
+    owner: 'Biorigeneral-Informatics',
+    repo: 'classificatore.sea',
     private: false
   });
   
-  // Controllo automatico ogni ora
-  setInterval(() => {
-    autoUpdater.checkForUpdates();
-  }, 60 * 60 * 1000); // 1 ora
+  // IMPORTANTE: Disabilita la verifica delle firme per testing
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
   
-  // Controllo iniziale (con delay per evitare conflitti all'avvio)
-  setTimeout(() => {
-    autoUpdater.checkForUpdates();
-  }, 10000); // 10 secondi dopo l'avvio
-  
+  // Event Handlers migliorati
   autoUpdater.on('checking-for-update', () => {
-    console.log('Controllo aggiornamenti...');
+    console.log('🔍 Controllo aggiornamenti...');
   });
   
   autoUpdater.on('update-available', (info) => {
-    console.log('Aggiornamento disponibile:', info);
+    console.log('✅ Aggiornamento disponibile:', info);
     showUpdateDialog(info);
   });
   
   autoUpdater.on('update-not-available', () => {
-    console.log('Nessun aggiornamento disponibile');
+    console.log('ℹ️ Nessun aggiornamento disponibile');
   });
   
+  // NUOVO: Gestione errori migliorata
   autoUpdater.on('error', (err) => {
-    console.log('Errore nell\'aggiornamento:', err);
+    console.error('❌ Errore auto-updater:', err);
+    
+    // Invia errore al renderer
+    if (mainWindow) {
+      mainWindow.webContents.send('update-error', {
+        message: err.message,
+        stack: err.stack
+      });
+    }
+    
+    // Mostra dialog di errore
+    dialog.showErrorBox('Errore Aggiornamento', 
+      `Si è verificato un errore durante l'aggiornamento:\n\n${err.message}\n\nRiprova più tardi.`);
   });
   
+  // MIGLIORATO: Progress con più dettagli
   autoUpdater.on('download-progress', (progressObj) => {
-    console.log(`Scaricamento: ${progressObj.percent}%`);
+    const logMsg = `📥 Download: ${Math.round(progressObj.percent)}% - ${(progressObj.bytesPerSecond/1024/1024).toFixed(2)}MB/s`;
+    console.log(logMsg);
+    
     if (mainWindow) {
       mainWindow.webContents.send('download-progress', progressObj);
     }
   });
   
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('Aggiornamento scaricato:', info);
+    console.log('✅ Aggiornamento scaricato:', info);
     showInstallDialog(info);
   });
+  
+  // Controllo automatico ogni ora (solo in produzione)
+  if (app.isPackaged) {
+    setInterval(() => {
+      autoUpdater.checkForUpdates();
+    }, 60 * 60 * 1000);
+    
+    // Controllo iniziale con delay
+    setTimeout(() => {
+      autoUpdater.checkForUpdates();
+    }, 10000);
+  }
 }
 
-// Funzione per mostrare il dialogo di aggiornamento disponibile
+// MIGLIORATO: Dialog di download con più informazioni
 function showUpdateDialog(updateInfo) {
+  const currentVersion = app.getVersion();
+  const newVersion = updateInfo.version;
+  
   dialog.showMessageBox(mainWindow, {
     type: 'info',
     title: 'Aggiornamento Disponibile - WasteGuard',
-    message: `È disponibile una nuova versione: ${updateInfo.version}`,
-    detail: `Versione corrente: ${app.getVersion()}\nNuova versione: ${updateInfo.version}\n\nVuoi scaricare e installare la nuova versione?`,
+    message: `È disponibile una nuova versione: ${newVersion}`,
+    detail: `Versione corrente: ${currentVersion}\nNuova versione: ${newVersion}\n\nDimensione: ${(updateInfo.files[0]?.size / 1024 / 1024).toFixed(2)}MB\n\nVuoi scaricare e installare la nuova versione?`,
     buttons: ['Scarica Ora', 'Più Tardi'],
     defaultId: 0,
     cancelId: 1,
     icon: null
   }).then(result => {
     if (result.response === 0) {
-      autoUpdater.downloadUpdate();
+      console.log('🚀 Avvio download aggiornamento...');
       
+      // Invia evento al renderer PRIMA di iniziare il download
       if (mainWindow) {
         mainWindow.webContents.send('update-downloading');
       }
       
-      // Mostra notifica di inizio download
-      dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Download in corso',
-        message: 'Il download dell\'aggiornamento è iniziato.',
-        detail: 'Continua a usare l\'applicazione normalmente. Ti avviseremo quando sarà pronto.',
-        buttons: ['OK']
+      // Avvia il download
+      autoUpdater.downloadUpdate().catch(error => {
+        console.error('❌ Errore download:', error);
+        
+        // Invia errore al renderer
+        if (mainWindow) {
+          mainWindow.webContents.send('update-error', {
+            message: 'Errore durante il download: ' + error.message
+          });
+        }
       });
     }
   });
@@ -2115,20 +2146,56 @@ ipcMain.handle('execute-sqlite', async (event, query, params, dbName) => {
 });
 
 
-// Handler per controllo manuale aggiornamenti
+// Handler IPC per controllo manuale aggiornamenti
 ipcMain.handle('check-for-updates', async () => {
   try {
-    await autoUpdater.checkForUpdates();
-    // Non restituire l'oggetto result, lascia che gli eventi gestiscano tutto
-    return { 
-      success: true, 
-      message: "Controllo aggiornamenti avviato. Verrai notificato se disponibili." 
-    };
+    console.log('🔍 Controllo manuale aggiornamenti richiesto');
+    
+    // Verifica connessione internet prima
+    const isOnline = await checkInternetConnection();
+    if (!isOnline) {
+      return { 
+        success: false, 
+        error: 'Connessione internet non disponibile' 
+      };
+    }
+    
+    const result = await autoUpdater.checkForUpdates();
+    
+    if (result) {
+      return { 
+        success: true, 
+        message: "Controllo completato. Verrai notificato se disponibili aggiornamenti." 
+      };
+    } else {
+      return { 
+        success: true, 
+        message: "Nessun aggiornamento disponibile." 
+      };
+    }
   } catch (error) {
-    console.error('Errore controllo aggiornamenti:', error);
-    return { success: false, error: error.message };
+    console.error('❌ Errore controllo aggiornamenti:', error);
+    return { 
+      success: false, 
+      error: `Errore durante il controllo: ${error.message}` 
+    };
   }
 });
+
+// NUOVO: Funzione per verificare connessione internet
+async function checkInternetConnection() {
+  try {
+    const { net } = require('electron');
+    return new Promise((resolve) => {
+      const request = net.request('https://api.github.com');
+      request.on('response', () => resolve(true));
+      request.on('error', () => resolve(false));
+      request.end();
+    });
+  } catch {
+    return false;
+  }
+}
 
 // Handler per ottenere la versione corrente dal package.json
 ipcMain.handle('get-app-version', () => {

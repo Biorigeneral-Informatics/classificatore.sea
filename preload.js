@@ -100,26 +100,53 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearInfoRaccolta: () => ipcRenderer.invoke('clear-info-raccolta'),
 
 
-  // API per aggiornamenti (aggiungere nel contextBridge)
+
+  // ===================================================================
+  // SEZIONE AGGIORNAMENTI - MIGLIORATA CON FIX PER PROGRESS TRACKING
+  // ===================================================================
+  
+  // API per aggiornamenti
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkGitHubVersion: () => ipcRenderer.invoke('check-github-version'),
 
-  // Listeners per eventi di aggiornamento
+  // FIX: Listeners migliorati per eventi di aggiornamento con logging
   onUpdateDownloading: (callback) => {
-    ipcRenderer.on('update-downloading', callback);
-    return () => ipcRenderer.removeListener('update-downloading', callback);
+    const wrappedCallback = (...args) => {
+      console.log('🚀 Evento update-downloading ricevuto nel preload:', args);
+      callback(...args);
+    };
+    ipcRenderer.on('update-downloading', wrappedCallback);
+    return () => ipcRenderer.removeListener('update-downloading', wrappedCallback);
   },
+  
   onDownloadProgress: (callback) => {
-    ipcRenderer.on('download-progress', callback);
-    return () => ipcRenderer.removeListener('download-progress', callback);
+    const wrappedCallback = (...args) => {
+      console.log('📥 Evento download-progress ricevuto nel preload:', args);
+      // args[0] è l'event, args[1] è il progress object
+      callback(...args);
+    };
+    ipcRenderer.on('download-progress', wrappedCallback);
+    return () => ipcRenderer.removeListener('download-progress', wrappedCallback);
   },
+  
+  // NUOVO: Listener per errori di aggiornamento
+  onUpdateError: (callback) => {
+    const wrappedCallback = (...args) => {
+      console.error('❌ Evento update-error ricevuto nel preload:', args);
+      callback(...args);
+    };
+    ipcRenderer.on('update-error', wrappedCallback);
+    return () => ipcRenderer.removeListener('update-error', wrappedCallback);
+  },
+  
+  // MIGLIORATO: Rimozione listener con gestione di tutti gli eventi
   removeAllUpdateListeners: () => {
+    console.log('🧹 Rimuovendo tutti i listener di aggiornamento...');
     ipcRenderer.removeAllListeners('update-downloading');
     ipcRenderer.removeAllListeners('download-progress');
+    ipcRenderer.removeAllListeners('update-error');
   }
-
-
 });
 
 // Esposizione di alcune variabili di Node per utilizzo nel renderer
