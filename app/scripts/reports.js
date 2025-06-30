@@ -629,6 +629,7 @@ async function openReport(reportPath) {
 }
 
 // Funzione migliorata per l'anteprima dei report
+// Funzione CORRETTA per l'anteprima dei report
 async function previewReport(reportName) {
     try {
         // Carica i dati del report
@@ -638,6 +639,8 @@ async function previewReport(reportName) {
             return;
         }
         
+        console.log('Dati report caricati:', reportData); // Debug
+        
         // Ottieni il container di anteprima
         const previewDialog = document.getElementById('reportPreviewDialog');
         const previewContent = document.getElementById('reportPreviewContent');
@@ -645,6 +648,19 @@ async function previewReport(reportName) {
         if (!previewDialog || !previewContent) {
             showNotification('Componenti di anteprima non trovati', 'error');
             return;
+        }
+        
+        // CORREZIONE: Estrai correttamente i dati dalla struttura del report
+        let dataToDisplay = [];
+        
+        if (reportData.risultati_classificazione && Array.isArray(reportData.risultati_classificazione)) {
+            // Caso normale: dati in reportData.risultati_classificazione
+            dataToDisplay = reportData.risultati_classificazione;
+        } else if (Array.isArray(reportData)) {
+            // Caso legacy: reportData è direttamente un array
+            dataToDisplay = reportData;
+        } else {
+            console.warn('Struttura dati report non riconosciuta:', reportData);
         }
         
         // Genera HTML per l'anteprima
@@ -659,9 +675,9 @@ async function previewReport(reportName) {
                         <tr>
         `;
         
-        // Aggiungi intestazioni
-        if (reportData.length > 0) {
-            const headers = Object.keys(reportData[0]);
+        // Aggiungi intestazioni se ci sono dati
+        if (dataToDisplay.length > 0) {
+            const headers = Object.keys(dataToDisplay[0]);
             headers.forEach(header => {
                 contentHtml += `<th>${header}</th>`;
             });
@@ -673,7 +689,7 @@ async function previewReport(reportName) {
             `;
             
             // Aggiungi righe
-            reportData.forEach(row => {
+            dataToDisplay.forEach(row => {
                 contentHtml += '<tr>';
                 headers.forEach(header => {
                     contentHtml += `<td>${row[header] !== undefined ? row[header] : ''}</td>`;

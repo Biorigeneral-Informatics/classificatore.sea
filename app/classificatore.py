@@ -2432,7 +2432,7 @@ class ClassificatoreRifiuti:
 
 def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
     """
-    Salva i risultati della classificazione in un file JSON
+    Salva i risultati della classificazione in un file JSON nella cartella reports
     
     Args:
         risultati (dict): Risultati della classificazione
@@ -2446,22 +2446,37 @@ def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
             print("Nessun risultato da salvare.")
             return False
         
-        # Percorso del file
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.join(script_dir, "data")
+        # MODIFICATO: Salva nella cartella reports invece che nella cartella data
+        from pathlib import Path
         
-        # Assicurati che la cartella esista
-        if not os.path.exists(data_dir):
-            os.makedirs(data_dir)
+        # Determina la cartella userData di Electron in base al sistema operativo
+        if os.name == 'nt':  # Windows
+            appdata = os.getenv('APPDATA')
+            if appdata:
+                reports_dir = os.path.join(appdata, 'WasteGuard', 'reports')
+            else:
+                # Fallback alla cartella classica se APPDATA non è disponibile
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                reports_dir = os.path.join(script_dir, "reports")
+        else:  # Linux/Mac
+            home_dir = str(Path.home())
+            reports_dir = os.path.join(home_dir, '.config', 'WasteGuard', 'reports')
         
-        file_path = os.path.join(data_dir, nome_file)
+        # Assicurati che la cartella reports esista
+        if not os.path.exists(reports_dir):
+            os.makedirs(reports_dir, recursive=True)
+            print(f"Cartella reports creata: {reports_dir}")
+        
+        # Percorso completo del file
+        file_path = os.path.join(reports_dir, nome_file)
         
         # Salva i risultati come JSON
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(risultati, f, ensure_ascii=False, indent=2)
         
-        print(f"Risultati salvati in {file_path}")
+        print(f"Risultati salvati nella cartella reports: {file_path}")
         return True
+        
     except Exception as e:
         print(f"Errore nel salvataggio dei risultati: {e}")
         return False
