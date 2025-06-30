@@ -953,7 +953,7 @@ function updateSaveButtonVisibility() {
 
 
 // Versione FINALE di saveAllData() che usa le API esistenti (senza verifyExcelData)
-
+// NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
 async function saveAllData() {
     console.log("=== INIZIO saveAllData() ===");
     
@@ -961,95 +961,8 @@ async function saveAllData() {
     showNotification('Salvataggio di tutti i dati in corso...', 'info');
     
     try {
-        // STEP 0: Verifica delle sostanze nel database usando saveExcelToPython
-        console.log("Step 0: Verifica sostanze nel database...");
-        
-        // Ottieni i dati Excel dalla sessionStorage
-        const raccoltaExcelData = sessionStorage.getItem('raccoltaExcelData');
-        
-        if (!raccoltaExcelData) {
-            throw new Error('Nessun dato Excel trovato. Caricare prima un file Excel.');
-        }
-        
-        let excelData = JSON.parse(raccoltaExcelData);
-        console.log("Dati Excel caricati per verifica:", excelData.length, "righe");
-        
-        try {
-            // Usa l'API esistente saveExcelToPython che già verifica le sostanze
-            console.log("Chiamata saveExcelToPython per verifica sostanze...");
-            const verifyResult = await window.electronAPI.saveExcelToPython(excelData, 'raccolta');
-            
-            console.log("Risultato verifica:", verifyResult);
-            
-            // Se la verifica fallisce a causa di sostanze mancanti
-            if (!verifyResult.success) {
-                if (verifyResult.sostanze_mancanti && verifyResult.sostanze_mancanti.length > 0) {
-                    console.log("Sostanze mancanti trovate:", verifyResult.sostanze_mancanti);
-                    
-                    // Mostra il dialog delle sostanze mancanti
-                    showSostanzeMissingDialog(verifyResult.sostanze_mancanti);
-                    
-                    // Interrompi il processo di salvataggio
-                    showNotification('Salvataggio annullato: sostanze mancanti nel database', 'error');
-                    return;
-                } else {
-                    // Se non ci sono sostanze_mancanti nel risultato, prova a estrarle dal messaggio
-                    if (verifyResult.message && verifyResult.message.includes("sostanze non sono presenti nel database:")) {
-                        const match = verifyResult.message.match(/sostanze non sono presenti nel database: (.+)$/);
-                        if (match) {
-                            const sostanzeMancanti = match[1].split(', ');
-                            console.log("Sostanze estratte dal messaggio:", sostanzeMancanti);
-                            showSostanzeMissingDialog(sostanzeMancanti);
-                            showNotification('Salvataggio annullato: sostanze mancanti nel database', 'error');
-                            return;
-                        }
-                    }
-                    
-                    // Fallback: mostra errore generico ma con possibilità di continuare
-                    const confirmProceed = confirm(
-                        `Errore nella verifica delle sostanze:\n\n${verifyResult.message || 'Errore sconosciuto'}\n\nVuoi procedere comunque con il salvataggio?`
-                    );
-                    
-                    if (!confirmProceed) {
-                        showNotification('Salvataggio annullato dall\'utente', 'warning');
-                        return;
-                    }
-                }
-            } else {
-                console.log("✅ Verifica sostanze completata con successo");
-            }
-                
-        } catch (verifyError) {
-            console.log("❌ ERRORE in saveExcelToPython:", verifyError.message);
-            
-            // Prova a estrarre informazioni sulle sostanze mancanti dall'errore
-            if (verifyError.message && verifyError.message.includes("sostanze non sono presenti nel database:")) {
-                const match = verifyError.message.match(/sostanze non sono presenti nel database: (.+)$/);
-                if (match) {
-                    const sostanzeMancanti = match[1].split(', ');
-                    console.log("Sostanze mancanti estratte dall'errore:", sostanzeMancanti);
-                    
-                    // Mostra direttamente il dialog con le sostanze mancanti
-                    showSostanzeMissingDialog(sostanzeMancanti);
-                    showNotification('Salvataggio annullato: sostanze mancanti nel database', 'error');
-                    return;
-                }
-            }
-            
-            // Se non riusciamo a estrarre le sostanze, mostra errore dettagliato
-            const messaggioErrore = `Si è verificato un errore durante la verifica delle sostanze nel database:\n\n${verifyError.message}\n\nVuoi procedere comunque con il salvataggio?`;
-            const confirmProceed = confirm(messaggioErrore);
-            
-            if (!confirmProceed) {
-                showNotification('Salvataggio annullato dall\'utente', 'warning');
-                return;
-            }
-            
-            console.log("Utente ha scelto di procedere nonostante l'errore di verifica");
-        }
-        
         // STEP 1: Salva i dati dei form
-        console.log("=== STEP 1: Salvataggio form ===");
+        console.log("Step 1: Salvataggio form...");
         const formSaved = await window.infoRaccoltaManager.saveFormData();
         
         if (!formSaved) {
@@ -1061,42 +974,106 @@ async function saveAllData() {
         console.log("✅ Form salvati con successo");
 
         // STEP 2: Ottieni i dati del form
+        console.log("Step 2: Ottenimento dati form...");
         const formData = window.infoRaccoltaManager.getFormData();
         console.log("Dati form ottenuti:", formData);
 
-        // STEP 3: Salva il progetto unificato
-        console.log("=== STEP 3: Salvataggio progetto unificato ===");
+        // STEP 3: Ottieni i dati Excel dalla tabella (versione aggiornata)
+        console.log("Step 3: Ottenimento dati Excel dalla tabella...");
+        const table = document.querySelector('.excel-data-table');
+        if (!table) {
+            console.error("❌ Nessuna tabella Excel trovata nell'interfaccia");
+            showNotification('Nessun dato Excel trovato. Caricare prima un file Excel.', 'error');
+            return;
+        }
+
+        // Crea un array di oggetti con i dati aggiornati dalla tabella
+        const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
+        const datiExcel = [];
         
-        // Crea un identificativo unico per il progetto basato sui dati del form
-        const committente = formData.committente?.replace(/\s+/g, '') || 'NoCommittente';
-        const dataCampionamento = formData.dataCampionamento?.replace(/-/g, '') || new Date().toISOString().slice(0, 10).replace(/-/g, '');
-        const identificativo = `${committente}_${dataCampionamento}`;
-        
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const rowData = {};
+            row.querySelectorAll('td').forEach((cell, index) => {
+                rowData[headers[index]] = cell.textContent.trim();
+            });
+            datiExcel.push(rowData);
+        });
+
+        console.log("Dati Excel estratti dalla tabella:", datiExcel.length, "righe");
+
+        // STEP 4: Funzione helper per pulire il nome committente
+        function pulisciNomeCommittente(nome) {
+            if (!nome) return 'NoCommittente';
+            return nome
+                .replace(/[^a-zA-Z0-9]/g, '') // Rimuovi caratteri speciali
+                .replace(/\s+/g, '') // Rimuovi spazi
+                .substring(0, 50); // Limita lunghezza
+        }
+
+        // STEP 5: Crea l'identificativo univoco
+        const committente = formData.infoCertificato?.committente || 'NoCommittente';
+        const dataCampionamento = formData.infoCertificato?.dataCampionamento || new Date().toISOString().split('T')[0];
+        const committenteNormalizzato = pulisciNomeCommittente(committente);
+        const dataFormattata = dataCampionamento.replace(/-/g, ''); // YYYYMMDD
+        const identificativo = `${committenteNormalizzato}_${dataFormattata}`;
+
         console.log("Identificativo progetto:", identificativo);
-        
-        // Salva il progetto unificato utilizzando l'API
-        const saveResult = await window.electronAPI.saveProgettoRaccolta({
+
+        // STEP 6: Crea l'oggetto progetto unificato
+        const progettoCompleto = {
             id: identificativo,
             timestamp: new Date().toISOString(),
             caratteristicheFisiche: formData.caratteristicheFisiche,
             infoCertificato: formData.infoCertificato,
-            datiExcel: excelData,
+            datiExcel: datiExcel,
             metalliCampione: {}, // Sarà popolato dopo l'elaborazione Python
-            versione: 1
-        });
+            versione: 1 // Per gestione versioni incrementali future
+        };
+
+        console.log("Progetto unificato creato:", progettoCompleto);
+
+        // STEP 7: Verifica esistenza Python e calcola metalli
+        try {
+            console.log("Step 7: Invio dei dati a Python per elaborazione metalli...");
+            const pythonResult = await window.electronAPI.saveExcelToPython(datiExcel, 'raccolta');
+            console.log("Risultato Python:", pythonResult);
+            
+            if (pythonResult.success && pythonResult.metalli_campione) {
+                progettoCompleto.metalliCampione = pythonResult.metalli_campione;
+                console.log("✅ Metalli campione aggiunti al progetto:", pythonResult.metalli_campione);
+            } else {
+                console.warn("⚠️ Nessun metallo trovato o errore Python:", pythonResult.message);
+                if (!pythonResult.success && pythonResult.sostanze_mancanti) {
+                    showNotification(pythonResult.message, 'error', 4000);
+                    return; // Interrompi se ci sono sostanze mancanti
+                }
+            }
+        } catch (pythonError) {
+            console.error("❌ Errore nell'elaborazione Python:", pythonError);
+            showNotification(pythonError.message, 'error', 4000);
+            return; // Interrompi se Python fallisce
+        }
+
+        // STEP 8: Salva il progetto unificato
+        console.log("Step 8: Salvataggio progetto unificato...");
+        const saveResult = await window.electronAPI.saveProgettoRaccolta(progettoCompleto);
         
         if (saveResult.success) {
-            // Pulisci i dati temporanei
-            sessionStorage.removeItem('raccoltaExcelData');
-            sessionStorage.removeItem('raccoltaFormData');
-            
-            // Reset dell'interfaccia
-            if (typeof resetRaccoltaInterface === 'function') {
-                resetRaccoltaInterface();
+            // Aggiorna sessionStorage per retrocompatibilità con sali-metalli
+            sessionStorage.setItem('raccoltaExcelData', JSON.stringify(datiExcel));
+            if (progettoCompleto.metalliCampione && Object.keys(progettoCompleto.metalliCampione).length > 0) {
+                sessionStorage.setItem('metalliCampione', JSON.stringify(progettoCompleto.metalliCampione));
             }
             
-            // Notifica successo
-            showNotification(`Progetto "${identificativo}" salvato con successo! Vai alla sezione Sali-Metalli per continuare.`, 'success');
+            // STEP 9: PULIZIA INTERFACCIA DOPO SALVATAGGIO SUCCESSO
+            console.log("Step 9: Pulizia interfaccia...");
+            cleanUpRaccoltaInterfaceAfterSave();
+            
+            // Aggiorna la sezione sali-metalli
+            await initSaliMetalli();
+            
+            // Notifica generale di successo
+            showNotification('Progetto salvato con successo! Vai alla sezione Sali-Metalli per continuare.', 'success');
             
             // Aggiungi attività
             if (typeof addActivity === 'function') {
@@ -1104,16 +1081,73 @@ async function saveAllData() {
             }
             
             console.log("✅ Progetto unificato salvato con successo!");
+            
         } else {
             throw new Error(saveResult.message || 'Errore nel salvataggio del progetto');
         }
         
     } catch (error) {
-        console.log("❌ ERRORE GENERALE:", error.message);
+        console.error("❌ ERRORE GENERALE:", error.message);
         showNotification('Errore nel salvataggio: ' + error.message, 'error');
     }
     
     console.log("=== FINE saveAllData() ===");
+}
+
+// NUOVA FUNZIONE: Pulisce l'interfaccia dopo il salvataggio con successo
+function cleanUpRaccoltaInterfaceAfterSave() {
+    try {
+        console.log("🧹 Pulizia interfaccia in corso...");
+        
+        // Rimuovi le markature di modifiche per pulizia visiva
+        document.querySelectorAll('.excel-data-table td.modified').forEach(cell => {
+            cell.classList.remove('modified');
+        });
+        
+        // Nascondi la tabella Excel
+        const excelTable = document.getElementById('excelDataTable');
+        if (excelTable) {
+            excelTable.style.display = 'none';
+            const tableContainer = excelTable.querySelector('.table-container');
+            if (tableContainer) {
+                tableContainer.innerHTML = '';
+            }
+        }
+        
+        // Rimuovi la visualizzazione del file
+        const fileInfo = document.querySelector('.file-info');
+        if (fileInfo) {
+            fileInfo.remove();
+        }
+        
+        // Ripristina la sezione di drop
+        const dropZone = document.getElementById('dropZone');
+        if (dropZone) {
+            dropZone.style.display = 'block';
+        }
+        
+        // Rimuovi i dati temporanei dalla sessionStorage
+        sessionStorage.removeItem('raccoltaExcelData');
+        sessionStorage.removeItem('uploadedFileName');
+        sessionStorage.removeItem('uploadedFileDate');
+        
+        // Aggiorna la visibilità dei pulsanti
+        updateSaveButtonVisibility();
+        
+        console.log("✅ Interfaccia pulita con successo");
+        
+    } catch (error) {
+        console.error('❌ Errore nella pulizia interfaccia:', error);
+        // Anche in caso di errore, prova almeno a nascondere la tabella
+        const excelTable = document.getElementById('excelDataTable');
+        if (excelTable) {
+            excelTable.style.display = 'none';
+        }
+        const dropZone = document.getElementById('dropZone');
+        if (dropZone) {
+            dropZone.style.display = 'block';
+        }
+    }
 }
 
 
