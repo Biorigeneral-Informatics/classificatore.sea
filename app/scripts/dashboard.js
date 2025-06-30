@@ -951,11 +951,48 @@ function updateSaveButtonVisibility() {
 }
 
 
-
-// Versione FINALE di saveAllData() che usa le API esistenti (senza verifyExcelData)
+// NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
+// NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
 // NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
 async function saveAllData() {
-    console.log("=== INIZIO saveAllData() ===");
+    console.log("Funzione saveAllData avviata - Salvataggio unificato");
+    
+    // *** NUOVO CONTROLLO PER NUMERI CON VIRGOLA ***
+    // Verifica se ci sono numeri con virgola nei dati Excel caricati
+    const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+    if (raccoltaDataStr) {
+        try {
+            const raccoltaData = JSON.parse(raccoltaDataStr);
+            
+            // Controlla ogni riga dei dati per numeri con virgola
+            let haCommaNumbers = false;
+            for (const row of raccoltaData) {
+                for (const [key, value] of Object.entries(row)) {
+                    // Converte il valore in stringa e controlla se contiene virgole nei numeri
+                    const stringValue = String(value);
+                    
+                    // Pattern per rilevare numeri con virgola come separatore decimale
+                    // Esempi: "12,5", "1.234,56", "0,75"
+                    const commaNumberPattern = /^\d{1,3}(\.\d{3})*,\d+$|^\d+,\d+$/;
+                    
+                    if (commaNumberPattern.test(stringValue.trim())) {
+                        haCommaNumbers = true;
+                        console.log(`Trovato numero con virgola nella colonna "${key}": "${stringValue}"`);
+                        break;
+                    }
+                }
+                if (haCommaNumbers) break;
+            }
+            
+            // Se trovati numeri con virgola, mostra alert e interrompi il salvataggio
+            if (haCommaNumbers) {
+                alert("Attenzione: sono stati rilevati numeri che utilizzano la virgola (,) come separatore decimale. Per salvare correttamente, i numeri devono utilizzare il punto (.) come separatore decimale. Correggere i dati prima di procedere con il salvataggio.");
+                return; // Interrompe la funzione
+            }
+        } catch (error) {
+            console.error("Errore durante il controllo dei numeri con virgola:", error);
+        }
+    }
     
     // Notifica l'utente che il processo di salvataggio è iniziato
     showNotification('Salvataggio di tutti i dati in corso...', 'info');
@@ -966,28 +1003,24 @@ async function saveAllData() {
         const formSaved = await window.infoRaccoltaManager.saveFormData();
         
         if (!formSaved) {
-            console.error("❌ Errore nel salvataggio dei form");
-            showNotification('Errore nel salvataggio del form. Verificare che tutti i campi obbligatori siano compilati.', 'error');
-            return;
+            console.error("Errore nel salvataggio dei form");
+            return; // Interrompi se i form non sono validi
         }
         
-        console.log("✅ Form salvati con successo");
+        console.log("Form salvati con successo");
 
         // STEP 2: Ottieni i dati del form
-        console.log("Step 2: Ottenimento dati form...");
         const formData = window.infoRaccoltaManager.getFormData();
-        console.log("Dati form ottenuti:", formData);
-
-        // STEP 3: Ottieni i dati Excel dalla tabella (versione aggiornata)
-        console.log("Step 3: Ottenimento dati Excel dalla tabella...");
+        
+        // STEP 3: Ottieni i dati Excel dalla tabella
         const table = document.querySelector('.excel-data-table');
         if (!table) {
-            console.error("❌ Nessuna tabella Excel trovata nell'interfaccia");
-            showNotification('Nessun dato Excel trovato. Caricare prima un file Excel.', 'error');
+            console.error("Nessuna tabella Excel trovata nell'interfaccia");
+            showNotification('Nessuna tabella Excel trovata', 'error');
             return;
         }
 
-        // Crea un array di oggetti con i dati aggiornati dalla tabella
+        // Crea un array di oggetti con i dati aggiornati
         const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
         const datiExcel = [];
         
@@ -999,11 +1032,9 @@ async function saveAllData() {
             datiExcel.push(rowData);
         });
 
-        console.log("Dati Excel estratti dalla tabella:", datiExcel.length, "righe");
-
         // STEP 4: Funzione helper per pulire il nome committente
         function pulisciNomeCommittente(nome) {
-            if (!nome) return 'NoCommittente';
+            if (!nome) return 'SconosciutoCommittente';
             return nome
                 .replace(/[^a-zA-Z0-9]/g, '') // Rimuovi caratteri speciali
                 .replace(/\s+/g, '') // Rimuovi spazi
@@ -1011,13 +1042,11 @@ async function saveAllData() {
         }
 
         // STEP 5: Crea l'identificativo univoco
-        const committente = formData.infoCertificato?.committente || 'NoCommittente';
-        const dataCampionamento = formData.infoCertificato?.dataCampionamento || new Date().toISOString().split('T')[0];
+        const committente = formData.infoCertificato.committente || 'SconosciutoCommittente';
+        const dataCampionamento = formData.infoCertificato.dataCampionamento || new Date().toISOString().split('T')[0];
         const committenteNormalizzato = pulisciNomeCommittente(committente);
         const dataFormattata = dataCampionamento.replace(/-/g, ''); // YYYYMMDD
         const identificativo = `${committenteNormalizzato}_${dataFormattata}`;
-
-        console.log("Identificativo progetto:", identificativo);
 
         // STEP 6: Crea l'oggetto progetto unificato
         const progettoCompleto = {
@@ -1040,16 +1069,16 @@ async function saveAllData() {
             
             if (pythonResult.success && pythonResult.metalli_campione) {
                 progettoCompleto.metalliCampione = pythonResult.metalli_campione;
-                console.log("✅ Metalli campione aggiunti al progetto:", pythonResult.metalli_campione);
+                console.log("Metalli campione aggiunti al progetto:", pythonResult.metalli_campione);
             } else {
-                console.warn("⚠️ Nessun metallo trovato o errore Python:", pythonResult.message);
+                console.warn("Nessun metallo trovato o errore Python:", pythonResult.message);
                 if (!pythonResult.success && pythonResult.sostanze_mancanti) {
                     showNotification(pythonResult.message, 'error', 4000);
                     return; // Interrompi se ci sono sostanze mancanti
                 }
             }
         } catch (pythonError) {
-            console.error("❌ Errore nell'elaborazione Python:", pythonError);
+            console.error("Errore nell'elaborazione Python:", pythonError);
             showNotification(pythonError.message, 'error', 4000);
             return; // Interrompi se Python fallisce
         }
@@ -1059,39 +1088,39 @@ async function saveAllData() {
         const saveResult = await window.electronAPI.saveProgettoRaccolta(progettoCompleto);
         
         if (saveResult.success) {
-            // Aggiorna sessionStorage per retrocompatibilità con sali-metalli
+            // STEP 9: Aggiorna sessionStorage per retrocompatibilità con sali-metalli
             sessionStorage.setItem('raccoltaExcelData', JSON.stringify(datiExcel));
             if (progettoCompleto.metalliCampione && Object.keys(progettoCompleto.metalliCampione).length > 0) {
                 sessionStorage.setItem('metalliCampione', JSON.stringify(progettoCompleto.metalliCampione));
             }
             
-            // STEP 9: PULIZIA INTERFACCIA DOPO SALVATAGGIO SUCCESSO
-            console.log("Step 9: Pulizia interfaccia...");
-            cleanUpRaccoltaInterfaceAfterSave();
-            
+            // Rimuovi markature di modifiche per pulizia visiva
+            document.querySelectorAll('.excel-data-table td.modified').forEach(cell => {
+                cell.classList.remove('modified');
+            });
+
             // Aggiorna la sezione sali-metalli
             await initSaliMetalli();
+            
+            // Pulisci l'interfaccia della sezione raccolta
+            cleanUpRaccoltaInterfaceAfterSave();
             
             // Notifica generale di successo
             showNotification('Progetto salvato con successo! Vai alla sezione Sali-Metalli per continuare.', 'success');
             
             // Aggiungi attività
-            if (typeof addActivity === 'function') {
-                addActivity('Progetto salvato', `Progetto "${identificativo}" creato`, 'fas fa-save');
-            }
+            addActivity('Progetto salvato', `Progetto "${identificativo}" creato`, 'fas fa-save');
             
-            console.log("✅ Progetto unificato salvato con successo!");
+            console.log("Progetto unificato salvato con successo!");
             
         } else {
             throw new Error(saveResult.message || 'Errore nel salvataggio del progetto');
         }
         
     } catch (error) {
-        console.error("❌ ERRORE GENERALE:", error.message);
+        console.error("Errore nel salvataggio:", error);
         showNotification('Errore nel salvataggio: ' + error.message, 'error');
     }
-    
-    console.log("=== FINE saveAllData() ===");
 }
 
 // NUOVA FUNZIONE: Pulisce l'interfaccia dopo il salvataggio con successo
