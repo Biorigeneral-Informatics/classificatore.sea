@@ -36,22 +36,32 @@ async function updateClassificationUI() {
         const infoMessage = document.getElementById('classificationInfoMessage');
         
         if (fileList.length > 0) {
-            // Se ci sono file, mostra il selettore e il pulsante di avvio
+            // Se ci sono file, mostra il selettore e ENTRAMBI i pulsanti
             if (fileInfo) fileInfo.style.display = 'block';
-            if (startBtn) startBtn.style.display = 'inline-block';
+            if (startBtn) {
+                startBtn.style.display = 'inline-block';
+                startBtn.disabled = false; // Assicurati che sia abilitato
+            }
+            // ✅ NUOVO: Mostra sempre anche il pulsante "Vai a Reports"
+            if (goToReportsBtn) {
+                goToReportsBtn.style.display = 'inline-block';
+            }
             
             // Rimuovi il messaggio informativo se esiste
             if (infoMessage) {
                 infoMessage.remove();
             }
-            
+   
             // Aggiorna le informazioni sui file disponibili
             updateClassificationFileSelector(fileList);
         } else {
-            // Se non ci sono file, mostra un messaggio che invita l'utente a completare l'assegnazione
+            // Se non ci sono file, nascondi tutto e mostra messaggio informativo
             if (fileInfo) fileInfo.style.display = 'none';
             if (startBtn) startBtn.style.display = 'none';
-            if (goToReportsBtn) goToReportsBtn.style.display = 'none';
+            // ✅ NUOVO: Mantieni visibile il pulsante "Vai a Reports" anche se non ci sono file
+            if (goToReportsBtn) {
+                goToReportsBtn.style.display = 'inline-block';
+            }
             
             // Aggiungi un messaggio informativo se non esiste già
             if (!infoMessage) {
@@ -80,7 +90,6 @@ async function updateClassificationUI() {
         showNotification('Errore nell\'aggiornamento dell\'interfaccia', 'error');
     }
 }
-
 
 // Nuova funzione per creare il selettore di file e gestire il limite
 // MODIFICATO: updateClassificationFileSelector con display codice EER - dataOra - committente
@@ -327,17 +336,6 @@ async function avviaClassificazione() {
             console.error('Errore nella generazione del report:', reportError);
             // Non bloccare completamente, ma notifica l'errore
             showNotification('Classificazione completata ma errore nella generazione del report: ' + reportError.message, 'warning');
-        }
-        
-        // Nascondi il pulsante "Avvia Classificazione"
-        if (startBtn) {
-            startBtn.style.display = 'none';
-        }
-        
-        // Mostra il pulsante "Vai a reports"
-        const goToReportsBtn = document.getElementById('goToReportsBtn');
-        if (goToReportsBtn) {
-            goToReportsBtn.style.display = 'inline-block';
         }
         
         addActivity('Classificazione completata', `File elaborato: ${selectedFile}`, 'fas fa-check');
