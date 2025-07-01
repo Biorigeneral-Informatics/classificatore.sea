@@ -155,15 +155,56 @@ function renderSaliMetalliUI() {
     console.log(`Metalli con concentrazione > 0: ${metalliNelCampione.length}`);
     console.log('Metalli filtrati:', JSON.stringify(metalliNelCampione));
     
-    // Controlla se ci sono metalli nel campione
+    // ✅ CASO: Nessun metallo nel campione - ATTIVA BYPASS
     if (metalliNelCampione.length === 0) {
+        console.log("🔄 Nessun metallo trovato - Preparazione bypass automatico");
+        
+        // Mostra messaggio informativo con opzione di bypass
         container.innerHTML = `
             <div class="no-data-message">
                 <i class="fas fa-info-circle"></i>
-                <p>Nessun metallo trovato nel campione. Verifica i dati caricati o controlla che i valori non siano sotto il limite di rilevabilità.</p>
+                <p>Nessun metallo rilevabile trovato nel campione.</p>
+                <p>Il file contiene solo sostanze non-metalli e può essere inviato direttamente alla sezione Classificazione.</p>
+                <div style="margin-top: 1rem;">
+                    <button id="bypassSaliMetalli" class="btn btn-primary">
+                        <i class="fas fa-forward"></i> Invia direttamente a Classificazione
+                    </button>
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.9em; color: #666;">
+                    <i class="fas fa-clock"></i> Bypass automatico tra <span id="countdown">5</span> secondi...
+                </div>
             </div>
         `;
-        return;
+        
+        // ✅ Event listener per il bypass manuale
+        const bypassButton = document.getElementById('bypassSaliMetalli');
+        if (bypassButton) {
+            bypassButton.addEventListener('click', async () => {
+                clearInterval(countdownTimer); // Ferma il countdown
+                await bypassSaliMetalliAndSaveFile();
+            });
+        }
+        
+        // ✅ Countdown visivo e bypass automatico dopo 5 secondi
+        let secondsLeft = 5;
+        const countdownElement = document.getElementById('countdown');
+        
+        const countdownTimer = setInterval(() => {
+            secondsLeft--;
+            if (countdownElement) {
+                countdownElement.textContent = secondsLeft;
+            }
+            
+            if (secondsLeft <= 0) {
+                clearInterval(countdownTimer);
+                if (document.getElementById('bypassSaliMetalli')) {
+                    console.log("🤖 Bypass automatico attivato dopo countdown");
+                    bypassSaliMetalliAndSaveFile();
+                }
+            }
+        }, 1000);
+        
+        return; // Esci dalla funzione
     }
     
     // Crea una sezione per ogni metallo nel campione
@@ -836,11 +877,186 @@ async function salvaFileConTimestamp(datiCampione) {
     }
 }
 
+// ✅ NUOVA FUNZIONE: Bypass della sezione Sali-Metalli per file senza metalli
+async function bypassSaliMetalliAndSaveFile() {
+    try {
+        console.log("🔄 Avvio bypass Sali-Metalli per file senza metalli...");
+        
+        // Recupera metadati del progetto
+        let metadatiProgetto = null;
+        try {
+            const progettoResult = await window.electronAPI.loadProgettoRaccolta();
+            if (progettoResult.success && progettoResult.data) {
+                metadatiProgetto = {
+                    committente: progettoResult.data.infoCertificato?.committente || 'Committente_Sconosciuto',
+                    dataCampionamento: progettoResult.data.infoCertificato?.dataCampionamento || new Date().toISOString().split('T')[0],
+                    codiceEER: progettoResult.data.infoCertificato?.codiceEER || 'EER_MANCANTE',
+                    numeroCampionamento: progettoResult.data.infoCertificato?.numeroCampionamento,
+                    caratteristicheFisiche: progettoResult.data.caratteristicheFisiche || {},
+                    infoCertificato: progettoResult.data.infoCertificato || {},
+                    timestampProgetto: progettoResult.data.timestamp,
+                    idProgetto: progettoResult.data.id
+                };
+                console.log("Metadati estratti dal progetto per bypass:", metadatiProgetto);
+            }
+        } catch (error) {
+            console.warn("Impossibile caricare metadati dal progetto per bypass:", error.message);
+        }
+        
+        // Prepara i dati del campione SENZA sali (solo altre sostanze non-metalli)
+        const datiCampione = {
+            _metadata: metadatiProgetto
+        };
+        
+        // ✅ CORREZIONE: Recupera sostanze non-metalli dal progetto
+        try {
+            const progettoResult = await window.electronAPI.loadProgettoRaccolta();
+            if (progettoResult.success && progettoResult.data?.datiExcel) {
+                const datiExcel = progettoResult.data.datiExcel;
+                console.log("Dati Excel trovati nel progetto per bypass:", datiExcel);
+                
+                // Processa ogni riga dei dati Excel
+                for (const row of datiExcel) {
+                    const sostanzaNome = row.Descriz || '';
+                    const valoreStr = row.Valore_Txt || '';
+                    
+                    console.log(`Processando sostanza: ${sostanzaNome} = ${valoreStr}`);
+                    
+                    // Salta se è vuoto o inizia con "<" (sotto soglia)
+                    if (!sostanzaNome || !valoreStr || valoreStr.trim().startsWith('<')) {
+                        console.log(`Saltata sostanza ${sostanzaNome}: valore sotto soglia o vuoto`);
+                        continue;
+                    }
+                    
+                    // ✅ CONTROLLO: Verifica se è un metallo (da escludere)
+                    const isMetallo = await isMetalloCheck(sostanzaNome);
+                    if (isMetallo) {
+                        console.log(`Saltata sostanza ${sostanzaNome}: è un metallo`);
+                        continue;
+                    }
+                    
+                    // Prova a convertire in numero
+                    const valoreNumerico = parseFloat(valoreStr.replace(',', '.'));
+                    if (!isNaN(valoreNumerico) && valoreNumerico > 0) {
+                        const sostanzaNormalizzata = sostanzaNome.trim();
+                        
+                        datiCampione[sostanzaNormalizzata] = {
+                            concentrazione_ppm: valoreNumerico,
+                            concentrazione_percentuale: valoreNumerico / 10000,
+                            nome_originale: sostanzaNormalizzata
+                        };
+                        
+                        console.log(`✅ Aggiunta sostanza non-metallo: ${sostanzaNormalizzata} = ${valoreNumerico} ppm`);
+                    }
+                }
+            } else {
+                console.warn("Nessun dato Excel trovato nel progetto per bypass");
+            }
+        } catch (error) {
+            console.error("Errore nel recupero dati Excel per bypass:", error);
+        }
+        
+        // Verifica che ci siano sostanze da includere
+        const sostanzeKeys = Object.keys(datiCampione).filter(key => key !== '_metadata');
+        console.log(`Sostanze trovate per bypass: ${sostanzeKeys.length}`, sostanzeKeys);
+        
+        if (sostanzeKeys.length === 0) {
+            // ✅ GESTIONE CASO NESSUNA SOSTANZA: Crea file vuoto ma valido
+            console.warn("Nessuna sostanza valida trovata, creando file di bypass minimo");
+            
+            // Aggiungi almeno una voce placeholder per evitare errori nel classificatore
+            datiCampione['PLACEHOLDER_BYPASS'] = {
+                concentrazione_ppm: 0.001,  // Valore minimo
+                concentrazione_percentuale: 0.0000001,
+                nome_originale: 'File senza sostanze rilevabili'
+            };
+        }
+        
+        // Genera nome file per il bypass
+        const codiceEER = metadatiProgetto?.codiceEER || 'EER_MANCANTE';
+        const committente = metadatiProgetto?.committente || 'Committente_Sconosciuto';
+        const dataOraItaliana = generateItalianDateTime();
+        
+        const committenteSanificato = committente
+            .replace(/[^a-zA-Z0-9]/g, '')
+            .substring(0, 20);
+        
+        const fileName = `dati_campione_${codiceEER}_${dataOraItaliana}_${committenteSanificato}.json`;
+        
+        console.log(`📁 Generato nome file per bypass: ${fileName}`);
+        console.log(`📋 Contenuto dati campione:`, datiCampione);
+        
+        // Controlla limite file
+        const fileList = await window.electronAPI.getCampioneFiles();
+        if (fileList.length >= 8) {
+            showNotification('Limite massimo di 8 file raggiunto. Elimina alcuni file dalla sezione Classificazione prima di continuare.', 'warning');
+            return;
+        }
+        
+        // Salva il file
+        const saveResult = await window.electronAPI.saveCampioneData(datiCampione, fileName);
+        
+        if (saveResult.success) {
+            console.log(`✅ File ${fileName} salvato con successo tramite bypass`);
+            
+            // Elimina il progetto temporaneo
+            try {
+                const deleteResult = await window.electronAPI.deleteProgettoRaccolta();
+                if (deleteResult.success) {
+                    console.log("🗑️ Progetto temporaneo eliminato con successo (bypass)");
+                }
+            } catch (deleteError) {
+                console.warn("⚠️ Errore nell'eliminazione del progetto temporaneo (bypass):", deleteError.message);
+            }
+            
+            // Pulisci interfaccia Sali-Metalli
+            cleanUpSaliMetalliInterfaceAfterSave();
+            
+            const numSostanze = Object.keys(datiCampione).filter(k => k !== '_metadata').length;
+            showNotification(`File ${fileName} salvato con successo! ${numSostanze} sostanze non-metalli processate.`, 'success');
+            addActivity('Bypass Sali-Metalli', 'File senza metalli inviato direttamente a Classificazione', 'fas fa-forward');
+            
+            // Vai alla sezione classificazione
+            showSection('classificazione');
+            
+            // Aggiorna l'interfaccia di classificazione
+            if (typeof updateClassificationUI === 'function') {
+                updateClassificationUI();
+            }
+            
+        } else {
+            throw new Error(saveResult.message || 'Errore nel salvataggio del file di bypass');
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore nel bypass Sali-Metalli:', error);
+        showNotification('Errore nel bypass: ' + error.message, 'error');
+    }
+}
 
-
-
-
-
+// ✅ FUNZIONE HELPER: Verifica se una sostanza è un metallo (asincrona)
+async function isMetalloCheck(nomeSostanza) {
+    try {
+        // Usa il dizionario dei metalli già caricato
+        if (Object.keys(metalliDizionario).length === 0) {
+            await loadMetalli(); // Carica se non ancora fatto
+        }
+        
+        const nomePulito = nomeSostanza.toLowerCase().trim();
+        
+        // Controlla se la sostanza è presente nel dizionario dei metalli
+        return Object.values(metalliDizionario).some(metallo => {
+            const metalloNomePulito = metallo.nome.toLowerCase().trim();
+            return metalloNomePulito === nomePulito || 
+                   nomePulito.includes(metalloNomePulito) ||
+                   metalloNomePulito.includes(nomePulito);
+        });
+        
+    } catch (error) {
+        console.warn(`Errore nella verifica metallo per ${nomeSostanza}:`, error);
+        return false; // In caso di errore, considera come non-metallo
+    }
+}
 
 // Esportazioni
 window.salvaFileConTimestamp = salvaFileConTimestamp;
