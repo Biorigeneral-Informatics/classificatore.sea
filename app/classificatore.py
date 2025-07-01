@@ -879,13 +879,18 @@ class ClassificatoreRifiuti:
         Returns:
             dict: Risultati della classificazione o None se ci sono errori
         """
+        print("=== INIZIO METODO classifica_dati ===", file=sys.stderr)
+        print(f"Numero sostanze ricevute: {len(campione_dati)}", file=sys.stderr)
+        
         try:
             # Verifica preliminare: controlla se tutte le sostanze sono presenti nel database
+            print("Controllo sostanze nel database...", file=sys.stderr)
             sostanze_mancanti = []
             
             # Prima ottieni tutte le sostanze dal database con i loro nomi normalizzati
             cursor = self.database.conn.cursor()
             
+            print("Caricamento sostanze dal database...", file=sys.stderr)
             # 1. Ottieni tutte le sostanze dalla tabella "sostanze"
             cursor.execute('SELECT Nome FROM "sostanze"')
             sostanze_db = [row[0] for row in cursor.fetchall()]
@@ -900,37 +905,52 @@ class ClassificatoreRifiuti:
             print(f"Trovate {len(sostanze_db)} sostanze e {len(sali_db)} sali nel database", file=sys.stderr)
             
             # Crea un dizionario di nomi normalizzati per il confronto
+            print("Creazione dizionario nomi normalizzati...", file=sys.stderr)
             sostanze_db_normalize = {self.normalize_name(nome): nome for nome in tutti_i_nomi}
 
-            for nome_sostanza in campione_dati.keys():
+            print("Controllo presenza sostanze campione nel database...", file=sys.stderr)
+            for i, nome_sostanza in enumerate(campione_dati.keys()):
+                print(f"Controllo sostanza {i+1}/{len(campione_dati)}: '{nome_sostanza}'", file=sys.stderr)
+                
                 # Normalizza il nome della sostanza dall'input
                 nome_normalizzato = self.normalize_name(nome_sostanza)
+                print(f"  Nome normalizzato: '{nome_normalizzato}'", file=sys.stderr)
                 
                 # Controlla se il nome normalizzato esiste nel database
                 if nome_normalizzato not in sostanze_db_normalize:
                     sostanze_mancanti.append(nome_sostanza)
-                    print(f"Sostanza mancante: '{nome_sostanza}' (normalizzata: '{nome_normalizzato}')", file=sys.stderr)
+                    print(f"  ❌ SOSTANZA MANCANTE: '{nome_sostanza}' (normalizzata: '{nome_normalizzato}')", file=sys.stderr)
+                else:
+                    print(f"  ✅ Sostanza trovata nel database", file=sys.stderr)
             
             # Se ci sono sostanze mancanti, interrompi la classificazione
             if sostanze_mancanti:
-                print("\nERRORE: Impossibile avviare la classificazione.")
-                print("Le seguenti sostanze non sono presenti nella Tabella di Riscontro:")
+                print(f"\n❌ ERRORE: Impossibile avviare la classificazione.", file=sys.stderr)
+                print(f"Le seguenti {len(sostanze_mancanti)} sostanze non sono presenti nella Tabella di Riscontro:", file=sys.stderr)
                 for sostanza in sostanze_mancanti:
-                    print(f"  - {sostanza}")
-                print("\nPotrebbe trattarsi di errori di battitura nei file di input.")
-                print("Verificare i nomi delle sostanze e assicurarsi che corrispondano esattamente a quelli nella Tabella di Riscontro.")
+                    print(f"  - {sostanza}", file=sys.stderr)
+                print("\nPotrebbe trattarsi di errori di battitura nei file di input.", file=sys.stderr)
+                print("Verificare i nomi delle sostanze e assicurarsi che corrispondano esattamente a quelli nella Tabella di Riscontro.", file=sys.stderr)
                 return None
-                
+            
+            print("✅ Tutte le sostanze sono presenti nel database", file=sys.stderr)
+            
             # VERIFICA AGGIUNTIVA: controlla se tutte le sostanze hanno le hazard class necessarie
+            print("Controllo hazard class necessarie...", file=sys.stderr)
             sostanze_senza_hazard_class = []
             
             for nome_sostanza in campione_dati.keys():
+                print(f"Controllo hazard class per: '{nome_sostanza}'", file=sys.stderr)
+                
                 # Se è un sale (cioè è presente nella tabella sali)
                 if nome_sostanza in sali_db:
+                    print(f"  '{nome_sostanza}' è un sale, controllo frasi H...", file=sys.stderr)
                     # Per i sali, dobbiamo cercare le frasi H direttamente nel database
                     cursor = self.database.conn.cursor()
                     cursor.execute('SELECT Hazard_Statement, Hazard_Class_and_Category FROM "frasi H" WHERE Nome_sostanza = ?', (nome_sostanza,))
                     frasi_h_rows = cursor.fetchall()
+                    
+                    print(f"  Trovate {len(frasi_h_rows)} frasi H per il sale", file=sys.stderr)
                     
                     # Verifica se le frasi che richiedono hazard class ce l'hanno
                     for row in frasi_h_rows:
@@ -938,7 +958,8 @@ class ClassificatoreRifiuti:
                         hazard_class = row[1]
                         
                         if frase_h in self.database.frasi_h_require_class and (not hazard_class or hazard_class.strip() == ""):
-                            if nome_sostanza not in sostanze_senza_hazard_class:
+                            print(f"  ❌ Manca hazard class per frase {frase_h}", file=sys.stderr)
+                            if nome_sostanza not in [s["sostanza"] for s in sostanze_senza_hazard_class]:
                                 sostanze_senza_hazard_class.append({
                                     "sostanza": nome_sostanza,
                                     "errore": f"Manca hazard class per {frase_h}",
@@ -947,25 +968,49 @@ class ClassificatoreRifiuti:
                             else:
                                 # Aggiungi la frase alla lista di frasi mancanti per questa sostanza
                                 next(item for item in sostanze_senza_hazard_class if item["sostanza"] == nome_sostanza)["frasi_mancanti"].append(frase_h)
+                        else:
+                            print(f"  ✅ Hazard class OK per frase {frase_h}", file=sys.stderr)
                 else:
-                    # Per le sostanze normali, usa il metodo esistente
-                    verifica = self.database.verifica_hazard_class_required(nome_sostanza)
+                    print(f"  '{nome_sostanza}' è una sostanza normale, verifica hazard class...", file=sys.stderr)
+                    
+                    # CORREZIONE: Usa il nome normalizzato per la ricerca, come nel controllo precedente
+                    nome_normalizzato = self.normalize_name(nome_sostanza)
+                    nome_db_corretto = sostanze_db_normalize.get(nome_normalizzato, nome_sostanza)
+                    
+                    print(f"  Cercando frasi H per nome normalizzato: '{nome_db_corretto}'", file=sys.stderr)
+                    
+                    # Per le sostanze normali, usa il metodo esistente con il nome corretto
+                    verifica = self.database.verifica_hazard_class_required(nome_db_corretto)
                     if not verifica["success"]:
+                        print(f"  ❌ Problema hazard class: {verifica['message']}", file=sys.stderr)
                         sostanze_senza_hazard_class.append({
                             "sostanza": nome_sostanza,
                             "errore": verifica["message"],
                             "frasi_mancanti": verifica["missing_hazard_class"]
                         })
+                    else:
+                        print(f"  ✅ Hazard class verificata per sostanza normale", file=sys.stderr)
             
-            # Se ci sono sostanze senza le hazard class richieste, interrompi
+            # Se ci sono sostanze senza le hazard class richieste, gestisci il caso
             if sostanze_senza_hazard_class:
-                print("\nERRORE: Impossibile avviare la classificazione.")
-                print("Le seguenti sostanze hanno frasi H che richiedono hazard class ma questa informazione è mancante:")
-                for info in sostanze_senza_hazard_class:
-                    print(f"  - {info['sostanza']}: mancano hazard class per {', '.join(info['frasi_mancanti'])}")
-                print("\nLa classificazione richiede l'informazione sulla hazard class per determinare correttamente i limiti da applicare.")
-                print("Si consiglia di aggiornare il database con le hazard class corrette per queste sostanze.")
-                return None
+                print(f"\n⚠️ AVVISO: Trovate sostanze senza frasi H associate:", file=sys.stderr)
+                for item in sostanze_senza_hazard_class:
+                    print(f"  - {item['sostanza']}: {item['errore']}", file=sys.stderr)
+                
+                # Filtra solo gli errori critici (frasi H che richiedono hazard class mancanti)
+                errori_critici = [item for item in sostanze_senza_hazard_class 
+                                if "non trovata nel database" not in item['errore']]
+                
+                if errori_critici:
+                    print(f"\n❌ ERRORE CRITICO: Sostanze con frasi H che richiedono hazard class mancanti:", file=sys.stderr)
+                    for item in errori_critici:
+                        print(f"  - {item['sostanza']}: {item['errore']}", file=sys.stderr)
+                    return None
+                else:
+                    print(f"✅ Nessun errore critico, proseguimento con la classificazione...", file=sys.stderr)
+            
+            print("✅ Tutte le hazard class sono complete", file=sys.stderr)
+            print("🚀 Proseguimento con la classificazione effettiva...", file=sys.stderr)
             
             # Dizionario per memorizzare le informazioni complete del campione
             campione = {}
@@ -1020,9 +1065,15 @@ class ClassificatoreRifiuti:
                                 "hazard_class": None
                             })
                 else:
-                    # Per le sostanze normali, usa i metodi esistenti
-                    frasi_h_con_class = self.database.get_frasi_h_con_class(nome_sostanza)
-                    frasi_euh_con_class = self.database.get_frasi_euh_con_class(nome_sostanza)
+                    # Per le sostanze normali, usa il nome normalizzato per la ricerca
+                    nome_normalizzato = self.normalize_name(nome_sostanza)
+                    nome_db_corretto = sostanze_db_normalize.get(nome_normalizzato, nome_sostanza)
+                    
+                    # Per le sostanze normali, usa i metodi esistenti con il nome corretto
+                    frasi_h_con_class = self.database.get_frasi_h_con_class(nome_db_corretto)
+                    frasi_euh_con_class = self.database.get_frasi_euh_con_class(nome_db_corretto)
+                    
+                    print(f"Sostanza '{nome_sostanza}' → ricerca frasi H con nome DB: '{nome_db_corretto}'", file=sys.stderr)
                 
                 # Se non trova frasi H e c'è un nome originale, prova a usare quello
                 if (not frasi_h_con_class or len(frasi_h_con_class) == 0) and nome_originale:
@@ -1088,6 +1139,9 @@ class ClassificatoreRifiuti:
                         if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 0):
                             hp_sostanza.add("HP2")
                     
+                    # Per HP3, aggiungi alla sommatoria senza cut-off (verrà verificato dopo)
+                    if frase_h_clean in self.database.hp_mapping["HP3"]:
+                        sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
                     
                     # Per HP8, verifica H314 con cut-off 1%
                     if frase_h_clean in self.database.hp_mapping["HP8"]:
@@ -1133,9 +1187,6 @@ class ClassificatoreRifiuti:
                             
                             # Aggiungi alla sommatoria per categoria
                             sommatoria_per_frase[frase_key] += concentrazione_percentuale
-                            
-                            # RIMUOVI O COMMENTA LA SEGUENTE RIGA PER EVITARE LA DOPPIA SOMMATORIA
-                            # sommatoria_per_frase[frase_h_clean] += concentrazione_percentuale
                     
                     # Per HP7, verifica delle frasi H cancerogene (senza sommatoria)
                     if frase_h_clean in self.database.hp_mapping["HP7"]:
@@ -1216,7 +1267,6 @@ class ClassificatoreRifiuti:
                             if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 3.0):
                                 hp_sostanza.add("HP10")
 
-
                     # Per HP11, verifica delle frasi H mutagene (senza sommatoria e senza cut-off)
                     if frase_h_clean in self.database.hp_mapping["HP11"]:
                         # Per H340, gestione per mutagenicità Cat. 1A/1B
@@ -1288,16 +1338,6 @@ class ClassificatoreRifiuti:
                             # Verifica se supera il limite per HP13 (non si applica cut-off)
                             if concentrazione_percentuale >= self.database.valori_limite.get(frase_h_clean, 10.0):
                                 hp_sostanza.add("HP13")
-                                                    
-                                # STEP 3: Verifica le sommatorie per HP3
-                                hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
-                                if hp3_sommatoria["assegnata"]:
-                                    hp_assegnate.add("HP3")
-                                    # Aggiungi o aggiorna la motivazione
-                                    if "HP3" in motivazioni_hp:
-                                        motivazioni_hp["HP3"] = f"{motivazioni_hp['HP3']}; {hp3_sommatoria['motivo']}"
-                                    else:
-                                        motivazioni_hp["HP3"] = hp3_sommatoria["motivo"]
 
                     # Per HP14, verifica frasi H ecotossiche con cut-off specifici
                     if frase_h_clean in self.database.hp_mapping["HP14"]:
@@ -1332,6 +1372,21 @@ class ClassificatoreRifiuti:
                         if concentrazione_percentuale >= self.database.valori_limite.get(frase_euh_clean, 0.1):
                             hp_sostanza.add("HP12")
             
+            # FINE DEL LOOP PRINCIPALE - ORA VERIFICHIAMO LE SOMMATORIE FINALI
+            
+            # STEP 3: Verifica HP3 (sommatorie + punto di infiammabilità)
+            hp3_sommatoria = self._verifica_hp3_sommatoria(sommatoria_per_frase)
+            hp3_infiammabilita = self._verifica_hp3_infiammabilita()
+            
+            if hp3_sommatoria["assegnata"] or hp3_infiammabilita["assegnata"]:
+                hp_assegnate.add("HP3")
+                motivi_hp3 = []
+                if hp3_sommatoria["assegnata"]:
+                    motivi_hp3.append(hp3_sommatoria["motivo"])
+                if hp3_infiammabilita["assegnata"]:
+                    motivi_hp3.append(hp3_infiammabilita["motivo"])
+                motivazioni_hp["HP3"] = "; ".join(motivi_hp3)
+
             # STEP 4: Verifica le sommatorie per HP8
             hp8_sommatoria = self._verifica_hp8_sommatoria(sommatoria_per_frase)
             if hp8_sommatoria["assegnata"]:
@@ -1445,14 +1500,17 @@ class ClassificatoreRifiuti:
                 "contiene_gasolio": self.contiene_gasolio
             }
             
+            print("✅ Classificazione completata con successo", file=sys.stderr)
+            
             return risultati
             
         except Exception as e:
             import traceback
-            traceback.print_exc()
-            print(f"Errore nella classificazione: {str(e)}")
+            traceback.print_exc(file=sys.stderr)
+            print(f"❌ ERRORE CRITICO in classifica_dati: {str(e)}", file=sys.stderr)
             return None
-    
+
+
     def _verifica_hp3_infiammabilita(self):
         """
         Verifica i criteri di HP3 basati sul punto di infiammabilità
@@ -2395,6 +2453,8 @@ class ClassificatoreRifiuti:
             risultato["motivo"] = f"HP14 assegnata per: {'; '.join(condizioni_soddisfatte)}"
             print(f"HP14 assegnata: {risultato['motivo']}")
         
+        print("✅ Classificazione completata con successo", file=sys.stderr)
+        
         return risultato
 
 
@@ -2489,6 +2549,8 @@ def main():
     MODIFICATO: Ora include i metadati nei risultati per l'aggregazione
     """
     try:
+        print("=== INIZIO CLASSIFICAZIONE ===", file=sys.stderr)
+        
         # Verifica se è stato passato un nome file come argomento
         nome_file = None
         if len(sys.argv) > 1:
@@ -2498,40 +2560,53 @@ def main():
         else:
             print("Nessun file specificato, usando il file di default")
         
+        print("Fase 1: Inizializzazione database...", file=sys.stderr)
         # Inizializza il database
         database = DatabaseSostanze()
         
         # Collegamento al database SQLite
         success_connection = database.connetti_database()
         if not success_connection:
+            print("ERRORE: Connessione database fallita", file=sys.stderr)
             return json.dumps({
                 "success": False, 
                 "message": "Impossibile connettersi al database"
             })
+        print("Database connesso con successo", file=sys.stderr)
 
+        print("Fase 2: Caricamento frasi H...", file=sys.stderr)
         # Carica frasi H e EUH
         success_loading = database.carica_frasi_h()
         if not success_loading:
+            print("ERRORE: Caricamento frasi H fallito", file=sys.stderr)
             return json.dumps({
                 "success": False, 
                 "message": "Impossibile caricare i dati dal database"
             })
+        print("Frasi H caricate con successo", file=sys.stderr)
         
+        print("Fase 3: Caricamento frasi EUH...", file=sys.stderr)
         success_loading_euh = database.carica_frasi_euh()
         if not success_loading_euh:
+            print("ERRORE: Caricamento frasi EUH fallito", file=sys.stderr)
             return json.dumps({
                 "success": False, 
                 "message": "Impossibile caricare le frasi EUH dal database"
             })
+        print("Frasi EUH caricate con successo", file=sys.stderr)
 
+        print("Fase 4: Inizializzazione classificatore...", file=sys.stderr)
         # Inizializza il classificatore
         classificatore = ClassificatoreRifiuti(database)
+        print("Classificatore inizializzato", file=sys.stderr)
         
+        print("Fase 5: Caricamento dati campione...", file=sys.stderr)
         # MODIFICATO: Carica i dati reali del campione CON i metadati
         campione_dati, metadati = carica_dati_campione(nome_file)
         
         # Verifica che siano stati caricati dati
         if not campione_dati:
+            print("ERRORE: Dati campione non caricati", file=sys.stderr)
             if nome_file:
                 return json.dumps({
                     "success": False, 
@@ -2543,22 +2618,30 @@ def main():
                     "message": "Nessun dato campione disponibile"
                 })
         
+        print(f"Dati campione caricati: {len(campione_dati)} sostanze", file=sys.stderr)
+        print(f"Sostanze nel campione: {list(campione_dati.keys())}", file=sys.stderr)
+        
+        print("Fase 6: Avvio classificazione...", file=sys.stderr)
         # Classifica il rifiuto usando i dati reali
         risultati = classificatore.classifica_dati(campione_dati)
 
         # Se c'è stato un errore nella classificazione
         if not risultati:
+            print("ERRORE: Classificazione ha restituito None", file=sys.stderr)
             return json.dumps({
                 "success": False, 
-                "message": "Errore durante la classificazione"
+                "message": "Errore durante la classificazione - nessun risultato restituito"
             })
+        
+        print("Classificazione completata con successo", file=sys.stderr)
+        print(f"Numero di chiavi nei risultati: {len(risultati) if isinstance(risultati, dict) else 'N/A'}", file=sys.stderr)
         
         # NUOVO: Aggiungi i metadati ai risultati per l'aggregazione
         if metadati:
             risultati['_metadata'] = metadati
-            print(f"Metadati inclusi nei risultati: Committente={metadati.get('committente', 'N/A')}")
+            print(f"Metadati inclusi nei risultati: Committente={metadati.get('committente', 'N/A')}", file=sys.stderr)
         else:
-            print("Nessun metadato da includere nei risultati")
+            print("Nessun metadato da includere nei risultati", file=sys.stderr)
         
         # Genera un nome file per i risultati basato sul file di input
         if nome_file and nome_file != "dati_campione.json":
@@ -2591,207 +2674,21 @@ def main():
         })
     
     except Exception as e:
-        # Gestisci qualsiasi eccezione non prevista
+        # Gestisci qualsiasi eccezione non prevista con dettagli completi
         import traceback
-        traceback.print_exc()
+        error_details = traceback.format_exc()
+        print(f"ERRORE CRITICO nella funzione main():", file=sys.stderr)
+        print(f"Tipo errore: {type(e).__name__}", file=sys.stderr)
+        print(f"Messaggio: {str(e)}", file=sys.stderr)
+        print(f"Traceback completo:", file=sys.stderr)
+        print(error_details, file=sys.stderr)
+        
         return json.dumps({
             "success": False, 
-            "message": f"Errore durante la classificazione: {str(e)}"
+            "message": f"Errore durante la classificazione: {str(e)}",
+            "error_type": type(e).__name__,
+            "traceback": error_details
         })
-
-
-# Funzioni di supporto per esportazione dei risultati
-def esporta_risultati_excel(risultati, file_path):
-    """
-    Esporta i risultati in formato Excel
-    
-    Args:
-        risultati (dict): Risultati della classificazione
-        file_path (str): Percorso del file Excel da creare
-        
-    Returns:
-        bool: True se l'esportazione ha avuto successo, False altrimenti
-    """
-    try:
-        import pandas as pd
-        
-        # Crea DataFrame per le sostanze
-        sostanze_data = []
-        for nome_sostanza, info in risultati["campione"].items():
-            sostanze_data.append({
-                "Sostanza": nome_sostanza,
-                "Concentrazione (ppm)": info["concentrazione_ppm"],
-                "Concentrazione (%)": info["concentrazione_percentuale"],
-                "Frasi H": ", ".join(info.get("frasi_h", [])),
-                "Caratteristiche HP": ", ".join(info.get("caratteristiche_pericolo", []))
-            })
-        
-        sostanze_df = pd.DataFrame(sostanze_data)
-        
-        # Crea DataFrame per le sommatorie
-        sommatorie_data = []
-        for frase_h, valore in risultati["sommatoria_per_frase"].items():
-            if valore > 0:  # Mostra solo valori > 0
-                limite = risultati["valori_limite"].get(frase_h, "N/A")
-                sommatorie_data.append({
-                    "Frase H": frase_h,
-                    "Concentrazione Totale (%)": valore,
-                    "Valore Limite (%)": limite,
-                    "Superamento Limite": "Sì" if limite != "N/A" and valore >= limite else "No"
-                })
-        
-        sommatorie_df = pd.DataFrame(sommatorie_data)
-        
-        # Crea DataFrame per il risultato finale
-        hp_data = []
-        for hp in risultati["caratteristiche_pericolo"]:
-            motivazione = risultati.get("motivazioni_hp", {}).get(hp, "")
-            hp_data.append({
-                "Caratteristica di Pericolo": hp,
-                "Descrizione": _get_hp_description(hp),
-                "Motivazione": motivazione
-            })
-        
-        hp_df = pd.DataFrame(hp_data)
-        
-        # Crea DataFrame per informazioni sul punto di infiammabilità
-        info_data = []
-        info_data.append({
-            "Stato Fisico": risultati.get("stato_fisico", "N/A"),
-            "Punto Infiammabilità (°C)": risultati.get("punto_infiammabilita", "N/A"),
-            "Contiene Gasolio/Carburanti/Oli": "Sì" if risultati.get("contiene_gasolio", False) else "No"
-        })
-        
-        info_df = pd.DataFrame(info_data)
-        
-        # Scrivi i DataFrame in un file Excel con fogli separati
-        with pd.ExcelWriter(file_path) as writer:
-            hp_df.to_excel(writer, sheet_name="Caratteristiche di Pericolo", index=False)
-            info_df.to_excel(writer, sheet_name="Informazioni Fisiche", index=False)
-            sostanze_df.to_excel(writer, sheet_name="Sostanze", index=False)
-            sommatorie_df.to_excel(writer, sheet_name="Sommatorie", index=False)
-        
-        print(f"Risultati esportati in Excel: {file_path}")
-        return True
-    
-    except Exception as e:
-        print(f"Errore nell'esportazione in Excel: {e}")
-        return False
-
-
-def _get_hp_description(hp):
-    """
-    Restituisce la descrizione di una caratteristica di pericolo HP
-    
-    Args:
-        hp (str): Codice della caratteristica di pericolo (es. "HP4")
-        
-    Returns:
-        str: Descrizione della caratteristica di pericolo
-    """
-    descrizioni = {
-        "HP1": "Esplosivo",
-        "HP2": "Comburente",
-        "HP3": "Infiammabile",
-        "HP4": "Irritante - Irritazione cutanea e lesioni oculari",
-        "HP5": "Tossicità specifica per organi bersaglio (STOT)/Tossicità in caso di aspirazione",
-        "HP6": "Tossicità acuta",
-        "HP7": "Cancerogeno",
-        "HP8": "Corrosivo",
-        "HP9": "Infettivo",
-        "HP10": "Tossico per la riproduzione",
-        "HP11": "Mutageno",
-        "HP12": "Liberazione di gas a tossicità acuta",
-        "HP13": "Sensibilizzante",
-        "HP14": "Ecotossico",
-        "HP15": "Rifiuto che non possiede direttamente una delle caratteristiche di pericolo summenzionate ma può manifestarla successivamente"
-    }
-    
-    return descrizioni.get(hp, "Descrizione non disponibile")
-
-# Aggiungi questa funzione di utilità per supportare la gestione di file multipli
-def lista_file_campione_disponibili():
-    """
-    Restituisce una lista dei file campione disponibili
-    
-    Returns:
-        list: Lista dei nomi dei file disponibili
-    """
-    try:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        file_disponibili = []
-        
-        # Cerca nella cartella userData (Electron)
-        try:
-            from pathlib import Path
-            
-            if os.name == 'nt':  # Windows
-                appdata = os.getenv('APPDATA')
-                if appdata:
-                    electron_dir = os.path.join(appdata, 'WasteGuard', 'campione_data')
-                else:
-                    electron_dir = None
-            else:  # Linux/Mac
-                home_dir = str(Path.home())
-                electron_dir = os.path.join(home_dir, '.config', 'WasteGuard', 'campione_data')
-            
-            if electron_dir and os.path.exists(electron_dir):
-                for file in os.listdir(electron_dir):
-                    if file.endswith('.json') and file.startswith('dati_campione_'):
-                        file_disponibili.append(file)
-                        
-        except Exception as e:
-            print(f"Errore nella ricerca in userData: {e}")
-        
-        # Cerca nella cartella data classica
-        data_dir = os.path.join(script_dir, "data")
-        if os.path.exists(data_dir):
-            for file in os.listdir(data_dir):
-                if file.endswith('.json') and ('dati_campione' in file or 'campione' in file):
-                    if file not in file_disponibili:  # Evita duplicati
-                        file_disponibili.append(file)
-        
-        # Ordina per timestamp (più recente per primo)
-        file_disponibili.sort(reverse=True)
-        
-        return file_disponibili
-        
-    except Exception as e:
-        print(f"Errore nella ricerca dei file campione: {e}")
-        return []
-
-
-# Funzione per uso da linea di comando per testare la disponibilità di file
-def mostra_file_disponibili():
-    """
-    Mostra i file campione disponibili (per uso da linea di comando)
-    """
-    try:
-        file_disponibili = lista_file_campione_disponibili()
-        
-        if not file_disponibili:
-            print("Nessun file campione trovato.")
-            return
-            
-        print("File campione disponibili:")
-        for i, file in enumerate(file_disponibili, 1):
-            # Estrai timestamp dal nome del file per mostrare data/ora
-            timestamp_match = re.search(r'dati_campione_(\d{14})', file)
-            if timestamp_match:
-                timestamp = timestamp_match.group(1)
-                year = timestamp[0:4]
-                month = timestamp[4:6]
-                day = timestamp[6:8]
-                hour = timestamp[8:10]
-                minute = timestamp[10:12]
-                second = timestamp[12:14]
-                data_ora = f"{day}/{month}/{year} {hour}:{minute}:{second}"
-                print(f"  {i}. {file} ({data_ora})")
-            else:
-                print(f"  {i}. {file}")
-                
-    except Exception as e:
-        print(f"Errore nella visualizzazione dei file disponibili: {e}")
 
 
 
