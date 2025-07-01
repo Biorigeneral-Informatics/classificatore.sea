@@ -986,31 +986,34 @@ async function generateClassificationReport(classificationData = null) {
        };
        
        // Se i dati provengono dal classificatore, estraili correttamente
-       if (classificationData.data && classificationData.data.campione) {
-           const campione = classificationData.data.campione;
-           const hp = classificationData.data.caratteristiche_pericolo || [];
-           
-           // Crea un oggetto riassuntivo per ogni sostanza
-           for (const [sostanza, info] of Object.entries(campione)) {
-               reportData.risultati_classificazione.push({
-                   'Sostanza': sostanza,
-                   'Concentrazione (ppm)': info.concentrazione_ppm || 0,
-                   'Concentrazione (%)': info.concentrazione_percentuale || 0,
-                   'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
-                   'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
-                   'CAS': info.cas || 'N/A'
-               });
-           }
+        if (classificationData.data && classificationData.data.campione) {
+            const campione = classificationData.data.campione;
+            const hp = classificationData.data.caratteristiche_pericolo || [];
+            
+            // Crea un oggetto riassuntivo per ogni sostanza
+            for (const [sostanza, info] of Object.entries(campione)) {
+                reportData.risultati_classificazione.push({
+                    'Sostanza': sostanza,
+                    'Concentrazione (ppm)': info.concentrazione_ppm || 0,
+                    'Concentrazione (%)': info.concentrazione_percentuale || 0,
+                    'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
+                    'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
+                    'CAS': info.cas || 'N/A',
+                    'Motivo HP': info.motivi_hp ? info.motivi_hp.join('; ') : ''  // ← NUOVA RIGA AGGIUNTA
+                });
+            }
            
            // Aggiungi una riga con il risultato complessivo
            reportData.risultati_classificazione.push({
-               'Sostanza': '** RISULTATO TOTALE **',
-               'Concentrazione (ppm)': '',
-               'Concentrazione (%)': '',
-               'Frasi H': '',
-               'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
-               'CAS': ''
-           });
+                'Sostanza': '** RISULTATO TOTALE **',
+                'Concentrazione (ppm)': '',
+                'Concentrazione (%)': '',
+                'Frasi H': '',
+                'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
+                'CAS': '',
+                'Motivo HP': ''  // ← NUOVA RIGA AGGIUNTA
+         });
+
        } else if (Array.isArray(classificationData)) {
            // Se i dati sono già in formato tabellare, usali direttamente
            reportData.risultati_classificazione.push(...classificationData);
