@@ -256,7 +256,6 @@ function updateClassificationFileInfo() {
     }
 }
 
-// Funzione per avviare il processo di classificazione
 // Funzione per avviare il processo di classificazione - CORRETTA
 async function avviaClassificazione() {
     try {
@@ -293,23 +292,12 @@ async function avviaClassificazione() {
         
         console.log('Risultato classificazione:', result);
         
-        // CORREZIONE 1: Prima archivia il risultato (opzionale, per backup)
-        try {
-            const archiveResult = await window.electronAPI.archiveClassificationResult(selectedFile, result);
-            
-            if (archiveResult.success) {
-                console.log(`Risultato archiviato: ${archiveResult.archivedFile}`);
-            } else {
-                console.warn('Errore nell\'archiviazione:', archiveResult.message);
-                // Non bloccare il flusso, continua comunque
-            }
-        } catch (archiveError) {
-            console.warn('Errore nell\'archiviazione automatica:', archiveError);
-            // Non bloccare il flusso
-        }
+        // ✅ CORRETTO: RIMOSSA ARCHIVIAZIONE AUTOMATICA
+        // Il file rimane disponibile nella sezione Classificazione per essere riutilizzato
+        // L'archiviazione avviene solo tramite eliminazione manuale dell'utente
+        console.log('Classificazione completata - file mantenuto disponibile per riutilizzo');
         
-        // CORREZIONE 2: GENERA IL REPORT NELLA CARTELLA REPORTS
-        // Questa è la parte che mancava!
+        // GENERA IL REPORT NELLA CARTELLA REPORTS
         try {
             console.log('Generazione report nella cartella reports...');
             

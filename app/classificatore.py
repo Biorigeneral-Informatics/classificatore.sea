@@ -812,7 +812,7 @@ class ClassificatoreRifiuti:
         # Carica informazioni dalla raccolta
         self.info_raccolta = carica_info_raccolta()
         
-        # Imposta valori predefiniti
+        # Imposta valori predefinitii
         self.stato_fisico = None
         self.punto_infiammabilita = None
         self.contiene_gasolio = False
