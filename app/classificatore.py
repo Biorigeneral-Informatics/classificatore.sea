@@ -955,6 +955,23 @@ class ClassificatoreRifiuti:
             # Crea un dizionario di nomi normalizzati per il confronto
             sostanze_db_normalize = {self.normalize_name(nome): nome for nome in tutti_i_nomi}
             
+            # NUOVO: Rimuovi doppia contabilizzazione metalli/sali
+            print("=== RIMOZIONE DOPPIA CONTABILIZZAZIONE ===", file=sys.stderr)
+            sostanze_da_rimuovere = set()
+            for nome_sostanza in list(campione_dati.keys()):
+                if 'e suoi composti come' in nome_sostanza:
+                    simbolo = nome_sostanza.split('come ')[1].strip().lower()
+                    # Cerca se esiste un sale di questo metallo
+                    for altro_nome in campione_dati.keys():
+                        if self.has_corresponding_salt(simbolo, altro_nome):
+                            sostanze_da_rimuovere.add(nome_sostanza)
+                            print(f"Rimuovo metallo originale: {nome_sostanza} (sostituito da sale)", file=sys.stderr)
+                            break
+            # Filtra il campione
+            if sostanze_da_rimuovere:
+                campione_dati = {k: v for k, v in campione_dati.items() if k not in sostanze_da_rimuovere}
+                print(f"Rimossi {len(sostanze_da_rimuovere)} metalli duplicati", file=sys.stderr)
+            
             # AGGIUNTO: Debug dettagliato delle sostanze mancanti
             sostanze_mancanti_debug = self.debug_sostanze_mancanti(campione_dati, sostanze_db_normalize)
             
@@ -2309,6 +2326,24 @@ class ClassificatoreRifiuti:
         print("✅ Classificazione completata con successo", file=sys.stderr)
         
         return risultato
+
+    def has_corresponding_salt(self, simbolo_metallo, nome_sostanza):
+        """Verifica se una sostanza è un sale del metallo dato"""
+        nome_lower = nome_sostanza.lower()
+        
+        # Mappatura simboli → sali comuni
+        mappature = {
+            'as': ['arsenico', 'arsenic'],
+            'co': ['cobalto', 'cobalt'],
+            'zn': ['zinco', 'zinc'],
+            'pb': ['piombo', 'lead'],
+            'cu': ['rame', 'copper'],
+            'hg': ['mercurio', 'mercury']
+        }
+        
+        if simbolo_metallo in mappature:
+            return any(metallo in nome_lower for metallo in mappature[simbolo_metallo])
+        return False
 
 
 
