@@ -1224,6 +1224,12 @@ class ClassificatoreRifiuti:
             if hp3_infiammabilita["assegnata"]:
                 hp_assegnate.add("HP3")
                 motivazioni_hp["HP3"] = hp3_infiammabilita["motivo"]
+                # Aggiungi motivo alle sostanze con frasi HP3
+                for nome_sostanza, info in campione.items():
+                    if any(frase in info.get("frasi_h", []) for frase in self.database.hp_mapping["HP3"]):
+                        motivo_infiammabilita = "HP3: criterio infiammabilità fisica"
+                        if motivo_infiammabilita not in info["motivi_hp"]:
+                            info["motivi_hp"].append(motivo_infiammabilita)
             
             # STEP 3: VERIFICHE DELLE SOMMATORIE (PER HP CHE SUPPORTANO ADDITIVITÀ)
             # Verifica HP1 da sommatoria
@@ -1258,6 +1264,12 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP4"] = f"{motivazioni_hp['HP4']}; {hp4_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP4"] = hp4_sommatoria["motivo"]
+                # Aggiungi motivo alle sostanze che contribuiscono ad HP4
+                for nome_sostanza, info in campione.items():
+                    if any(frase in info.get("frasi_h", []) for frase in self.database.hp_mapping["HP4"]):
+                        motivo_sommatoria = "HP4: sommatoria frasi"
+                        if motivo_sommatoria not in info["motivi_hp"]:
+                            info["motivi_hp"].append(motivo_sommatoria)
             
             # Verifica HP5 da sommatoria
             hp5_sommatoria = self._verifica_hp5_sommatoria(sommatoria_per_frase)
@@ -1267,6 +1279,12 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP5"] = f"{motivazioni_hp['HP5']}; {hp5_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP5"] = hp5_sommatoria["motivo"]
+                # Aggiungi motivo alle sostanze che contribuiscono ad HP5
+                for nome_sostanza, info in campione.items():
+                    if any(frase in info.get("frasi_h", []) for frase in self.database.hp_mapping["HP5"]):
+                        motivo_sommatoria = "HP5: sommatoria frasi"
+                        if motivo_sommatoria not in info["motivi_hp"]:
+                            info["motivi_hp"].append(motivo_sommatoria)
             
             # Verifica HP6 da sommatoria
             hp6_sommatoria = self._verifica_hp6_sommatoria(sommatoria_per_frase)
@@ -1276,6 +1294,12 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP6"] = f"{motivazioni_hp['HP6']}; {hp6_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP6"] = hp6_sommatoria["motivo"]
+                # Aggiungi motivo alle sostanze che contribuiscono ad HP6
+                for nome_sostanza, info in campione.items():
+                    if any(frase in info.get("frasi_h", []) for frase in self.database.hp_mapping["HP6"]):
+                        motivo_sommatoria = "HP6: sommatoria frasi"
+                        if motivo_sommatoria not in info["motivi_hp"]:
+                            info["motivi_hp"].append(motivo_sommatoria)
             
             # Verifica HP8 da sommatoria
             hp8_sommatoria = self._verifica_hp8_sommatoria(sommatoria_per_frase)
@@ -1285,18 +1309,36 @@ class ClassificatoreRifiuti:
                     motivazioni_hp["HP8"] = f"{motivazioni_hp['HP8']}; {hp8_sommatoria['motivo']}"
                 else:
                     motivazioni_hp["HP8"] = hp8_sommatoria["motivo"]
+                # Aggiungi motivo alle sostanze che contribuiscono ad HP8
+                for nome_sostanza, info in campione.items():
+                    if any(frase in info.get("frasi_h", []) for frase in self.database.hp_mapping["HP8"]):
+                        motivo_sommatoria = "HP8: sommatoria frasi"
+                        if motivo_sommatoria not in info["motivi_hp"]:
+                            info["motivi_hp"].append(motivo_sommatoria)
             
             # Verifica HP12 da sommatoria
             hp12_sommatoria = self._verifica_hp12_sommatoria(sommatoria_per_frase)
             if hp12_sommatoria["assegnata"]:
                 hp_assegnate.add("HP12")
                 motivazioni_hp["HP12"] = hp12_sommatoria["motivo"]
+                # Aggiungi motivo alle sostanze che contribuiscono ad HP12
+                for nome_sostanza, info in campione.items():
+                    if any(frase in info.get("frasi_euh", []) for frase in self.database.hp_mapping["HP12"]):
+                        motivo_sommatoria = "HP12: sommatoria frasi EUH"
+                        if motivo_sommatoria not in info["motivi_hp"]:
+                            info["motivi_hp"].append(motivo_sommatoria)
             
             # Verifica HP14 da sommatoria
             hp14_sommatoria = self._verifica_hp14_sommatoria(sommatoria_per_frase)
             if hp14_sommatoria["assegnata"]:
                 hp_assegnate.add("HP14")
                 motivazioni_hp["HP14"] = hp14_sommatoria["motivo"]
+                # Aggiungi motivo alle sostanze che contribuiscono ad HP14
+                for nome_sostanza, info in campione.items():
+                    if any(frase in info.get("frasi_h", []) for frase in self.database.hp_mapping["HP14"]):
+                        motivo_sommatoria = "HP14: sommatoria frasi"
+                        if motivo_sommatoria not in info["motivi_hp"]:
+                            info["motivi_hp"].append(motivo_sommatoria)
             
             # Prepara i risultati finali della classificazione
             risultati = {

@@ -1204,9 +1204,9 @@ async function generateClassificationReport(classificationData = null) {
                     'Concentrazione (ppm)': info.concentrazione_ppm || 0,
                     'Concentrazione (%)': info.concentrazione_percentuale || 0,
                     'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
-                    'Caratteristiche HP': info.caratteristiche_pericolo ? info.caratteristiche_pericolo.join(', ') : 'Nessuna',
+                    'Caratteristiche HP': generateHPWithReasons(info, hp, classificationData.data.motivazioni_hp || {}),
                     'CAS': info.cas || 'N/A',
-                    'Motivo HP': info.motivi_hp ? info.motivi_hp.join('; ') : ''  // ← NUOVA RIGA AGGIUNTA
+                    'Motivo HP': info.motivi_hp ? info.motivi_hp.join('; ') : ''
                 });
             }
            
@@ -1218,7 +1218,7 @@ async function generateClassificationReport(classificationData = null) {
                 'Frasi H': '',
                 'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
                 'CAS': '',
-                'Motivo HP': ''  // ← NUOVA RIGA AGGIUNTA
+                'Motivo HP': ''
          });
 
        } else if (Array.isArray(classificationData)) {
@@ -1693,4 +1693,136 @@ function openNotes(reportName) {
         console.error('Errore nell\'apertura delle note:', error);
         showNotification('Errore nell\'apertura delle note: ' + error.message, 'error');
     }
+}
+
+// AGGIUNGI QUESTA FUNZIONE PRIMA DI generateClassificationReport:
+function generateHPWithReasons(sostanzaInfo, globalHP, motivazioni_hp) {
+    const hpIndividuali = sostanzaInfo.caratteristiche_pericolo || [];
+    const motiviIndividuali = sostanzaInfo.motivi_hp || [];
+    
+    // Crea un Set di tutte le HP che riguardano questa sostanza
+    const tutteHP = new Set([...hpIndividuali]);
+    
+    // Aggiungi HP globali se la sostanza contribuisce a esse
+    globalHP.forEach(hp => {
+        // Se la sostanza ha motivi che menzionano questa HP, includila
+        if (motiviIndividuali.some(motivo => motivo.includes(hp))) {
+            tutteHP.add(hp);
+        }
+    });
+
+    // Aggiungi HP globali per cui la sostanza contribuisce ma non ha motivi espliciti
+    globalHP.forEach(hp => {
+        if (!tutteHP.has(hp)) {
+            // Verifica se la sostanza ha frasi H/EUH rilevanti per questa HP
+            const frasiRelevanti = sostanzaInfo.frasi_h || [];
+            const frasiEuhRelevanti = sostanzaInfo.frasi_euh || [];
+            
+            // Mappa delle frasi per ogni HP (semplificata)
+            const frasiPerHP = {
+                'HP1': ['H200', 'H201', 'H202', 'H203', 'H204', 'H240', 'H241'],
+                'HP2': ['H270', 'H271', 'H272'],
+                'HP3': ['H224', 'H225', 'H226', 'H228', 'H242', 'H250', 'H251', 'H252', 'H260', 'H261'],
+                'HP4': ['H314', 'H315', 'H318', 'H319'],
+                'HP5': ['H370', 'H371', 'H335', 'H372', 'H373', 'H304'],
+                'HP6': ['H300', 'H301', 'H302', 'H310', 'H311', 'H312', 'H330', 'H331', 'H332'],
+                'HP8': ['H314'],
+                'HP12': ['EUH029', 'EUH031', 'EUH032'],
+                'HP14': ['H400', 'H410', 'H411', 'H412', 'H413', 'H420']
+            };
+            
+            const frasiHP = frasiPerHP[hp] || [];
+            const haFrasiRelevanti = frasiRelevanti.some(frase => frasiHP.includes(frase)) ||
+                                    frasiEuhRelevanti.some(frase => frasiHP.includes(frase));
+            
+            if (haFrasiRelevanti) {
+                tutteHP.add(hp);
+            }
+        }
+    });
+    
+    // Ordina HP per priorità/importanza (più pericolose prima)
+    const prioritaHP = {
+        'HP1': 1,  // Esplosivo - massima priorità
+        'HP2': 2,  // Comburente
+        'HP6': 3,  // Tossicità acuta
+        'HP7': 4,  // Cancerogeno
+        'HP8': 5,  // Corrosivo
+        'HP10': 6, // Tossico per riproduzione
+        'HP11': 7, // Mutageno
+        'HP5': 8,  // STOT
+        'HP12': 9, // Gas tossici
+        'HP13': 10, // Sensibilizzante
+        'HP14': 11, // Ecotossico
+        'HP3': 12,  // Infiammabile
+        'HP4': 13,  // Irritante
+        'HP15': 14  // Sviluppo caratteristiche
+    };
+
+    const hpFinali = Array.from(tutteHP).sort((a, b) => {
+        const prioritaA = prioritaHP[a] || 99;
+        const prioritaB = prioritaHP[b] || 99;
+        return prioritaA - prioritaB;
+    });
+    
+    // Se non ci sono HP, ritorna "Nessuna"
+    if (hpFinali.length === 0) {
+        return 'Nessuna';
+    }
+    
+    // Crea la stringa con HP e motivi abbreviati
+    const hpConMotivi = hpFinali.map(hp => {
+        // Cerca motivi individuali specifici per questa HP
+        const motivoIndividuale = motiviIndividuali.find(motivo => 
+            motivo.startsWith(hp + ':') && !motivo.includes('sommatoria') && !motivo.includes('criterio')
+        );
+        
+        // Cerca motivi da sommatoria per questa HP
+        const motivoSommatoria = motiviIndividuali.find(motivo => 
+            motivo.startsWith(hp + ':') && motivo.includes('sommatoria')
+        );
+        
+        // Cerca motivi da infiammabilità per HP3
+        const motivoInfiammabilita = motiviIndividuali.find(motivo => 
+            motivo.startsWith(hp + ':') && motivo.includes('criterio infiammabilità')
+        );
+        
+        // Cerca motivi da presenza per HP15
+        const motivoPresenza = motiviIndividuali.find(motivo => 
+            motivo.startsWith(hp + ':') && motivo.includes('presenza')
+        );
+        
+        // Priorità: Individuale > Infiammabilità > Presenza > Sommatoria
+        let motivoFinale = '';
+        
+        if (motivoIndividuale) {
+            const dettaglio = motivoIndividuale.split(':')[1]?.trim();
+            if (dettaglio && dettaglio.includes('≥0%')) {
+                motivoFinale = '[IND] qualsiasi conc.'; // Individuale senza soglia
+            } else if (dettaglio) {
+                motivoFinale = '[IND] ' + dettaglio; // Individuale con soglia specifica
+            }
+        } else if (motivoInfiammabilita) {
+            motivoFinale = '[FIS] infiamm.fisica'; // Criterio fisico
+        } else if (motivoPresenza) {
+            const frase = motivoPresenza.split('presenza ')[1]?.trim();
+            motivoFinale = frase ? `[PRES] presenza ${frase}` : '[PRES] presenza'; // Solo presenza
+        } else if (motivoSommatoria) {
+            motivoFinale = '[SOM] sommat.'; // Da sommatoria
+        }
+        
+        // Restituisci HP con o senza motivo
+        return motivoFinale ? `${hp} (${motivoFinale})` : hp;
+    });
+    
+    // Migliora la spaziatura per leggibilità
+    let risultato = hpConMotivi.join(' • '); // Usa bullet point invece di virgole
+
+    // Se ci sono molte HP, usa il formato a righe
+    if (hpConMotivi.length > 4) {
+        risultato = hpConMotivi.join('\n• '); // Metti ogni HP su una riga
+        risultato = '• ' + risultato; // Aggiungi bullet all'inizio
+    }
+
+    return risultato;
 }
