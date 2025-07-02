@@ -797,6 +797,7 @@ async function previewReport(reportName) {
         
         // Aggiungi event listeners per i pulsanti di esportazione nell'anteprima
        const exportWordBtn = document.getElementById('exportPreviewWordBtn');
+       const closeBtn = document.getElementById('closePreviewBtn');
 
         if (exportWordBtn) {
             exportWordBtn.onclick = () => {
@@ -896,36 +897,125 @@ async function exportReport(reportName, format) {
                 break;
 
             case 'word':
-                    const wordPath = await window.electronAPI.saveFile({
-                        title: 'Salva report Word',
-                        defaultPath: `${outputName}.docx`,
-                        filters: [
-                            { name: 'Word Files', extensions: ['docx'] }
-                        ]
-                    });
-                    
-                    if (wordPath) {
+                const wordPath = await window.electronAPI.saveFile({
+                    title: 'Salva report Word',
+                    defaultPath: `${outputName}.docx`,
+                    filters: [
+                        { name: 'Word Files', extensions: ['docx'] }
+                    ]
+                });
+                
+                if (wordPath) {
+                    try {
+                        console.log('Inizio esportazione Word:', wordPath);
                         const result = await window.electronAPI.exportReportWord(reportData, wordPath);
+                        
+                        console.log('Risultato esportazione:', result);
+                        
                         if (result.success) {
                             showNotification('Report esportato in formato Word');
                             addActivity('Report esportato', `${outputName}.docx`, 'fas fa-file-word');
                             
-                            // Chiedi se l'utente vuole aprire il file
                             const shouldOpen = confirm("Esportazione completata. Vuoi aprire il file?");
                             if (shouldOpen) {
-                                await window.electronAPI.openFile(wordPath);
+                                await window.electronAPI.openExternal(wordPath);
                             }
                         } else {
-                            throw new Error(result.error || 'Errore durante l\'esportazione');
+                            // Mostra errore dettagliato
+                            let errorMsg = result.error || 'Errore sconosciuto';
+                            
+                            if (result.stderr) {
+                                errorMsg += `\nDettagli Python: ${result.stderr}`;
+                            }
+                            
+                            if (result.details) {
+                                errorMsg += `\nDettagli: ${result.details}`;
+                            }
+                            
+                            console.error('Errore dettagliato esportazione Word:', {
+                                error: result.error,
+                                details: result.details,
+                                output: result.output,
+                                stderr: result.stderr
+                            });
+                            
+                            // Suggerimenti basati sull'errore
+                            if (errorMsg.includes('python-docx')) {
+                                errorMsg += '\n\nSoluzione: Installa python-docx con: pip install python-docx';
+                            } else if (errorMsg.includes('No such file')) {
+                                errorMsg += '\n\nVerifica che lo script export_word.py sia presente nella cartella app/';
+                            } else if (errorMsg.includes('Permission denied')) {
+                                errorMsg += '\n\nVerifica i permessi di scrittura nella cartella di destinazione';
+                            }
+                            
+                            throw new Error(errorMsg);
                         }
+                    } catch (error) {
+                        console.error('Errore catch esportazione Word:', error);
+                        
+                        // Mostra errore in un dialog più dettagliato
+                        const errorDialog = document.createElement('div');
+                        errorDialog.innerHTML = `
+                            <div style="
+                                position: fixed;
+                                top: 0;
+                                left: 0;
+                                width: 100%;
+                                height: 100%;
+                                background: rgba(0,0,0,0.5);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                z-index: 10000;
+                            ">
+                                <div style="
+                                    background: white;
+                                    padding: 2rem;
+                                    border-radius: 8px;
+                                    max-width: 600px;
+                                    max-height: 400px;
+                                    overflow-y: auto;
+                                ">
+                                    <h3 style="color: #e74c3c; margin-bottom: 1rem;">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        Errore Esportazione Word
+                                    </h3>
+                                    <pre style="
+                                        background: #f8f9fa;
+                                        padding: 1rem;
+                                        border-radius: 4px;
+                                        font-size: 0.9rem;
+                                        white-space: pre-wrap;
+                                        word-wrap: break-word;
+                                    ">${error.message}</pre>
+                                    <div style="text-align: right; margin-top: 1rem;">
+                                        <button onclick="this.closest('div').parentElement.remove()" 
+                                                style="
+                                                    background: #3498db;
+                                                    color: white;
+                                                    border: none;
+                                                    padding: 0.5rem 1rem;
+                                                    border-radius: 4px;
+                                                    cursor: pointer;
+                                                ">
+                                            Chiudi
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        document.body.appendChild(errorDialog);
+                        
+                        showNotification(`Errore nell'esportazione Word`, 'error');
                     }
-                    break;
+                }
+                break;
+            }
+        } catch (error) {
+            console.error(`Errore nell'esportazione del report in formato ${format}:`, error);
+            showNotification(`Errore nell'esportazione: ${error.message}`, 'error');
         }
-    } catch (error) {
-        console.error(`Errore nell'esportazione del report in formato ${format}:`, error);
-        showNotification(`Errore nell'esportazione: ${error.message}`, 'error');
     }
-}
 
 // Funzione migliorata per eliminare report
 async function deleteReport(reportName) {

@@ -1488,8 +1488,36 @@ ipcMain.handle('open-external', async (event, path) => {
 
     ipcMain.handle('export-report-word', async (event, reportData, filePath) => {
         try {
-            // Path dello script Python
-            const pythonScript = path.join(__dirname, 'export_word.py');
+            console.log('=== INIZIO EXPORT WORD ===');
+            console.log('FilePath richiesto:', filePath);
+            console.log('Dimensione reportData:', Object.keys(reportData).length);
+            
+            // Path dello script Python con controlli multipli
+            const possiblePaths = [
+                path.join(__dirname, 'app', 'export_word.py'),
+                path.join(__dirname, 'export_word.py'),
+                path.resolve('./app/export_word.py'),
+                path.resolve('./export_word.py')
+            ];
+            
+            let pythonScript = null;
+            for (const testPath of possiblePaths) {
+                console.log('Controllo percorso:', testPath);
+                if (fs.existsSync(testPath)) {
+                    pythonScript = testPath;
+                    console.log('✓ Script Python trovato:', testPath);
+                    break;
+                } else {
+                    console.log('✗ Non trovato:', testPath);
+                }
+            }
+            
+            if (!pythonScript) {
+                return {
+                    success: false,
+                    error: 'Script Python non trovato in nessuno dei percorsi testati'
+                };
+            }
             
             // Prepara i dati per Python
             const dataToSend = JSON.stringify({
@@ -1497,40 +1525,88 @@ ipcMain.handle('open-external', async (event, path) => {
                 filePath: filePath
             });
             
+            console.log('Dati da inviare a Python (primi 200 char):', dataToSend.substring(0, 200) + '...');
+            
+            // Test se Python è disponibile
+            console.log('Testando disponibilità Python...');
+            
             return new Promise((resolve, reject) => {
                 const pythonProcess = spawn('python', [pythonScript], {
-                    stdio: ['pipe', 'pipe', 'pipe']
+                    stdio: ['pipe', 'pipe', 'pipe'],
+                    cwd: path.dirname(pythonScript) // Imposta la directory di lavoro
                 });
+                
+                console.log('Processo Python avviato');
                 
                 // Invia i dati al processo Python
                 pythonProcess.stdin.write(dataToSend);
                 pythonProcess.stdin.end();
+                console.log('Dati inviati al processo Python');
                 
                 let output = '';
                 let error = '';
                 
                 pythonProcess.stdout.on('data', (data) => {
-                    output += data.toString();
+                    const chunk = data.toString();
+                    output += chunk;
+                    console.log('Python STDOUT:', chunk);
                 });
                 
                 pythonProcess.stderr.on('data', (data) => {
-                    error += data.toString();
+                    const chunk = data.toString();
+                    error += chunk;
+                    console.error('Python STDERR:', chunk);
                 });
                 
                 pythonProcess.on('close', (code) => {
+                    console.log('=== PROCESSO PYTHON COMPLETATO ===');
+                    console.log('Exit code:', code);
+                    console.log('Output completo:', output);
+                    console.log('Error completo:', error);
+                    console.log('===============================');
+                    
                     if (code === 0) {
-                        resolve({ success: true, message: 'Export completato' });
+                        // Verifica che il file sia stato creato
+                        if (fs.existsSync(filePath)) {
+                            console.log('✓ File Word creato con successo:', filePath);
+                            resolve({ success: true, message: 'Export completato' });
+                        } else {
+                            console.log('✗ File Word non trovato dopo export:', filePath);
+                            resolve({ 
+                                success: false, 
+                                error: 'File non creato nonostante exit code 0',
+                                details: output,
+                                stderr: error
+                            });
+                        }
                     } else {
-                        reject({ success: false, error: error || 'Errore durante l\'export' });
+                        resolve({ 
+                            success: false, 
+                            error: error || `Processo Python fallito con exit code ${code}`,
+                            details: `Exit code: ${code}`,
+                            output: output,
+                            stderr: error
+                        });
                     }
                 });
                 
                 pythonProcess.on('error', (err) => {
-                    reject({ success: false, error: err.message });
+                    console.error('Errore avvio processo Python:', err);
+                    resolve({ 
+                        success: false, 
+                        error: `Impossibile avviare Python: ${err.message}`,
+                        details: 'Verifica che Python sia installato e nel PATH'
+                    });
                 });
             });
+            
         } catch (error) {
-            return { success: false, error: error.message };
+            console.error('Errore generale export Word:', error);
+            return { 
+                success: false, 
+                error: `Errore generale: ${error.message}`,
+                stack: error.stack
+            };
         }
     });
 
