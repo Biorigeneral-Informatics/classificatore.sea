@@ -102,92 +102,146 @@ let frasiEUHInEditMode = false;
 //------------ FUNZIONI ------------//
 //-----------------------------------//
 
-// Mappatura tra frasi H e Hazard Class corrispondenti
+// Mappatura completa tra frasi H e Hazard Class corrispondenti
+// Basata sul documento ufficiale delle caratteristiche di pericolo
 const frasiHToHazardClass = {
-    // HP1
+    // HP1 - Esplosivo
     "H200": ["Unst. Expl."],
     "H201": ["Expl. 1.1"],
     "H202": ["Expl. 1.2"],
     "H203": ["Expl. 1.3"],
     "H204": ["Expl. 1.4"],
+    "H205": ["Expl. 1.5"],
     "H240": ["Self-react. A", "Org. Perox. A"],
     "H241": ["Self-react. B", "Org. Perox. B"],
-    
-    // HP2
+    // HP2 - Comburente
     "H270": ["Ox. Gas 1"],
     "H271": ["Ox. Liq. 1", "Ox. Sol. 1"],
     "H272": ["Ox. Liq. 2", "Ox. Liq. 3", "Ox. Sol. 2", "Ox. Sol. 3"],
-    
-    // HP3
+    // HP3 - Infiammabile
     "H220": ["Flam. Gas 1"],
     "H221": ["Flam. Gas 2"],
     "H222": ["Aerosol 1"],
     "H223": ["Aerosol 2"],
     "H224": ["Flam. Liq. 1"],
-    "H225": ["Flam. Liq.2"],
+    "H225": ["Flam. Liq. 2"],
     "H226": ["Flam. Liq. 3"],
     "H228": ["Flam. Sol. 1", "Flam. Sol. 2"],
+    "H229": ["Aerosol 3"],
+    "H230": ["Flam. Gas 1A"],
+    "H231": ["Flam. Gas 1B"],
+    "H232": ["Flam. Gas 1C"],
     "H242": ["Self-react. CD", "Self-react. EF", "Org. Perox. CD", "Org. Perox. EF"],
     "H250": ["Pyr. Liq. 1", "Pyr. Sol. 1"],
-    "H251": ["Self-heat.1"],
+    "H251": ["Self-heat. 1"],
     "H252": ["Self-heat. 2"],
     "H260": ["Water-react. 1"],
     "H261": ["Water-react. 2", "Water-react. 3"],
-    
-    // HP4
-    "H314": ["Skin corr. 1A", "SkinCorr. 1B", "SkinCorr. 1C"],
-    "H315": ["Skin irrit. 2"],
-    "H318": ["Eye dam. 1"],
-    "H319": ["Eye irrit. 2"],
-    
-    // HP5
+    // HP4 - Irritante (corrette le nomenclature)
+    "H314": ["Skin Corr. 1A", "Skin Corr. 1B", "Skin Corr. 1C"],
+    "H315": ["Skin Irrit. 2"],
+    "H316": ["Skin Irrit. 3"],
+    "H317": ["Skin Sens. 1"],
+    "H318": ["Eye Dam. 1"],
+    "H319": ["Eye Irrit. 2"],
+    "H320": ["Eye Irrit. 3"],
+    // HP5 - Tossicità specifica per organi bersaglio
+    "H335": ["STOT SE 3"],
+    "H336": ["STOT SE 3"],
     "H370": ["STOT SE 1"],
     "H371": ["STOT SE 2"],
-    "H335": ["STOT SE 3"],
     "H372": ["STOT RE 1"],
     "H373": ["STOT RE 2"],
     "H304": ["Asp. Tox. 1"],
-    
-    // HP6
-    "H300": ["Acute Tox.1", "Acute Tox. 2"],
+    // HP6 - Tossicità acuta
+    "H300": ["Acute Tox. 1", "Acute Tox. 2"],
     "H301": ["Acute Tox. 3"],
-    "H302": ["Acute Tox 4"],
-    "H310": ["Acute Tox.1", "Acute Tox.2"],
+    "H302": ["Acute Tox. 4"],
+    "H310": ["Acute Tox. 1", "Acute Tox. 2"],
     "H311": ["Acute Tox. 3"],
-    "H312": ["Acute Tox 4"],
-    "H330": ["Acute Tox 1", "Acute Tox.2"],
+    "H312": ["Acute Tox. 4"],
+    "H330": ["Acute Tox. 1", "Acute Tox. 2"],
     "H331": ["Acute Tox. 3"],
     "H332": ["Acute Tox. 4"],
-    
-    // HP7
+    // HP7 - Cancerogeno
     "H350": ["Carc. 1A", "Carc. 1B"],
     "H351": ["Carc. 2"],
-    
-    // HP8 (già incluso in HP4)
-    
-    // HP10
+    // HP8 - Corrosivo (stesso di HP4 per H314, ma soglie diverse)
+    // H314 già definito sopra
+    // HP9 - Infettivo (non usato in CLP)
+    // HP10 - Tossico per la riproduzione
     "H360": ["Repr. 1A", "Repr. 1B"],
     "H361": ["Repr. 2"],
-    
-    // HP11
+    "H362": ["Lact."],
+    // HP11 - Mutageno
     "H340": ["Muta. 1A", "Muta. 1B"],
     "H341": ["Muta. 2"],
-    
-    // HP13
-    "H317": ["SkinSens. 1"],
+    // HP12 - Liberazione gas tossico (non usato in CLP)
+    // HP13 - Sensibilizzante
     "H334": ["Resp. Sens. 1"],
-    
-    // HP14
-    "H420": ["Ozone 1"],
+    // HP14 - Ecotossico
     "H400": ["Aquatic Acute 1"],
     "H410": ["Aquatic Chronic 1"],
     "H411": ["Aquatic Chronic 2"],
     "H412": ["Aquatic Chronic 3"],
-    "H413": ["Aquatic Chronic 4"]
+    "H413": ["Aquatic Chronic 4"],
+    "H420": ["Ozone 1"],
+    // HP15 - Potenziale sviluppo di caratteristiche di pericolo
+    // H205 già definito sopra
+    // Nuove frasi H aggiunte (totale 17 nuove)
+    "H221A": ["Flam. Gas 2A"],
+    "H221B": ["Flam. Gas 2B"],
+    "H222A": ["Aerosol 1A"],
+    "H222B": ["Aerosol 1B"],
+    "H223A": ["Aerosol 2A"],
+    "H223B": ["Aerosol 2B"],
+    "H224A": ["Flam. Liq. 1A"],
+    "H224B": ["Flam. Liq. 1B"],
+    "H225A": ["Flam. Liq. 2A"],
+    "H225B": ["Flam. Liq. 2B"],
+    "H226A": ["Flam. Liq. 3A"],
+    "H226B": ["Flam. Liq. 3B"],
+    "H228A": ["Flam. Sol. 1A"],
+    "H228B": ["Flam. Sol. 1B"],
+    "H228C": ["Flam. Sol. 2A"],
+    "H228D": ["Flam. Sol. 2B"],
+    "H229A": ["Aerosol 3A"],
+    "H229B": ["Aerosol 3B"]
 };
 
-// Lista di frasi H valide (quelle supportate dal classificatore)
-const frasiHValide = Object.keys(frasiHToHazardClass);
+// Lista aggiornata di frasi H valide (tutte quelle supportate dal classificatore)
+const frasiHValide = [
+    // HP1 - Esplosivo
+    "H200", "H201", "H202", "H203", "H204", "H205", "H240", "H241",
+    // HP2 - Comburente
+    "H270", "H271", "H272",
+    // HP3 - Infiammabile
+    "H220", "H221", "H222", "H223", "H224", "H225", "H226", "H228", "H229", "H230", "H231", "H232", "H242", "H250", "H251", "H252", "H260", "H261",
+    // HP4 - Irritante
+    "H314", "H315", "H316", "H317", "H318", "H319", "H320",
+    // HP5 - Tossicità specifica per organi bersaglio
+    "H335", "H336", "H370", "H371", "H372", "H373", "H304",
+    // HP6 - Tossicità acuta
+    "H300", "H301", "H302", "H310", "H311", "H312", "H330", "H331", "H332",
+    // HP7 - Cancerogeno
+    "H350", "H351",
+    // HP8 - Corrosivo (stesso di HP4 per H314, ma soglie diverse)
+    // H314 già definito sopra
+    // HP9 - Infettivo (non usato in CLP)
+    // HP10 - Tossico per la riproduzione
+    "H360", "H361", "H362",
+    // HP11 - Mutageno
+    "H340", "H341",
+    // HP12 - Liberazione gas tossico (non usato in CLP)
+    // HP13 - Sensibilizzante
+    "H334",
+    // HP14 - Ecotossico
+    "H400", "H410", "H411", "H412", "H413", "H420",
+    // HP15 - Potenziale sviluppo di caratteristiche di pericolo
+    // H205 già definito sopra
+    // Nuove frasi H aggiunte
+    "H221A", "H221B", "H222A", "H222B", "H223A", "H223B", "H224A", "H224B", "H225A", "H225B", "H226A", "H226B", "H228A", "H228B", "H228C", "H228D", "H229A", "H229B"
+];
 
 // Funzione per aggiornare le opzioni del menu a tendina dell'Hazard Class
 // MODIFICATO: ora non mostra errori durante l'input
@@ -206,8 +260,14 @@ function updateHazardClassOptions(fraseHInput, showErrors = false) {
         if (errorMsg) errorMsg.remove();
     }
     
+    // IMPORTANTE: Assicurati che il select sia sempre cliccabile
+    hazardClassSelect.style.pointerEvents = 'auto';
+    hazardClassSelect.style.position = 'relative';
+    hazardClassSelect.style.zIndex = '1000';
+    
     // Abilita/disabilita il select di Hazard Class in base alla presenza di una frase H valida
-    hazardClassSelect.disabled = !fraseH || !frasiHValide.includes(fraseH);
+    const isValidPhrase = fraseH && frasiHValide.includes(fraseH);
+    hazardClassSelect.disabled = !isValidPhrase;
     
     // Reset delle opzioni
     hazardClassSelect.innerHTML = '';
@@ -237,6 +297,11 @@ function updateHazardClassOptions(fraseHInput, showErrors = false) {
     } else {
         // Frase H valida
         defaultOption.textContent = 'Seleziona un Hazard Class';
+        
+        // Assicurati che il select sia completamente abilitato
+        hazardClassSelect.disabled = false;
+        hazardClassSelect.style.opacity = '1';
+        hazardClassSelect.style.cursor = 'pointer';
     }
     
     hazardClassSelect.appendChild(defaultOption);
@@ -249,6 +314,11 @@ function updateHazardClassOptions(fraseHInput, showErrors = false) {
             option.textContent = hazardClass;
             hazardClassSelect.appendChild(option);
         });
+        
+        // Forza il refresh del select per assicurare che sia funzionante
+        hazardClassSelect.style.display = 'none';
+        hazardClassSelect.offsetHeight; // Trigger reflow
+        hazardClassSelect.style.display = 'block';
     }
     
     return frasiHValide.includes(fraseH);
@@ -3715,38 +3785,6 @@ async function inserisciNuovaSostanza() {
             return false;
         }
         
-        // Lista di frasi H valide (quelle supportate dal classificatore)
-        const frasiHValide = [
-            // HP1 - Esplosivo
-            "H200", "H201", "H202", "H203", "H204", "H240", "H241",
-            // HP2 - Comburente
-            "H270", "H271", "H272",
-            // HP3 - Infiammabile
-            "H224", "H225", "H226", "H228", "H242", "H250", "H251", "H252", "H260", "H261",
-            // HP4 - Irritante
-            "H314", "H315", "H318", "H319",
-            // HP5 - Tossicità specifica per organi bersaglio (STOT)/Tossicità in caso di aspirazione
-            "H370", "H371", "H335", "H372", "H373", "H304",
-            // HP6 - Tossicità acuta
-            "H300", "H301", "H302", "H310", "H311", "H312", "H330", "H331", "H332",
-            // HP7 - cancerogeno
-            "H350", "H351",
-            // HP8 - Corrosivo (già presente in HP4)
-            // "H314",
-            // HP10 - Tossico per la riproduzione
-            "H360", "H361",
-            // HP11 - Mutageno
-            "H340", "H341",
-            // HP12 - Liberazione di gas a tossicità acuta (EUH codes, controllati separatamente)
-            // "EUH029", "EUH031", "EUH032",
-            // HP13 - Sensibilizzante respiratorio
-            "H317", "H334",
-            // HP14 - Ecotossico 
-            "H400", "H410", "H411", "H412", "H413", "H420",
-            // HP15 - Potenziale sviluppo di caratteristiche di pericolo
-            "H205"
-        ];
-        
         // Validazione frasi H (deve esserci almeno una frase H con relativa classe)
         let fraseHValidaTrovata = false;
         const frasiHContainer = document.getElementById('frasiHContainer');
@@ -5042,8 +5080,14 @@ function updateHazardClassSaleOptions(fraseHInput, showErrors = false) {
         if (errorMsg) errorMsg.remove();
     }
     
+    // IMPORTANTE: Assicurati che il select sia sempre cliccabile
+    hazardClassSelect.style.pointerEvents = 'auto';
+    hazardClassSelect.style.position = 'relative';
+    hazardClassSelect.style.zIndex = '1000';
+    
     // Abilita/disabilita il select di Hazard Class in base alla presenza di una frase H valida
-    hazardClassSelect.disabled = !fraseH || !frasiHValide.includes(fraseH);
+    const isValidPhrase = fraseH && frasiHValide.includes(fraseH);
+    hazardClassSelect.disabled = !isValidPhrase;
     
     // Reset delle opzioni
     hazardClassSelect.innerHTML = '';
@@ -5073,6 +5117,11 @@ function updateHazardClassSaleOptions(fraseHInput, showErrors = false) {
     } else {
         // Frase H valida
         defaultOption.textContent = 'Seleziona un Hazard Class';
+        
+        // Assicurati che il select sia completamente abilitato
+        hazardClassSelect.disabled = false;
+        hazardClassSelect.style.opacity = '1';
+        hazardClassSelect.style.cursor = 'pointer';
     }
     
     hazardClassSelect.appendChild(defaultOption);
@@ -5085,6 +5134,11 @@ function updateHazardClassSaleOptions(fraseHInput, showErrors = false) {
             option.textContent = hazardClass;
             hazardClassSelect.appendChild(option);
         });
+        
+        // Forza il refresh del select per assicurare che sia funzionante
+        hazardClassSelect.style.display = 'none';
+        hazardClassSelect.offsetHeight; // Trigger reflow
+        hazardClassSelect.style.display = 'block';
     }
     
     return frasiHValide.includes(fraseH);
@@ -5584,7 +5638,7 @@ async function eliminaSale(id) {
                         );
                         
                         if (deleteSostanze.success && deleteSostanze.changes > 0) {
-                            operazioniCompletate.push(`${deleteSostanze.changes} record/i sostanze eliminate`);
+                            operazioniCompletate.push(`${deleteSostanze.changes} record/i sostanze eliminati`);
                         }
                     }
                     
