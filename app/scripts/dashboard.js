@@ -623,6 +623,786 @@ function updateSavedFiles() {
 
 
 
+
+
+
+
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+
+
+
+
+
+/*  FUNZIONI PER I DATI */
+
+// Carica i dati salvati
+async function loadSavedData() {
+    try {
+        // Carica lista report
+        const reportsList = await window.electronAPI.getReportsList();
+        document.getElementById('reportsCount').textContent = reportsList.length;
+        
+        // Carica dati Excel Raccolta se disponibili
+        const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+        if (raccoltaDataStr) {
+            try {
+                const raccoltaData = JSON.parse(raccoltaDataStr);
+                // Aggiorna la sezione sali-metalli con i dati
+                updateSaliMetalliWithExcelData(raccoltaData);
+            } catch (error) {
+                console.error('Errore nel caricamento dei dati Excel salvati:', error);
+            }
+        }
+        
+        // Aggiorna la UI
+        updateRecentActivities();
+        updateSavedFiles();
+    } catch (error) {
+        console.error('Errore nel caricamento dei dati:', error);
+        showNotification('Errore nel caricamento dei dati', 'error');
+    }
+}
+
+// Aggiorna la sezione attività recenti
+function updateRecentActivities() {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    const container = document.getElementById('activitiesContainer');
+    
+    if (activities.length === 0) {
+        container.innerHTML = `
+            <div class="no-activities-message">
+                <i class="fas fa-info-circle"></i>
+                <p>Nessuna attività recente</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    // Mostra solo le 5 attività più recenti
+    const recentActivities = activities.slice(0, 5);
+    
+    recentActivities.forEach(activity => {
+        const activityItem = document.createElement('div');
+        activityItem.className = 'activity-item';
+        activityItem.innerHTML = `
+            <div class="activity-icon">
+                <i class="${activity.icon}"></i>
+            </div>
+            <div class="activity-details">
+                <h4>${activity.title}</h4>
+                <p>${activity.description}</p>
+                <small>${formatTimeAgo(new Date(activity.timestamp))}</small>
+            </div>
+        `;
+        container.appendChild(activityItem);
+    });
+}
+
+// Aggiunge una nuova attività
+function addActivity(title, description, icon) {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    
+    activities.unshift({
+        title,
+        description,
+        icon,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Mantiene solo le 20 attività più recenti
+    if (activities.length > 20) {
+        activities.pop();
+    }
+    
+    localStorage.setItem('recentActivities', JSON.stringify(activities));
+    updateRecentActivities();
+}
+
+// Aggiorna la sezione file salvati
+function updateSavedFiles() {
+    const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+    const tbody = document.getElementById('savedFilesTable');
+    
+    if (savedFiles.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-table-message">
+                    <i class="fas fa-info-circle"></i>
+                    Nessun file salvato
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    savedFiles.forEach(file => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${file.name}</td>
+            <td>${new Date(file.date).toLocaleString('it-IT')}</td>
+            <td>${file.format.toUpperCase()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="openFile('${file.path}')">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.path}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+
+
+
+
+
+/*  FUNZIONI PER I DATI */
+
+// Carica i dati salvati
+async function loadSavedData() {
+    try {
+        // Carica lista report
+        const reportsList = await window.electronAPI.getReportsList();
+        document.getElementById('reportsCount').textContent = reportsList.length;
+        
+        // Carica dati Excel Raccolta se disponibili
+        const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+        if (raccoltaDataStr) {
+            try {
+                const raccoltaData = JSON.parse(raccoltaDataStr);
+                // Aggiorna la sezione sali-metalli con i dati
+                updateSaliMetalliWithExcelData(raccoltaData);
+            } catch (error) {
+                console.error('Errore nel caricamento dei dati Excel salvati:', error);
+            }
+        }
+        
+        // Aggiorna la UI
+        updateRecentActivities();
+        updateSavedFiles();
+    } catch (error) {
+        console.error('Errore nel caricamento dei dati:', error);
+        showNotification('Errore nel caricamento dei dati', 'error');
+    }
+}
+
+// Aggiorna la sezione attività recenti
+function updateRecentActivities() {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    const container = document.getElementById('activitiesContainer');
+    
+    if (activities.length === 0) {
+        container.innerHTML = `
+            <div class="no-activities-message">
+                <i class="fas fa-info-circle"></i>
+                <p>Nessuna attività recente</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    // Mostra solo le 5 attività più recenti
+    const recentActivities = activities.slice(0, 5);
+    
+    recentActivities.forEach(activity => {
+        const activityItem = document.createElement('div');
+        activityItem.className = 'activity-item';
+        activityItem.innerHTML = `
+            <div class="activity-icon">
+                <i class="${activity.icon}"></i>
+            </div>
+            <div class="activity-details">
+                <h4>${activity.title}</h4>
+                <p>${activity.description}</p>
+                <small>${formatTimeAgo(new Date(activity.timestamp))}</small>
+            </div>
+        `;
+        container.appendChild(activityItem);
+    });
+}
+
+// Aggiunge una nuova attività
+function addActivity(title, description, icon) {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    
+    activities.unshift({
+        title,
+        description,
+        icon,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Mantiene solo le 20 attività più recenti
+    if (activities.length > 20) {
+        activities.pop();
+    }
+    
+    localStorage.setItem('recentActivities', JSON.stringify(activities));
+    updateRecentActivities();
+}
+
+// Aggiorna la sezione file salvati
+function updateSavedFiles() {
+    const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+    const tbody = document.getElementById('savedFilesTable');
+    
+    if (savedFiles.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-table-message">
+                    <i class="fas fa-info-circle"></i>
+                    Nessun file salvato
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    savedFiles.forEach(file => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${file.name}</td>
+            <td>${new Date(file.date).toLocaleString('it-IT')}</td>
+            <td>${file.format.toUpperCase()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="openFile('${file.path}')">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.path}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+
+
+
+
+
+/*  FUNZIONI PER I DATI */
+
+// Carica i dati salvati
+async function loadSavedData() {
+    try {
+        // Carica lista report
+        const reportsList = await window.electronAPI.getReportsList();
+        document.getElementById('reportsCount').textContent = reportsList.length;
+        
+        // Carica dati Excel Raccolta se disponibili
+        const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+        if (raccoltaDataStr) {
+            try {
+                const raccoltaData = JSON.parse(raccoltaDataStr);
+                // Aggiorna la sezione sali-metalli con i dati
+                updateSaliMetalliWithExcelData(raccoltaData);
+            } catch (error) {
+                console.error('Errore nel caricamento dei dati Excel salvati:', error);
+            }
+        }
+        
+        // Aggiorna la UI
+        updateRecentActivities();
+        updateSavedFiles();
+    } catch (error) {
+        console.error('Errore nel caricamento dei dati:', error);
+        showNotification('Errore nel caricamento dei dati', 'error');
+    }
+}
+
+// Aggiorna la sezione attività recenti
+function updateRecentActivities() {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    const container = document.getElementById('activitiesContainer');
+    
+    if (activities.length === 0) {
+        container.innerHTML = `
+            <div class="no-activities-message">
+                <i class="fas fa-info-circle"></i>
+                <p>Nessuna attività recente</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    // Mostra solo le 5 attività più recenti
+    const recentActivities = activities.slice(0, 5);
+    
+    recentActivities.forEach(activity => {
+        const activityItem = document.createElement('div');
+        activityItem.className = 'activity-item';
+        activityItem.innerHTML = `
+            <div class="activity-icon">
+                <i class="${activity.icon}"></i>
+            </div>
+            <div class="activity-details">
+                <h4>${activity.title}</h4>
+                <p>${activity.description}</p>
+                <small>${formatTimeAgo(new Date(activity.timestamp))}</small>
+            </div>
+        `;
+        container.appendChild(activityItem);
+    });
+}
+
+// Aggiunge una nuova attività
+function addActivity(title, description, icon) {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    
+    activities.unshift({
+        title,
+        description,
+        icon,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Mantiene solo le 20 attività più recenti
+    if (activities.length > 20) {
+        activities.pop();
+    }
+    
+    localStorage.setItem('recentActivities', JSON.stringify(activities));
+    updateRecentActivities();
+}
+
+// Aggiorna la sezione file salvati
+function updateSavedFiles() {
+    const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+    const tbody = document.getElementById('savedFilesTable');
+    
+    if (savedFiles.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-table-message">
+                    <i class="fas fa-info-circle"></i>
+                    Nessun file salvato
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    savedFiles.forEach(file => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${file.name}</td>
+            <td>${new Date(file.date).toLocaleString('it-IT')}</td>
+            <td>${file.format.toUpperCase()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="openFile('${file.path}')">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.path}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+
+
+
+
+
+/*  FUNZIONI PER I DATI */
+
+// Carica i dati salvati
+async function loadSavedData() {
+    try {
+        // Carica lista report
+        const reportsList = await window.electronAPI.getReportsList();
+        document.getElementById('reportsCount').textContent = reportsList.length;
+        
+        // Carica dati Excel Raccolta se disponibili
+        const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+        if (raccoltaDataStr) {
+            try {
+                const raccoltaData = JSON.parse(raccoltaDataStr);
+                // Aggiorna la sezione sali-metalli con i dati
+                updateSaliMetalliWithExcelData(raccoltaData);
+            } catch (error) {
+                console.error('Errore nel caricamento dei dati Excel salvati:', error);
+            }
+        }
+        
+        // Aggiorna la UI
+        updateRecentActivities();
+        updateSavedFiles();
+    } catch (error) {
+        console.error('Errore nel caricamento dei dati:', error);
+        showNotification('Errore nel caricamento dei dati', 'error');
+    }
+}
+
+// Aggiorna la sezione attività recenti
+function updateRecentActivities() {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    const container = document.getElementById('activitiesContainer');
+    
+    if (activities.length === 0) {
+        container.innerHTML = `
+            <div class="no-activities-message">
+                <i class="fas fa-info-circle"></i>
+                <p>Nessuna attività recente</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    // Mostra solo le 5 attività più recenti
+    const recentActivities = activities.slice(0, 5);
+    
+    recentActivities.forEach(activity => {
+        const activityItem = document.createElement('div');
+        activityItem.className = 'activity-item';
+        activityItem.innerHTML = `
+            <div class="activity-icon">
+                <i class="${activity.icon}"></i>
+            </div>
+            <div class="activity-details">
+                <h4>${activity.title}</h4>
+                <p>${activity.description}</p>
+                <small>${formatTimeAgo(new Date(activity.timestamp))}</small>
+            </div>
+        `;
+        container.appendChild(activityItem);
+    });
+}
+
+// Aggiunge una nuova attività
+function addActivity(title, description, icon) {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    
+    activities.unshift({
+        title,
+        description,
+        icon,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Mantiene solo le 20 attività più recenti
+    if (activities.length > 20) {
+        activities.pop();
+    }
+    
+    localStorage.setItem('recentActivities', JSON.stringify(activities));
+    updateRecentActivities();
+}
+
+// Aggiorna la sezione file salvati
+function updateSavedFiles() {
+    const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+    const tbody = document.getElementById('savedFilesTable');
+    
+    if (savedFiles.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-table-message">
+                    <i class="fas fa-info-circle"></i>
+                    Nessun file salvato
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    savedFiles.forEach(file => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${file.name}</td>
+            <td>${new Date(file.date).toLocaleString('it-IT')}</td>
+            <td>${file.format.toUpperCase()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="openFile('${file.path}')">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.path}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+//==========================================================================================================
+
+
+
+
+
+/*  FUNZIONI PER I DATI */
+
+// Carica i dati salvati
+async function loadSavedData() {
+    try {
+        // Carica lista report
+        const reportsList = await window.electronAPI.getReportsList();
+        document.getElementById('reportsCount').textContent = reportsList.length;
+        
+        // Carica dati Excel Raccolta se disponibili
+        const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
+        if (raccoltaDataStr) {
+            try {
+                const raccoltaData = JSON.parse(raccoltaDataStr);
+                // Aggiorna la sezione sali-metalli con i dati
+                updateSaliMetalliWithExcelData(raccoltaData);
+            } catch (error) {
+                console.error('Errore nel caricamento dei dati Excel salvati:', error);
+            }
+        }
+        
+        // Aggiorna la UI
+        updateRecentActivities();
+        updateSavedFiles();
+    } catch (error) {
+        console.error('Errore nel caricamento dei dati:', error);
+        showNotification('Errore nel caricamento dei dati', 'error');
+    }
+}
+
+// Aggiorna la sezione attività recenti
+function updateRecentActivities() {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    const container = document.getElementById('activitiesContainer');
+    
+    if (activities.length === 0) {
+        container.innerHTML = `
+            <div class="no-activities-message">
+                <i class="fas fa-info-circle"></i>
+                <p>Nessuna attività recente</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    // Mostra solo le 5 attività più recenti
+    const recentActivities = activities.slice(0, 5);
+    
+    recentActivities.forEach(activity => {
+        const activityItem = document.createElement('div');
+        activityItem.className = 'activity-item';
+        activityItem.innerHTML = `
+            <div class="activity-icon">
+                <i class="${activity.icon}"></i>
+            </div>
+            <div class="activity-details">
+                <h4>${activity.title}</h4>
+                <p>${activity.description}</p>
+                <small>${formatTimeAgo(new Date(activity.timestamp))}</small>
+            </div>
+        `;
+        container.appendChild(activityItem);
+    });
+}
+
+// Aggiunge una nuova attività
+function addActivity(title, description, icon) {
+    const activities = JSON.parse(localStorage.getItem('recentActivities') || '[]');
+    
+    activities.unshift({
+        title,
+        description,
+        icon,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Mantiene solo le 20 attività più recenti
+    if (activities.length > 20) {
+        activities.pop();
+    }
+    
+    localStorage.setItem('recentActivities', JSON.stringify(activities));
+    updateRecentActivities();
+}
+
+// Aggiorna la sezione file salvati
+function updateSavedFiles() {
+    const savedFiles = JSON.parse(localStorage.getItem('savedFiles') || '[]');
+    const tbody = document.getElementById('savedFilesTable');
+    
+    if (savedFiles.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty-table-message">
+                    <i class="fas fa-info-circle"></i>
+                    Nessun file salvato
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = '';
+    
+    savedFiles.forEach(file => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${file.name}</td>
+            <td>${new Date(file.date).toLocaleString('it-IT')}</td>
+            <td>${file.format.toUpperCase()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="openFile('${file.path}')">
+                    <i class="fas fa-folder-open"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.path}')">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // ==== Funzioni di utilità ====
 
 // Mostra notifica
@@ -873,21 +1653,6 @@ async function handleFileSelection(filePath) {
                 );
             });
             
-            // NUOVO CODICE: Verifica immediata delle sostanze nel database
-            try {
-                // Invia i dati a Python per verifica (ma senza salvarli permanentemente)
-                const verifyResult = await window.electronAPI.verifyExcelData(filteredData, 'raccolta');
-                
-                // Se la verifica fallisce a causa di sostanze mancanti
-                if (!verifyResult.success && verifyResult.sostanze_mancanti && verifyResult.sostanze_mancanti.length > 0) {
-                    showSostanzeMissingDialog(verifyResult.sostanze_mancanti);
-                    return; // Interrompi il caricamento
-                }
-            } catch (verifyError) {
-                console.error("Errore nella verifica delle sostanze:", verifyError);
-                // Continua comunque, il controllo verrà fatto durante il salvataggio
-            }
-            
             // Salva i dati filtrati in sessionStorage
             sessionStorage.setItem('raccoltaExcelData', JSON.stringify(filteredData));
 
@@ -952,13 +1717,10 @@ function updateSaveButtonVisibility() {
 
 
 // NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
-// NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
-// NUOVA FUNZIONE: Salva tutti i dati (Excel + Form) in un'unica operazione
 async function saveAllData() {
-    console.log("Funzione saveAllData avviata - Salvataggio unificato");
+    console.log("Funzione saveAllData avviata - Salvataggio unificato (approccio ibrido)");
     
     // *** NUOVO CONTROLLO PER NUMERI CON VIRGOLA ***
-    // Verifica se ci sono numeri con virgola nei dati Excel caricati
     const raccoltaDataStr = sessionStorage.getItem('raccoltaExcelData');
     if (raccoltaDataStr) {
         try {
@@ -968,11 +1730,7 @@ async function saveAllData() {
             let haCommaNumbers = false;
             for (const row of raccoltaData) {
                 for (const [key, value] of Object.entries(row)) {
-                    // Converte il valore in stringa e controlla se contiene virgole nei numeri
                     const stringValue = String(value);
-                    
-                    // Pattern per rilevare numeri con virgola come separatore decimale
-                    // Esempi: "12,5", "1.234,56", "0,75"
                     const commaNumberPattern = /^\d{1,3}(\.\d{3})*,\d+$|^\d+,\d+$/;
                     
                     if (commaNumberPattern.test(stringValue.trim())) {
@@ -987,18 +1745,18 @@ async function saveAllData() {
             // Se trovati numeri con virgola, mostra alert e interrompi il salvataggio
             if (haCommaNumbers) {
                 alert("Attenzione: sono stati rilevati numeri che utilizzano la virgola (,) come separatore decimale. Per salvare correttamente, i numeri devono utilizzare il punto (.) come separatore decimale. Correggere i dati prima di procedere con il salvataggio.");
-                return; // Interrompe la funzione
+                return; // INTERROMPI IL SALVATAGGIO
             }
         } catch (error) {
-            console.error("Errore durante il controllo dei numeri con virgola:", error);
+            console.error("Errore nel controllo dei numeri con virgola:", error);
         }
     }
-    
+
     // Notifica l'utente che il processo di salvataggio è iniziato
     showNotification('Salvataggio di tutti i dati in corso...', 'info');
-    
+
     try {
-        // STEP 1: Salva i dati dei form
+        // STEP 1: Salva i dati dei form (APPROCCIO VECCHIO - FUNZIONANTE)
         console.log("Step 1: Salvataggio form...");
         const formSaved = await window.infoRaccoltaManager.saveFormData();
         
@@ -1009,10 +1767,10 @@ async function saveAllData() {
         
         console.log("Form salvati con successo");
 
-        // STEP 2: Ottieni i dati del form
+        // STEP 2: Ottieni i dati del form (APPROCCIO VECCHIO - FUNZIONANTE)
         const formData = window.infoRaccoltaManager.getFormData();
         
-        // STEP 3: Ottieni i dati Excel dalla tabella
+        // STEP 3: Ottieni i dati Excel dalla tabella (aggiornati con eventuali modifiche)
         const table = document.querySelector('.excel-data-table');
         if (!table) {
             console.error("Nessuna tabella Excel trovata nell'interfaccia");
@@ -1020,7 +1778,7 @@ async function saveAllData() {
             return;
         }
 
-        // Crea un array di oggetti con i dati aggiornati
+        // Crea un array di oggetti con i dati aggiornati dalla tabella
         const headers = Array.from(table.querySelectorAll('th')).map(th => th.textContent.trim());
         const datiExcel = [];
         
@@ -1032,7 +1790,10 @@ async function saveAllData() {
             datiExcel.push(rowData);
         });
 
-        // STEP 4: Funzione helper per pulire il nome committente
+        console.log("Dati Excel estratti dalla tabella:", datiExcel);
+        console.log("Dati form raccolti:", formData);
+
+        // STEP 4: Crea l'identificativo univoco (STESSO APPROCCIO)
         function pulisciNomeCommittente(nome) {
             if (!nome) return 'SconosciutoCommittente';
             return nome
@@ -1041,14 +1802,13 @@ async function saveAllData() {
                 .substring(0, 50); // Limita lunghezza
         }
 
-        // STEP 5: Crea l'identificativo univoco
         const committente = formData.infoCertificato.committente || 'SconosciutoCommittente';
         const dataCampionamento = formData.infoCertificato.dataCampionamento || new Date().toISOString().split('T')[0];
         const committenteNormalizzato = pulisciNomeCommittente(committente);
         const dataFormattata = dataCampionamento.replace(/-/g, ''); // YYYYMMDD
         const identificativo = `${committenteNormalizzato}_${dataFormattata}`;
 
-        // STEP 6: Crea l'oggetto progetto unificato
+        // STEP 5: Crea l'oggetto progetto unificato (STESSO APPROCCIO)
         const progettoCompleto = {
             id: identificativo,
             timestamp: new Date().toISOString(),
@@ -1061,34 +1821,53 @@ async function saveAllData() {
 
         console.log("Progetto unificato creato:", progettoCompleto);
 
-        // STEP 7: Verifica esistenza Python e calcola metalli
+        // STEP 6: *** NUOVO CONTROLLO AVANZATO SOSTANZE *** 
+        console.log("Step 6: Verifica sostanze nel database con controllo avanzato...");
+        
+        let pythonResult;
         try {
-            console.log("Step 7: Invio dei dati a Python per elaborazione metalli...");
-            const pythonResult = await window.electronAPI.saveExcelToPython(datiExcel, 'raccolta');
+            pythonResult = await window.electronAPI.saveExcelToPython(datiExcel, 'raccolta');
             console.log("Risultato Python:", pythonResult);
-            
-            if (pythonResult.success && pythonResult.metalli_campione) {
-                progettoCompleto.metalliCampione = pythonResult.metalli_campione;
-                console.log("Metalli campione aggiunti al progetto:", pythonResult.metalli_campione);
-            } else {
-                console.warn("Nessun metallo trovato o errore Python:", pythonResult.message);
-                if (!pythonResult.success && pythonResult.sostanze_mancanti) {
-                    showNotification(pythonResult.message, 'error', 4000);
-                    return; // Interrompi se ci sono sostanze mancanti
-                }
-            }
         } catch (pythonError) {
             console.error("Errore nell'elaborazione Python:", pythonError);
-            showNotification(pythonError.message, 'error', 4000);
-            return; // Interrompi se Python fallisce
+            showNotification('Errore durante la verifica delle sostanze nel database', 'error');
+            return; // INTERROMPI IL SALVATAGGIO
         }
 
-        // STEP 8: Salva il progetto unificato
-        console.log("Step 8: Salvataggio progetto unificato...");
+        // STEP 7: *** CONTROLLO CRITICO - NUOVO ALERT SYSTEM ***
+        if (!pythonResult.success) {
+            console.error("Python ha restituito un errore:", pythonResult.message);
+            
+            // Se l'errore riguarda sostanze mancanti, mostra l'alert dettagliato (NUOVO APPROCCIO)
+            if (pythonResult.sostanze_mancanti && pythonResult.sostanze_mancanti.length > 0) {
+                console.log("Sostanze mancanti rilevate:", pythonResult.sostanze_mancanti);
+                
+                // *** ALERT UGUALE A QUELLO DELLE VIRGOLE ***
+                showSostanzeMissingDialog(pythonResult.sostanze_mancanti);
+                
+                // **INTERROMPI COMPLETAMENTE IL PROCESSO**
+                return;
+            } else {
+                // Altri tipi di errore - usa alert anche qui per coerenza
+                alert('Errore durante l\'elaborazione dei dati: ' + (pythonResult.message || 'Errore sconosciuto'));
+                return; // INTERROMPI IL SALVATAGGIO
+            }
+        }
+
+        // STEP 8: Se arriviamo qui, tutte le sostanze sono OK - procedi con metalli
+        if (pythonResult.success && pythonResult.metalli_campione) {
+            progettoCompleto.metalliCampione = pythonResult.metalli_campione;
+            console.log("Metalli campione aggiunti al progetto:", pythonResult.metalli_campione);
+        } else {
+            console.warn("Nessun metallo trovato o errore Python:", pythonResult.message);
+        }
+
+        // STEP 9: Salva il progetto unificato (STESSO APPROCCIO)
+        console.log("Step 9: Salvataggio progetto unificato...");
         const saveResult = await window.electronAPI.saveProgettoRaccolta(progettoCompleto);
         
         if (saveResult.success) {
-            // STEP 9: Aggiorna sessionStorage per retrocompatibilità con sali-metalli
+            // STEP 10: Aggiorna sessionStorage per retrocompatibilità con sali-metalli
             sessionStorage.setItem('raccoltaExcelData', JSON.stringify(datiExcel));
             if (progettoCompleto.metalliCampione && Object.keys(progettoCompleto.metalliCampione).length > 0) {
                 sessionStorage.setItem('metalliCampione', JSON.stringify(progettoCompleto.metalliCampione));
@@ -1180,56 +1959,20 @@ function cleanUpRaccoltaInterfaceAfterSave() {
 }
 
 
-// SOSTITUIRE la funzione showSostanzeMissingDialog esistente in dashboard.js con questa versione migliorata
-
+// FUNZIONE MODIFICATA: Sostituisce showSostanzeMissingDialog esistente
+// *** NUOVA FUNZIONE ALERT AVANZATO *** (dal nuovo approccio)
+// *** NUOVA FUNZIONE ALERT AVANZATO *** (dal nuovo approccio)
 function showSostanzeMissingDialog(sostanzeMancanti) {
-    // Crea un messaggio dettagliato con tutte le sostanze mancanti
+    // Costruisci il messaggio dettagliato
     let alertMessage = '';
-    
     if (sostanzeMancanti.length === 1) {
         alertMessage = `ERRORE: Sostanza mancante nel database\n\n• ${sostanzeMancanti[0]}\n\nNon è possibile procedere con il salvataggio fino a quando questa sostanza non sarà aggiunta al database.`;
     } else {
         alertMessage = `ERRORE: ${sostanzeMancanti.length} sostanze mancanti nel database\n\n${sostanzeMancanti.map(s => `• ${s}`).join('\n')}\n\nNon è possibile procedere con il salvataggio fino a quando tutte queste sostanze non saranno aggiunte al database.`;
     }
     
-    // Mostra l'alert con tutte le sostanze mancanti
+    // Mostra l'alert (uguale a quello per le virgole)
     alert(alertMessage);
-    
-    // Mostra anche una notifica più breve per feedback visivo
-    const shortMessage = sostanzeMancanti.length === 1 
-        ? `Sostanza "${sostanzeMancanti[0]}" non trovata nel database`
-        : `${sostanzeMancanti.length} sostanze non trovate nel database`;
-    
-    showNotification(shortMessage, 'error', 6000);
-    
-    // Riporta l'interfaccia allo stato iniziale
-    const dropZone = document.getElementById('dropZone');
-    if (dropZone) {
-        dropZone.style.display = 'block';
-    }
-    
-    // Nascondi la tabella Excel se visibile
-    const excelTable = document.getElementById('excelDataTable');
-    if (excelTable) {
-        excelTable.style.display = 'none';
-    }
-    
-    // Nascondi il pulsante "Salva Tutto"
-    const saveBtn = document.getElementById('saveChangesBtn');
-    if (saveBtn) {
-        saveBtn.style.display = 'none';
-    }
-    
-    // Rimuovi eventuali file-info precedenti
-    const oldFileInfo = document.querySelector('.file-info');
-    if (oldFileInfo) {
-        oldFileInfo.remove();
-    }
-    
-    // Pulisci i dati dalla sessionStorage
-    sessionStorage.removeItem('raccoltaExcelData');
-    
-    console.log("Sostanze mancanti mostrate all'utente:", sostanzeMancanti);
 }
 
 
@@ -1421,9 +2164,6 @@ function deleteUploadedFile() {
         
         // MODIFICATO: Aggiorna la visibilità del pulsante
         updateSaveButtonVisibility();
-        
-        // Aggiorna la sezione sali-metalli
-        updateSaliMetalliWithExcelData([]);
         
         // Aggiungi attività
         addActivity('File eliminato', 'Dati Excel rimossi', 'fas fa-trash');

@@ -206,13 +206,23 @@ def carica_info_raccolta():
         # 2. Nella cartella utente (Electron)
         from pathlib import Path
         home_dir = str(Path.home())
-        electron_dir = os.path.join(home_dir, '.config', 'WasteGuard') if os.name != 'nt' else os.path.join(os.getenv('APPDATA'), 'WasteGuard')
-        electron_path = os.path.join(electron_dir, "info_raccolta.json")
+        if os.name != 'nt':
+            electron_dir = os.path.join(home_dir, '.config', 'WasteGuard')
+        else:
+            appdata = os.getenv('APPDATA')
+            if appdata:
+                electron_dir = os.path.join(appdata, 'WasteGuard')
+            else:
+                electron_dir = None
+        if electron_dir:
+            electron_path = os.path.join(electron_dir, "info_raccolta.json")
+        else:
+            electron_path = None
         
         # Prova a caricare da uno dei percorsi possibili
         if os.path.exists(classic_path):
             file_path = classic_path
-        elif os.path.exists(electron_path):
+        elif electron_path and os.path.exists(electron_path):
             file_path = electron_path
         else:
             print("File info_raccolta.json non trovato. Percorsi cercati:")
@@ -2323,7 +2333,7 @@ def salva_risultati(risultati, nome_file="risultati_classificazione.json"):
         
         # Assicurati che la cartella reports esista
         if not os.path.exists(reports_dir):
-            os.makedirs(reports_dir, recursive=True)
+            os.makedirs(reports_dir, exist_ok=True)
             print(f"Cartella reports creata: {reports_dir}")
         
         # Percorso completo del file
@@ -2401,7 +2411,11 @@ def main():
         
         print("Fase 5: Caricamento dati campione...", file=sys.stderr)
         # MODIFICATO: Carica i dati reali del campione CON i metadati
-        campione_dati, metadati = carica_dati_campione(nome_file)
+        result = carica_dati_campione(nome_file)
+        if result is None:
+            campione_dati, metadati = None, None
+        else:
+            campione_dati, metadati = result
         
         # Verifica che siano stati caricati dati
         if not campione_dati:
@@ -2498,8 +2512,6 @@ def main():
 
 
 # Se il file viene eseguito con l'argomento --list, mostra i file disponibili
-if __name__ == "__main__" and len(sys.argv) > 1 and sys.argv[1] == "--list":
-    mostra_file_disponibili()
-elif __name__ == "__main__":
+if __name__ == "__main__":
     # Stampa il risultato JSON
     print(main())
