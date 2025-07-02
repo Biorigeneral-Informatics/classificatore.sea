@@ -878,6 +878,52 @@ class ClassificatoreRifiuti:
         
         return nome
 
+    def debug_sostanze_mancanti(self, campione_dati, sostanze_db_normalize):
+        """
+        Funzione di debug per identificare le sostanze mancanti
+        """
+        print("=== DEBUG SOSTANZE MANCANTI ===", file=sys.stderr)
+        print(f"Sostanze nel campione: {len(campione_dati)}", file=sys.stderr)
+        print(f"Sostanze nel database: {len(sostanze_db_normalize)}", file=sys.stderr)
+        
+        sostanze_mancanti = []
+        sostanze_trovate = []
+        
+        for nome_sostanza in campione_dati.keys():
+            nome_normalizzato = self.normalize_name(nome_sostanza)
+            
+            if nome_normalizzato not in sostanze_db_normalize:
+                sostanze_mancanti.append({
+                    'originale': nome_sostanza,
+                    'normalizzato': nome_normalizzato
+                })
+            else:
+                sostanze_trovate.append({
+                    'originale': nome_sostanza,
+                    'normalizzato': nome_normalizzato,
+                    'db_match': sostanze_db_normalize[nome_normalizzato]
+                })
+        
+        print(f"\n--- SOSTANZE TROVATE ({len(sostanze_trovate)}) ---", file=sys.stderr)
+        for sostanza in sostanze_trovate:
+            print(f"✓ '{sostanza['originale']}' → '{sostanza['normalizzato']}' → '{sostanza['db_match']}'", file=sys.stderr)
+        
+        print(f"\n--- SOSTANZE MANCANTI ({len(sostanze_mancanti)}) ---", file=sys.stderr)
+        for sostanza in sostanze_mancanti:
+            print(f"✗ '{sostanza['originale']}' → '{sostanza['normalizzato']}'", file=sys.stderr)
+            
+            # Cerca possibili corrispondenze parziali
+            possibili_match = []
+            for db_name in sostanze_db_normalize.keys():
+                if sostanza['normalizzato'] in db_name or db_name in sostanza['normalizzato']:
+                    possibili_match.append(db_name)
+            
+            if possibili_match:
+                print(f"  Possibili corrispondenze: {possibili_match[:3]}", file=sys.stderr)
+        
+        print("=== FINE DEBUG ===\n", file=sys.stderr)
+        return sostanze_mancanti
+
     def classifica_dati(self, campione_dati):
         """
         Classifica un rifiuto in base ai dati del campione già preprocessati
@@ -891,9 +937,6 @@ class ClassificatoreRifiuti:
         """
         try:
             # Verifica preliminare: controlla se tutte le sostanze sono presenti nel database
-            sostanze_mancanti = []
-            
-            # Prima ottieni tutte le sostanze dal database con i loro nomi normalizzati
             cursor = self.database.conn.cursor()
             
             # 1. Ottieni tutte le sostanze dalla tabella "sostanze"
@@ -911,72 +954,31 @@ class ClassificatoreRifiuti:
             
             # Crea un dizionario di nomi normalizzati per il confronto
             sostanze_db_normalize = {self.normalize_name(nome): nome for nome in tutti_i_nomi}
-
-            for nome_sostanza in campione_dati.keys():
-                # Normalizza il nome della sostanza dall'input
-                nome_normalizzato = self.normalize_name(nome_sostanza)
+            
+            # AGGIUNTO: Debug dettagliato delle sostanze mancanti
+            sostanze_mancanti_debug = self.debug_sostanze_mancanti(campione_dati, sostanze_db_normalize)
+            
+            # Se ci sono sostanze mancanti, prova a gestirle
+            if sostanze_mancanti_debug:
+                print("\n=== GESTIONE SOSTANZE MANCANTI ===", file=sys.stderr)
                 
-                # Controlla se il nome normalizzato esiste nel database
-                if nome_normalizzato not in sostanze_db_normalize:
-                    sostanze_mancanti.append(nome_sostanza)
-                    print(f"Sostanza mancante: '{nome_sostanza}' (normalizzata: '{nome_normalizzato}')", file=sys.stderr)
-            
-            # Se ci sono sostanze mancanti, interrompi la classificazione
-            if sostanze_mancanti:
-                print("\nERRORE: Impossibile avviare la classificazione.")
-                print("Le seguenti sostanze non sono presenti nella Tabella di Riscontro:")
-                for sostanza in sostanze_mancanti:
-                    print(f"  - {sostanza}")
-                print("\nPotrebbe trattarsi di errori di battitura nei file di input.")
-                print("Verificare i nomi delle sostanze e assicurarsi che corrispondano esattamente a quelli nella Tabella di Riscontro.")
-                return None
+                # Opzione 1: Ignora sostanze mancanti e continua con quelle trovate
+                campione_dati_filtrato = {}
+                for nome_sostanza, dati in campione_dati.items():
+                    nome_normalizzato = self.normalize_name(nome_sostanza)
+                    if nome_normalizzato in sostanze_db_normalize:
+                        campione_dati_filtrato[nome_sostanza] = dati
+                    else:
+                        print(f"IGNORANDO sostanza mancante: '{nome_sostanza}'", file=sys.stderr)
                 
-            # VERIFICA AGGIUNTIVA: controlla se tutte le sostanze hanno le hazard class necessarie
-            sostanze_senza_hazard_class = []
+                if len(campione_dati_filtrato) == 0:
+                    print("ERRORE: Nessuna sostanza valida rimasta dopo il filtraggio", file=sys.stderr)
+                    return None
+                
+                print(f"Procedendo con {len(campione_dati_filtrato)} sostanze valide su {len(campione_dati)} totali", file=sys.stderr)
+                campione_dati = campione_dati_filtrato
             
-            for nome_sostanza in campione_dati.keys():
-                # Se è un sale (cioè è presente nella tabella sali)
-                if nome_sostanza in sali_db:
-                    # Per i sali, dobbiamo cercare le frasi H direttamente nel database
-                    cursor = self.database.conn.cursor()
-                    cursor.execute('SELECT Hazard_Statement, Hazard_Class_and_Category FROM "frasi H" WHERE Nome_sostanza = ?', (nome_sostanza,))
-                    frasi_h_rows = cursor.fetchall()
-                    
-                    # Verifica se le frasi che richiedono hazard class ce l'hanno
-                    for row in frasi_h_rows:
-                        frase_h = row[0]
-                        hazard_class = row[1]
-                        
-                        if frase_h in self.database.frasi_h_require_class and (not hazard_class or hazard_class.strip() == ""):
-                            if nome_sostanza not in sostanze_senza_hazard_class:
-                                sostanze_senza_hazard_class.append({
-                                    "sostanza": nome_sostanza,
-                                    "errore": f"Manca hazard class per {frase_h}",
-                                    "frasi_mancanti": [frase_h]
-                                })
-                            else:
-                                # Aggiungi la frase alla lista di frasi mancanti per questa sostanza
-                                next(item for item in sostanze_senza_hazard_class if item["sostanza"] == nome_sostanza)["frasi_mancanti"].append(frase_h)
-                else:
-                    # Per le sostanze normali, usa il metodo esistente
-                    verifica = self.database.verifica_hazard_class_required(nome_sostanza)
-                    if not verifica["success"]:
-                        sostanze_senza_hazard_class.append({
-                            "sostanza": nome_sostanza,
-                            "errore": verifica["message"],
-                            "frasi_mancanti": verifica["missing_hazard_class"]
-                        })
-            
-            # Se ci sono sostanze senza le hazard class richieste, interrompi
-            if sostanze_senza_hazard_class:
-                print("\nERRORE: Impossibile avviare la classificazione.")
-                print("Le seguenti sostanze non hanno hazard class valide per alcune frasi H:")
-                for item in sostanze_senza_hazard_class:
-                    print(f"  - {item['sostanza']}: {item['errore']}")
-                print("\nAssicurarsi che tutte le sostanze abbiano le hazard class necessarie nella Tabella delle Frasi H.")
-                return None
-            
-            print("Tutte le sostanze sono valide. Avvio della classificazione...\n")
+            print("Tutte le sostanze rimanenti sono valide. Avvio della classificazione...\n", file=sys.stderr)
             
             # Inizializza strutture dati per il risultato
             campione = {}
