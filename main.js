@@ -728,9 +728,7 @@ function createApplicationMenu() {
 
 }
 
-// Funzione per controllare le dipendenze Python
 // Funzione per controllare le dipendenze Python (CORRETTA)
-// Funzione per controllare le dipendenze Python (USA SEMPRE .venv)
 function checkPythonDependencies() {
   return new Promise((resolve, reject) => {
     // Usa il percorso specifico all'ambiente virtuale Python - sempre .venv
@@ -1486,6 +1484,54 @@ ipcMain.handle('open-external', async (event, path) => {
         console.error('Errore nell\'esportazione del report in PDF:', error);
         throw error;
       }
+    });
+
+    ipcMain.handle('export-report-word', async (event, reportData, filePath) => {
+        try {
+            // Path dello script Python
+            const pythonScript = path.join(__dirname, 'export_word.py');
+            
+            // Prepara i dati per Python
+            const dataToSend = JSON.stringify({
+                reportData: reportData,
+                filePath: filePath
+            });
+            
+            return new Promise((resolve, reject) => {
+                const pythonProcess = spawn('python', [pythonScript], {
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                // Invia i dati al processo Python
+                pythonProcess.stdin.write(dataToSend);
+                pythonProcess.stdin.end();
+                
+                let output = '';
+                let error = '';
+                
+                pythonProcess.stdout.on('data', (data) => {
+                    output += data.toString();
+                });
+                
+                pythonProcess.stderr.on('data', (data) => {
+                    error += data.toString();
+                });
+                
+                pythonProcess.on('close', (code) => {
+                    if (code === 0) {
+                        resolve({ success: true, message: 'Export completato' });
+                    } else {
+                        reject({ success: false, error: error || 'Errore durante l\'export' });
+                    }
+                });
+                
+                pythonProcess.on('error', (err) => {
+                    reject({ success: false, error: err.message });
+                });
+            });
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     });
 
     ipcMain.handle('save-excel-to-python', async (event, data, dataType = 'raccolta') => {

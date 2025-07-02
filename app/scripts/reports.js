@@ -471,13 +471,9 @@ function loadReports() {
                                     <i class="fas fa-eye"></i>
                                     <span>Anteprima</span>
                                 </button>
-                                <button class="action-btn" onclick="exportReport('${report}', 'excel')" title="Esporta Excel">
-                                    <i class="fas fa-file-excel"></i>
-                                    <span>Excel</span>
-                                </button>
-                                <button class="action-btn" onclick="exportReport('${report}', 'pdf')" title="Esporta PDF">
-                                    <i class="fas fa-file-pdf"></i>
-                                    <span>PDF</span>
+                               <button class="action-btn" onclick="exportReport('${report}', 'word')" title="Esporta Word">
+                                    <i class="fas fa-file-word"></i>
+                                    <span>Word</span>
                                 </button>
                                 <button class="action-btn" onclick="openNotes('${report}')" title="Note">
                                     <i class="fas fa-sticky-note"></i>
@@ -628,8 +624,7 @@ async function openReport(reportPath) {
     }
 }
 
-// Funzione migliorata per l'anteprima dei report
-// Funzione CORRETTA per l'anteprima dei report
+// Funzione ottimizzata per visualizzare l'anteprima del report
 async function previewReport(reportName) {
     try {
         // Carica i dati del report
@@ -650,12 +645,14 @@ async function previewReport(reportName) {
             return;
         }
         
-        // CORREZIONE: Estrai correttamente i dati dalla struttura del report
+        // Estrai correttamente i dati dalla struttura del report
         let dataToDisplay = [];
+        let metadata = null;
         
         if (reportData.risultati_classificazione && Array.isArray(reportData.risultati_classificazione)) {
             // Caso normale: dati in reportData.risultati_classificazione
             dataToDisplay = reportData.risultati_classificazione;
+            metadata = reportData._metadata || null;
         } else if (Array.isArray(reportData)) {
             // Caso legacy: reportData è direttamente un array
             dataToDisplay = reportData;
@@ -663,73 +660,167 @@ async function previewReport(reportName) {
             console.warn('Struttura dati report non riconosciuta:', reportData);
         }
         
-        // Genera HTML per l'anteprima
+        // Informazioni base del report
+        const reportInfo = {
+            name: reportName.replace('.json', ''),
+            date: new Date().toLocaleString('it-IT'),
+            recordCount: dataToDisplay.length,
+            committente: metadata?.committente || 'Non specificato',
+            codiceEER: metadata?.infoCertificato?.codiceEER || metadata?.codiceEER || 'N/A',
+            numeroCampionamento: metadata?.infoCertificato?.numeroCampionamento || metadata?.numeroCampionamento || 'N/A'
+        };
+        
+        // Genera HTML per l'anteprima ottimizzata
         let contentHtml = `
-            <div class="preview-header">
-                <h3>${reportName.replace('.json', '')}</h3>
-                <p class="preview-date">Generato il: ${new Date().toLocaleString('it-IT')}</p>
+            <div class="optimized-preview-header">
+                <div class="preview-metadata-section">
+                    <div class="preview-meta-info">
+                        <span class="preview-date">
+                            <i class="fas fa-calendar-alt"></i>
+                            ${reportInfo.date}
+                        </span>
+                        <span class="preview-records">
+                            <i class="fas fa-database"></i>
+                            ${reportInfo.recordCount} record
+                        </span>
+                    </div>
+                </div>
+                <div class="preview-info-cards">
+                    <div class="info-card">
+                        <div class="info-label">Committente</div>
+                        <div class="info-value">${reportInfo.committente}</div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-label">Codice EER</div>
+                        <div class="info-value">${reportInfo.codiceEER}</div>
+                    </div>
+                    ${reportInfo.numeroCampionamento !== 'N/A' ? `
+                    <div class="info-card">
+                        <div class="info-label">N° Campionamento</div>
+                        <div class="info-value">${reportInfo.numeroCampionamento}</div>
+                    </div>
+                    ` : ''}
+                </div>
             </div>
-            <div class="preview-table-container">
-                <table class="preview-table">
-                    <thead>
-                        <tr>
+            
+            <div class="optimized-preview-content">
         `;
         
-        // Aggiungi intestazioni se ci sono dati
+        // Genera la tabella se ci sono dati
         if (dataToDisplay.length > 0) {
             const headers = Object.keys(dataToDisplay[0]);
+            
+            contentHtml += `
+                <div class="optimized-table-wrapper">
+                    <table class="optimized-preview-table">
+                        <thead>
+                            <tr>
+            `;
+            
+            // Aggiungi intestazioni con icone
             headers.forEach(header => {
-                contentHtml += `<th>${header}</th>`;
+                let icon = 'fas fa-tag';
+                if (header.toLowerCase().includes('concentrazione')) icon = 'fas fa-flask';
+                if (header.toLowerCase().includes('sostanza')) icon = 'fas fa-atom';
+                if (header.toLowerCase().includes('frasi')) icon = 'fas fa-exclamation-triangle';
+                if (header.toLowerCase().includes('caratteristiche')) icon = 'fas fa-shield-alt';
+                if (header.toLowerCase().includes('hp')) icon = 'fas fa-shield-alt';
+                if (header.toLowerCase().includes('ppm')) icon = 'fas fa-tint';
+                if (header.toLowerCase().includes('%')) icon = 'fas fa-percentage';
+                
+                contentHtml += `
+                    <th>
+                        <i class="${icon}"></i>
+                        <span>${header}</span>
+                    </th>
+                `;
             });
             
             contentHtml += `
-                        </tr>
-                    </thead>
-                    <tbody>
+                            </tr>
+                        </thead>
+                        <tbody>
             `;
             
-            // Aggiungi righe
-            dataToDisplay.forEach(row => {
+            // Aggiungi righe con limitazione del testo
+            dataToDisplay.forEach((row, index) => {
                 contentHtml += '<tr>';
                 headers.forEach(header => {
-                    contentHtml += `<td>${row[header] !== undefined ? row[header] : ''}</td>`;
+                    let cellValue = row[header] !== undefined ? String(row[header]) : '';
+                    let displayValue = cellValue;
+                    
+                    // Formattazione speciale per alcuni tipi di dato
+                    if (header.toLowerCase().includes('concentrazione') && !isNaN(cellValue)) {
+                        displayValue = parseFloat(cellValue).toFixed(3);
+                    }
+                    
+                    // Tronca il testo se troppo lungo
+                    if (typeof cellValue === 'string' && cellValue.length > 35) {
+                        displayValue = cellValue.substring(0, 35) + '...';
+                    }
+                    
+                    contentHtml += `
+                        <td class="data-cell" data-full-text="${cellValue}">
+                            ${displayValue}
+                        </td>
+                    `;
                 });
                 contentHtml += '</tr>';
             });
             
             contentHtml += `
-                    </tbody>
-                </table>
-            </div>
+                        </tbody>
+                    </table>
+                </div>
             `;
         } else {
             contentHtml += `
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="5">Nessun dato disponibile</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+                <div class="no-data-preview">
+                    <i class="fas fa-inbox"></i>
+                    <h4>Nessun dato disponibile</h4>
+                    <p>Il report non contiene dati di classificazione.</p>
+                </div>
             `;
         }
+        
+        contentHtml += `</div>`;
         
         // Aggiorna il contenuto e mostra il dialog
         previewContent.innerHTML = contentHtml;
         previewDialog.style.display = 'flex';
         
+        // Imposta il titolo del dialog più semplice
+        const dialogTitle = previewDialog.querySelector('.support-dialog-title');
+        if (dialogTitle) {
+            dialogTitle.innerHTML = `<i class="fas fa-file-alt"></i> Anteprima Report`;
+        }
+        
         // Aggiungi event listeners per i pulsanti di esportazione nell'anteprima
-        document.getElementById('exportPreviewExcelBtn').onclick = () => {
-            exportReport(reportName, 'excel');
-        };
-        document.getElementById('exportPreviewPdfBtn').onclick = () => {
-            exportReport(reportName, 'pdf');
-        };
-        document.getElementById('closePreviewBtn').onclick = () => {
-            previewDialog.style.display = 'none';
-        };
+       const exportWordBtn = document.getElementById('exportPreviewWordBtn');
+
+        if (exportWordBtn) {
+            exportWordBtn.onclick = () => {
+                exportReport(reportName, 'word');
+            };
+        }
+        
+        if (closeBtn) {
+            closeBtn.onclick = () => {
+                previewDialog.style.display = 'none';
+            };
+        }
+        
+        // Aggiungi tooltip personalizzati per le celle con testo troncato
+        const dataCells = previewContent.querySelectorAll('.data-cell');
+        dataCells.forEach(cell => {
+            const fullText = cell.getAttribute('data-full-text');
+            const displayText = cell.textContent.trim();
+            
+            if (fullText && fullText.length > displayText.length) {
+                cell.style.cursor = 'help';
+                cell.title = fullText;
+            }
+        });
         
     } catch (error) {
         console.error('Errore nella visualizzazione dell\'anteprima:', error);
@@ -803,6 +894,32 @@ async function exportReport(reportName, format) {
                     }
                 }
                 break;
+
+            case 'word':
+                    const wordPath = await window.electronAPI.saveFile({
+                        title: 'Salva report Word',
+                        defaultPath: `${outputName}.docx`,
+                        filters: [
+                            { name: 'Word Files', extensions: ['docx'] }
+                        ]
+                    });
+                    
+                    if (wordPath) {
+                        const result = await window.electronAPI.exportReportWord(reportData, wordPath);
+                        if (result.success) {
+                            showNotification('Report esportato in formato Word');
+                            addActivity('Report esportato', `${outputName}.docx`, 'fas fa-file-word');
+                            
+                            // Chiedi se l'utente vuole aprire il file
+                            const shouldOpen = confirm("Esportazione completata. Vuoi aprire il file?");
+                            if (shouldOpen) {
+                                await window.electronAPI.openFile(wordPath);
+                            }
+                        } else {
+                            throw new Error(result.error || 'Errore durante l\'esportazione');
+                        }
+                    }
+                    break;
         }
     } catch (error) {
         console.error(`Errore nell'esportazione del report in formato ${format}:`, error);
