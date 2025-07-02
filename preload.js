@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteReport: (reportName) => ipcRenderer.invoke('delete-report', reportName),
   exportReportExcel: (reportData, filePath) => ipcRenderer.invoke('export-report-excel', reportData, filePath),
   exportReportPdf: (reportData, filePath) => ipcRenderer.invoke('export-report-pdf', reportData, filePath),
+  exportReportWord: (reportData, filePath) => ipcRenderer.invoke('export-report-word', reportData, filePath),
+
   
   // API per gestione file e reports
   getReportsPath: () => ipcRenderer.invoke('getReportsPath'),

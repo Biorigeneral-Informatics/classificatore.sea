@@ -2207,7 +2207,427 @@ select[disabled] {
     background: rgba(255, 255, 255, 0.1);
 }
 
+/* =============================================================================
+   ANTEPRIMA REPORT OTTIMIZZATA - CSS PULITO E FUNZIONALE
+   Migliora gli stili esistenti con margini adeguati e UX ottimizzata
+   ============================================================================= */
 
+/* Migliora il dialog di anteprima esistente con margini appropriati */
+#reportPreviewDialog .support-dialog {
+    width: 90% !important;
+    max-width: 1200px !important;
+    max-height: 95vh !important;
+    border-radius: 12px !important;
+    margin: 2.5vh auto !important; /* Margini verticali per non toccare i bordi */
+}
+
+#reportPreviewDialog .support-dialog-content {
+    padding: 0 !important;
+    max-height: calc(95vh - 180px) !important;
+    overflow: hidden !important;
+}
+
+#reportPreviewContent {
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 2rem !important; /* Margini laterali per evitare il taglio */
+}
+
+/* Header ottimizzato senza ridondanze */
+.optimized-preview-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 1.5rem 2rem;
+    margin: -1rem -2rem 0 -2rem;
+    color: white;
+    border-radius: 12px 12px 0 0;
+}
+
+.preview-metadata-section {
+    margin-bottom: 1rem;
+}
+
+.preview-meta-info {
+    display: flex;
+    gap: 2rem;
+    font-size: 0.95rem;
+    opacity: 0.95;
+    justify-content: flex-start;
+}
+
+.preview-meta-info span {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.preview-info-cards {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.info-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    flex: 1;
+    min-width: 150px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-label {
+    font-size: 0.8rem;
+    opacity: 0.85;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.info-value {
+    font-weight: 600;
+    font-size: 0.95rem;
+    word-break: break-word;
+}
+
+/* Contenuto principale ottimizzato */
+.optimized-preview-content {
+    padding: 1.5rem 0;
+    max-height: 55vh;
+    overflow-y: auto;
+    background: var(--bg-color);
+}
+
+/* Scroll bar migliorata */
+.optimized-preview-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.optimized-preview-content::-webkit-scrollbar-track {
+    background: var(--surface-card);
+    border-radius: 4px;
+}
+
+.optimized-preview-content::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.optimized-preview-content::-webkit-scrollbar-thumb:hover {
+    background: var(--secondary);
+}
+
+/* Wrapper della tabella ottimizzato */
+.optimized-table-wrapper {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+    background: var(--surface-card);
+    margin: 0; /* Rimuovi margini extra */
+}
+
+/* Tabella ottimizzata */
+.optimized-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.optimized-preview-table th {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: white;
+    padding: 0.9rem 0.7rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border: none;
+}
+
+.optimized-preview-table th i {
+    margin-right: 0.5rem;
+    opacity: 0.9;
+    font-size: 0.85rem;
+}
+
+.optimized-preview-table th span {
+    font-weight: 600;
+}
+
+/* Celle dati ottimizzate */
+.data-cell {
+    padding: 0.7rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    transition: all 0.2s ease;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    position: relative;
+}
+
+/* Rimuovi il cursore help di default e gestiscilo via JavaScript */
+.data-cell {
+    cursor: default !important;
+}
+
+/* Solo le celle con testo troncato avranno cursor help (gestito via JS) */
+.data-cell[title]:not([title=""]) {
+    cursor: help !important;
+}
+
+.optimized-preview-table tbody tr:nth-child(even) {
+    background: rgba(var(--primary-rgb, 46, 125, 50), 0.03);
+}
+
+.optimized-preview-table tbody tr:hover {
+    background: rgba(var(--primary-rgb, 46, 125, 50), 0.08);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.optimized-preview-table tbody tr:hover .data-cell {
+    background: inherit;
+}
+
+/* Hover migliorato per celle con testo completo */
+.data-cell:hover {
+    overflow: visible;
+    white-space: normal;
+    z-index: 5;
+    position: relative;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    background: var(--primary) !important;
+    color: white !important;
+    padding: 0.9rem !important;
+    max-width: none;
+    min-width: 200px;
+}
+
+/* Sezione quando non ci sono dati */
+.no-data-preview {
+    text-align: center;
+    padding: 3rem 2rem;
+    color: var(--text-muted);
+}
+
+.no-data-preview i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+    color: var(--primary);
+}
+
+.no-data-preview h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-color);
+    font-size: 1.2rem;
+}
+
+.no-data-preview p {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+/* Migliora il footer del dialog esistente */
+#reportPreviewDialog .support-dialog-footer {
+    background: var(--surface-card);
+    border-top: 2px solid var(--primary);
+    padding: 1.5rem 2rem;
+    margin: 0 !important;
+}
+
+#reportPreviewDialog .report-preview-actions {
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+#reportPreviewDialog .report-preview-actions .btn {
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#reportPreviewDialog .report-preview-actions .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+#reportPreviewDialog .report-preview-actions .btn i {
+    margin-right: 0.5rem;
+}
+
+/* Migliora header del dialog */
+#reportPreviewDialog .support-dialog-header {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    padding: 1.5rem 2rem;
+    position: relative;
+}
+
+#reportPreviewDialog .support-dialog-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Rimuovi l'icona extra dal ::before */
+#reportPreviewDialog .support-dialog-title::before {
+    display: none;
+}
+
+/* Migliora il bottone di chiusura */
+#reportPreviewDialog .support-dialog-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#reportPreviewDialog .support-dialog-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+/* Responsive design ottimizzato */
+@media (max-width: 768px) {
+    #reportPreviewDialog .support-dialog {
+        width: 95% !important;
+        margin: 1rem auto !important;
+    }
+    
+    #reportPreviewContent {
+        margin: 0 1rem !important;
+    }
+    
+    .optimized-preview-header {
+        padding: 1rem 1.5rem;
+        margin: -1rem -1.5rem 0 -1.5rem;
+    }
+    
+    .preview-info-cards {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .preview-meta-info {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .optimized-preview-content {
+        padding: 1rem 0;
+        max-height: 45vh;
+    }
+    
+    .optimized-preview-table {
+        font-size: 0.8rem;
+    }
+    
+    .optimized-preview-table th,
+    .data-cell {
+        padding: 0.5rem 0.4rem;
+    }
+    
+    .data-cell {
+        max-width: 120px;
+    }
+    
+    #reportPreviewDialog .report-preview-actions {
+        flex-direction: column;
+        gap: 0.8rem;
+    }
+    
+    #reportPreviewDialog .report-preview-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Tema scuro ottimizzato */
+[data-theme="dark"] .optimized-preview-header {
+    background: linear-gradient(135deg, var(--primary), #108a3f);
+}
+
+[data-theme="dark"] .info-card {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+[data-theme="dark"] .optimized-table-wrapper {
+    background: #1a1a1a;
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .optimized-preview-table th {
+    background: linear-gradient(135deg, var(--primary), #108a3f);
+}
+
+[data-theme="dark"] .data-cell {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .optimized-preview-table tbody tr:nth-child(even) {
+    background: rgba(0, 214, 91, 0.05);
+}
+
+[data-theme="dark"] .optimized-preview-table tbody tr:hover {
+    background: rgba(0, 214, 91, 0.12);
+}
+
+[data-theme="dark"] .data-cell:hover {
+    background: var(--primary) !important;
+    color: #1a1a1a !important;
+}
+
+[data-theme="dark"] .optimized-preview-content {
+    background: #1a1a1a;
+}
+
+[data-theme="dark"] .optimized-preview-content::-webkit-scrollbar-track {
+    background: #2a2a2a;
+}
+
+[data-theme="dark"] #reportPreviewDialog .support-dialog {
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] #reportPreviewDialog .support-dialog-header {
+    background: linear-gradient(135deg, var(--primary), #108a3f);
+}
+
+[data-theme="dark"] #reportPreviewDialog .support-dialog-footer {
+    background: #1a1a1a;
+    border-color: rgba(0, 214, 91, 0.3);
+}
 
 
 
@@ -3976,33 +4396,38 @@ button:disabled:hover {
   color: var(--warning);
 }
 
-/* Card aggiornamenti nella Home */
+/* Card aggiornamenti nella Home - Fix per tema chiaro */
 .update-card {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
-  color: white;
-  border: none !important;
+  /* Stile di base per tema chiaro */
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
 }
 
 .update-card i {
-  color: white;
+  color: var(--primary);
   opacity: 0.9;
 }
 
 .update-card .stat-info h4 {
-  color: white;
+  color: var(--text-color);
   margin-bottom: 0.75rem;
 }
 
 .update-card .btn {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--primary);
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--primary);
   transition: all 0.3s ease;
 }
 
 .update-card .btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: var(--primary);
+  border-color: var(--primary);
   transform: translateY(-1px);
 }
 
@@ -4011,26 +4436,86 @@ button:disabled:hover {
   margin-top: 0.5rem;
   padding: 0.25rem 0.5rem;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
 }
 
 .update-status.checking {
-  background: rgba(33, 150, 243, 0.2);
+  background: rgba(33, 150, 243, 0.1);
   border-color: rgba(33, 150, 243, 0.3);
-  color: #e3f2fd;
+  color: #1976d2;
 }
 
 .update-status.available {
-  background: rgba(76, 175, 80, 0.2);
+  background: rgba(76, 175, 80, 0.1);
   border-color: rgba(76, 175, 80, 0.3);
-  color: #e8f5e8;
+  color: #388e3c;
 }
 
 .update-status.error {
-  background: rgba(244, 67, 54, 0.2);
+  background: rgba(244, 67, 54, 0.1);
   border-color: rgba(244, 67, 54, 0.3);
-  color: #ffebee;
+  color: #d32f2f;
+}
+
+/* Stili specifici per il tema scuro - stesso stile degli altri container */
+[data-theme="dark"] .update-card {
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: none;
+}
+
+[data-theme="dark"] .update-card i {
+  color: var(--primary);
+  opacity: 0.9;
+}
+
+[data-theme="dark"] .update-card .stat-info h4 {
+  color: var(--text-color);
+  margin-bottom: 0.75rem;
+}
+
+[data-theme="dark"] .update-card .btn {
+  background: var(--primary);
+  color: white;
+  border: 1px solid var(--primary);
+  transition: all 0.3s ease;
+}
+
+[data-theme="dark"] .update-card .btn:hover {
+  background: transparent;
+  color: var(--primary);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .update-status {
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-color);
+}
+
+[data-theme="dark"] .update-status.checking {
+  background: rgba(33, 150, 243, 0.1);
+  border-color: rgba(33, 150, 243, 0.3);
+  color: #64b5f6;
+}
+
+[data-theme="dark"] .update-status.available {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.3);
+  color: #81c784;
+}
+
+[data-theme="dark"] .update-status.error {
+  background: rgba(244, 67, 54, 0.1);
+  border-color: rgba(244, 67, 54, 0.3);
+  color: #e57373;
 }
 
 /* Animazioni */
@@ -4095,9 +4580,6 @@ button:disabled:hover {
 [data-theme="dark"] .update-download-details {
   border-color: #444;
 }
-
-
-
 
 .update-icon.error {
   background: linear-gradient(135deg, var(--danger), #e57373);
