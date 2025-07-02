@@ -212,13 +212,13 @@ const frasiHToHazardClass = {
 // Lista aggiornata di frasi H valide (tutte quelle supportate dal classificatore)
 const frasiHValide = [
     // HP1 - Esplosivo
-    "H200", "H201", "H202", "H203", "H204", "H205", "H240", "H241",
+    "H200", "H201", "H202", "H203", "H204", "H240", "H241",
     // HP2 - Comburente
     "H270", "H271", "H272",
     // HP3 - Infiammabile
     "H220", "H221", "H222", "H223", "H224", "H225", "H226", "H228", "H229", "H230", "H231", "H232", "H242", "H250", "H251", "H252", "H260", "H261",
     // HP4 - Irritante
-    "H314", "H315", "H316", "H317", "H318", "H319", "H320",
+    "H314", "H315", "H318", "H319",
     // HP5 - Tossicità specifica per organi bersaglio
     "H335", "H336", "H370", "H371", "H372", "H373", "H304",
     // HP6 - Tossicità acuta
@@ -234,11 +234,11 @@ const frasiHValide = [
     "H340", "H341",
     // HP12 - Liberazione gas tossico (non usato in CLP)
     // HP13 - Sensibilizzante
-    "H334",
+    "H317", "H334",
     // HP14 - Ecotossico
     "H400", "H410", "H411", "H412", "H413", "H420",
     // HP15 - Potenziale sviluppo di caratteristiche di pericolo
-    // H205 già definito sopra
+    "H205",
     // Nuove frasi H aggiunte
     "H221A", "H221B", "H222A", "H222B", "H223A", "H223B", "H224A", "H224B", "H225A", "H225B", "H226A", "H226B", "H228A", "H228B", "H228C", "H228D", "H229A", "H229B"
 ];
@@ -3525,7 +3525,7 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
 
 
 // Function to check if a substance already exists by both CAS and Name
-async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
+async function verificaSostanzaEsistente(nomeSostanza, codCAS, allowSimilar = false) {
     try {
         // Normalizza gli input per il confronto
         const nomeNormalizzato = nomeSostanza.trim();
@@ -3543,6 +3543,7 @@ async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
             return {
                 esistente: true,
                 tipo: 'CAS',
+                bloccante: true, // CAS duplicato è sempre bloccante
                 messaggio: `Una sostanza con il codice CAS "${codCAS}" è già presente nel database (${checkCASResult.data[0].Nome})`,
                 data: checkCASResult.data[0]
             };
@@ -3569,6 +3570,7 @@ async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
                     return {
                         esistente: true,
                         tipo: 'Nome',
+                        bloccante: !allowSimilar, // Può essere bypassato se allowSimilar = true
                         messaggio: `Una sostanza con il nome "${sostanza.Nome}" è già presente nel database (CAS: ${sostanza.CAS})`,
                         data: sostanza
                     };
@@ -3583,6 +3585,7 @@ async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
                         return {
                             esistente: true,
                             tipo: 'NomeSimilare',
+                            bloccante: false, // Mai bloccante, sempre con scelta utente
                             messaggio: `Una sostanza con un nome simile "${sostanza.Nome}" è già presente nel database (CAS: ${sostanza.CAS})`,
                             data: sostanza
                         };
@@ -3598,6 +3601,7 @@ async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
                     return {
                         esistente: true,
                         tipo: 'NomeSimilare',
+                        bloccante: false, // Mai bloccante, sempre con scelta utente
                         messaggio: `Una sostanza con un nome simile "${sostanza.Nome}" è già presente nel database (CAS: ${sostanza.CAS})`,
                         data: sostanza
                     };
@@ -3609,6 +3613,7 @@ async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
         return {
             esistente: false,
             tipo: null,
+            bloccante: false,
             messaggio: '',
             data: null
         };
@@ -3618,6 +3623,7 @@ async function verificaSostanzaEsistente(nomeSostanza, codCAS) {
         return {
             esistente: false,
             tipo: null,
+            bloccante: false,
             messaggio: 'Errore durante la verifica: ' + error.message,
             data: null
         };
@@ -3656,7 +3662,6 @@ function calcolaDistanzaLevenshtein(a, b) {
 
     return matrix[b.length][a.length];
 }
-
 
 
 // Funzione per inserire una nuova sostanza con controlli migliorati per le frasi H
@@ -3751,38 +3756,36 @@ async function inserisciNuovaSostanza() {
         const verificaEsistente = await verificaSostanzaEsistente(nomeSostanza, codCAS);
 
         if (verificaEsistente.esistente) {
-            // Evidenzia il campo appropriato con errore
+            // Se è CAS duplicato, blocca sempre (più grave)
             if (verificaEsistente.tipo === 'CAS') {
                 document.getElementById('codCAS').classList.add('input-error');
-            } else if (verificaEsistente.tipo === 'Nome' || verificaEsistente.tipo === 'NomeSimilare') {
-                document.getElementById('nomeSostanza').classList.add('input-error');
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = verificaEsistente.messaggio;
+                document.getElementById('codCAS').parentNode.appendChild(errorDiv);
+                
+                showNotification(verificaEsistente.messaggio, 'warning', 4000);
+                
+                setTimeout(() => {
+                    document.querySelectorAll('.input-error').forEach(el => {
+                        el.classList.remove('input-error');
+                    });
+                    document.querySelectorAll('.error-message').forEach(el => {
+                        el.remove();
+                    });
+                }, 4000);
+                
+                return false;
+            } else {
+                // Per nomi simili, chiedi conferma con alert semplice
+                const conferma = confirm(verificaEsistente.messaggio + '\n\nVuoi procedere comunque con l\'inserimento?');
+                if (!conferma) {
+                    showNotification('Inserimento annullato', 'info');
+                    return false;
+                }
+                // Se l'utente conferma, continua con l'inserimento normale
             }
-            
-            // Aggiungi messaggio di errore sotto il campo
-            const campoTarget = verificaEsistente.tipo === 'CAS' ? 
-                document.getElementById('codCAS') : 
-                document.getElementById('nomeSostanza');
-            
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = verificaEsistente.messaggio;
-            campoTarget.parentNode.appendChild(errorDiv);
-            
-
-            
-            showNotification(verificaEsistente.messaggio, 'warning', 4000);
-            
-            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
-            setTimeout(() => {
-                document.querySelectorAll('.input-error').forEach(el => {
-                    el.classList.remove('input-error');
-                });
-                document.querySelectorAll('.error-message').forEach(el => {
-                    el.remove();
-                });
-            }, 4000);
-            
-            return false;
         }
         
         // Validazione frasi H (deve esserci almeno una frase H con relativa classe)
@@ -4016,6 +4019,7 @@ async function inserisciNuovaSostanza() {
         return false;
     }
 }
+
 
 // Aggiungi stile CSS per evidenziare i campi con errore e i messaggi
 function aggiungiStileBase() {
