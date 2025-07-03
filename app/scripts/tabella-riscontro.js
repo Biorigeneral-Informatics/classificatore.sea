@@ -125,30 +125,38 @@ function asyncConfirm(message, title = 'Conferma') {
             background: white;
             border-radius: 8px;
             padding: 20px;
-            max-width: 400px;
+            max-width: 450px;
             width: 90%;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            font-family: Arial, sans-serif;
         `;
 
         dialog.innerHTML = `
-            <h3 style="margin: 0 0 15px 0; color: #333;">${title}</h3>
-            <p style="margin: 0 0 20px 0; line-height: 1.4; color: #555; white-space: pre-wrap;">${message}</p>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <h3 style="margin: 0 0 15px 0; color: #333; font-size: 1.2rem;">${title}</h3>
+            <p style="margin: 0 0 20px 0; line-height: 1.5; color: #555; white-space: pre-wrap;">${message}</p>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
                 <button id="cancelBtn" style="
-                    padding: 8px 16px;
+                    padding: 10px 20px;
                     border: 1px solid #ccc;
                     background: #f8f9fa;
+                    color: #333;
                     border-radius: 4px;
                     cursor: pointer;
-                ">Annulla</button>
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                " onmouseover="this.style.background='#e9ecef'" onmouseout="this.style.background='#f8f9fa'">Annulla</button>
                 <button id="confirmBtn" style="
-                    padding: 8px 16px;
+                    padding: 10px 20px;
                     border: none;
                     background: #007bff;
                     color: white;
                     border-radius: 4px;
                     cursor: pointer;
-                ">Conferma</button>
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                " onmouseover="this.style.background='#0056b3'" onmouseout="this.style.background='#007bff'">Conferma</button>
             </div>
         `;
 
@@ -158,27 +166,39 @@ function asyncConfirm(message, title = 'Conferma') {
         const confirmBtn = dialog.querySelector('#confirmBtn');
         const cancelBtn = dialog.querySelector('#cancelBtn');
         
+        // Focus sul pulsante di conferma
         setTimeout(() => confirmBtn.focus(), 50);
 
+        // Handler per conferma
         confirmBtn.onclick = () => {
             document.body.removeChild(overlay);
             resolve(true);
         };
 
+        // Handler per annulla
         cancelBtn.onclick = () => {
             document.body.removeChild(overlay);
             resolve(false);
         };
 
+        // Handler per ESC
         const handleKeydown = (e) => {
             if (e.key === 'Escape') {
                 document.body.removeChild(overlay);
                 document.removeEventListener('keydown', handleKeydown);
                 resolve(false);
+            } else if (e.key === 'Enter') {
+                // Conferma con ENTER se il focus è sul pulsante conferma
+                if (document.activeElement === confirmBtn) {
+                    document.body.removeChild(overlay);
+                    document.removeEventListener('keydown', handleKeydown);
+                    resolve(true);
+                }
             }
         };
         document.addEventListener('keydown', handleKeydown);
 
+        // Click su overlay per chiudere (annulla)
         overlay.onclick = (e) => {
             if (e.target === overlay) {
                 document.body.removeChild(overlay);
@@ -3512,7 +3532,8 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
         if (!nomeSostanza || nomeSostanza.trim() === '') {
             return {
                 valido: false,
-                messaggio: 'Il nome della sostanza non può essere vuoto'
+                messaggio: 'Il nome della sostanza non può essere vuoto',
+                bloccante: true
             };
         }
 
@@ -3554,7 +3575,8 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
                             valido: false,
                             messaggio: `La sostanza "${nomeSostanza}" corrisponde esattamente al sale "${campoInfo.valore}" (CAS: ${sale.CAS || 'N/A'}). Non può essere inserita come sostanza.`,
                             saleCorrispondente: sale,
-                            tipoCorrispondenza: 'esatta'
+                            tipoCorrispondenza: 'esatta',
+                            bloccante: true
                         };
                     }
                     
@@ -3569,7 +3591,8 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
                                 valido: false,
                                 messaggio: `La sostanza "${nomeSostanza}" è molto simile al sale "${campoInfo.valore}" (CAS: ${sale.CAS || 'N/A'}). Non può essere inserita come sostanza.`,
                                 saleCorrispondente: sale,
-                                tipoCorrispondenza: 'contenimento'
+                                tipoCorrispondenza: 'contenimento',
+                                bloccante: false
                             };
                         }
                     }
@@ -3587,7 +3610,8 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
                             messaggio: `La sostanza "${nomeSostanza}" è molto simile al sale "${campoInfo.valore}" (CAS: ${sale.CAS || 'N/A'}). Non può essere inserita come sostanza.`,
                             saleCorrispondente: sale,
                             tipoCorrispondenza: 'similarità',
-                            distanza: distanza
+                            distanza: distanza,
+                            bloccante: false
                         };
                     }
                 }
@@ -3599,7 +3623,8 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
             valido: true,
             messaggio: '',
             saleCorrispondente: null,
-            tipoCorrispondenza: null
+            tipoCorrispondenza: null,
+            bloccante: false
         };
         
     } catch (error) {
@@ -3609,7 +3634,8 @@ async function verificaNomeSostanzaVsSali(nomeSostanza) {
         return {
             valido: true, // Permetti l'inserimento in caso di errore di sistema
             messaggio: 'Avviso: Impossibile verificare la corrispondenza con i sali a causa di un errore tecnico: ' + error.message,
-            errore: true
+            errore: true,
+            bloccante: false
         };
     }
 }
@@ -3821,26 +3847,44 @@ async function inserisciNuovaSostanza() {
         // NUOVO: Verifica se il nome è presente nella tabella sali
         const verificaSali = await verificaNomeSostanzaVsSali(nomeSostanza);
         if (!verificaSali.valido) {
-            // Evidenzia il campo nome con errore
-            document.getElementById('nomeSostanza').classList.add('input-error');
-            
-            // Aggiungi messaggio di errore sotto il campo
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = verificaSali.messaggio;
-            document.getElementById('nomeSostanza').parentNode.appendChild(errorDiv);
-            
-            showNotification(verificaSali.messaggio, 'error', 4000);
-            
-            // Rimuovi automaticamente l'errore e il messaggio dopo 3 secondi
-            setTimeout(() => {
-                document.getElementById('nomeSostanza').classList.remove('input-error');
-                document.querySelectorAll('.error-message').forEach(el => {
-                    el.remove();
-                });
-            }, 4000);
-            
-            return false;
+            if (verificaSali.bloccante) {
+                // BLOCCO DIRETTO per corrispondenze esatte
+                document.getElementById('nomeSostanza').classList.add('input-error');
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = verificaSali.messaggio;
+                document.getElementById('nomeSostanza').parentNode.appendChild(errorDiv);
+                
+                showNotification(verificaSali.messaggio, 'error', 4000);
+                
+                setTimeout(() => {
+                    document.getElementById('nomeSostanza').classList.remove('input-error');
+                    document.querySelectorAll('.error-message').forEach(el => {
+                        el.remove();
+                    });
+                }, 4000);
+                
+                return false;
+            } else {
+                // CONFERMA per similarità/contenimento
+                const conferma = await asyncConfirm(verificaSali.messaggio + '\n\nVuoi procedere comunque con l\'inserimento?', 'Sostanza simile a sale trovata');
+                if (!conferma) {
+                    showNotification('Inserimento annullato', 'info');
+                    
+                    setTimeout(() => {
+                        document.querySelectorAll('.input-error').forEach(el => {
+                            el.classList.remove('input-error');
+                        });
+                        document.querySelectorAll('.error-message').forEach(el => {
+                            el.remove();
+                        });
+                    }, 2000);
+                    
+                    return false;
+                }
+                // Se l'utente conferma, continua con l'inserimento normale
+            }
         }
         
         // NUOVO: Verifica sia CAS che Nome duplicati usando la nuova funzione
@@ -4616,55 +4660,95 @@ async function inserisciNuovoSaleConFrasiValidato() {
             
             return false;
         }
-        
-        // NUOVO: Verifica se il nome sale è già presente nel database
-        const verificaDuplicati = await verificaNomeSaleEsistente(nomeSale);
-        if (!verificaDuplicati.valido) {
-            // Evidenzia il campo nome con errore
-            document.getElementById('nomeSale').classList.add('input-error');
-            
-            // Aggiungi messaggio di errore sotto il campo
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = verificaDuplicati.messaggio;
-            document.getElementById('nomeSale').parentNode.appendChild(errorDiv);
-            
-            showNotification(verificaDuplicati.messaggio, 'error', 4000);
-            
-            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
-            setTimeout(() => {
-                document.getElementById('nomeSale').classList.remove('input-error');
-                document.querySelectorAll('.error-message').forEach(el => {
-                    el.remove();
-                });
-            }, 4000);
-            
-            return false;
+
+        // NUOVO: Verifica sia CAS che Nome duplicati usando la nuova funzione
+        const verificaEsistente = await verificaSostanzaEsistente(nomeSostanza, codCAS);
+
+        if (verificaEsistente.esistente) {
+            // Se è CAS duplicato, blocca sempre (più grave)
+            if (verificaEsistente.tipo === 'CAS') {
+                document.getElementById('codCAS').classList.add('input-error');
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = verificaEsistente.messaggio;
+                document.getElementById('codCAS').parentNode.appendChild(errorDiv);
+                
+                showNotification(verificaEsistente.messaggio, 'warning', 4000);
+                
+                setTimeout(() => {
+                    document.querySelectorAll('.input-error').forEach(el => {
+                        el.classList.remove('input-error');
+                    });
+                    document.querySelectorAll('.error-message').forEach(el => {
+                        el.remove();
+                    });
+                }, 4000);
+                
+                return false;
+            } else {
+                // Per nomi simili nella tabella SOSTANZE, chiedi conferma
+                // NOTA: Il controllo vs SALI è già stato fatto sopra
+                const conferma = await asyncConfirm(verificaEsistente.messaggio + '\n\nVuoi procedere comunque con l\'inserimento?', 'Sostanza simile trovata');
+                if (!conferma) {
+                    showNotification('Inserimento annullato', 'info');
+                    
+                    setTimeout(() => {
+                        document.querySelectorAll('.input-error').forEach(el => {
+                            el.classList.remove('input-error');
+                        });
+                        document.querySelectorAll('.error-message').forEach(el => {
+                            el.remove();
+                        });
+                    }, 2000);
+                    
+                    return false;
+                }
+                // Se l'utente conferma, continua con l'inserimento normale
+            }
         }
         
         // NUOVO: Verifica se il nome sale corrisponde a una sostanza esistente
         const verificaSostanze = await verificaNomeSaleVsSostanze(nomeSale);
         if (!verificaSostanze.valido) {
-            // Evidenzia il campo nome con errore
-            document.getElementById('nomeSale').classList.add('input-error');
-            
-            // Aggiungi messaggio di errore sotto il campo
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = verificaSostanze.messaggio;
-            document.getElementById('nomeSale').parentNode.appendChild(errorDiv);
-            
-            showNotification(verificaSostanze.messaggio, 'error', 4000);
-            
-            // Rimuovi automaticamente l'errore e il messaggio dopo 4 secondi
-            setTimeout(() => {
-                document.getElementById('nomeSale').classList.remove('input-error');
-                document.querySelectorAll('.error-message').forEach(el => {
-                    el.remove();
-                });
-            }, 4000);
-            
-            return false;
+            if (verificaSostanze.bloccante) {
+                // BLOCCO DIRETTO per corrispondenze esatte
+                document.getElementById('nomeSale').classList.add('input-error');
+                
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = verificaSostanze.messaggio;
+                document.getElementById('nomeSale').parentNode.appendChild(errorDiv);
+                
+                showNotification(verificaSostanze.messaggio, 'error', 4000);
+                
+                setTimeout(() => {
+                    document.getElementById('nomeSale').classList.remove('input-error');
+                    document.querySelectorAll('.error-message').forEach(el => {
+                        el.remove();
+                    });
+                }, 4000);
+                
+                return false;
+            } else {
+                // CONFERMA per similarità/contenimento
+                const conferma = await asyncConfirm(verificaSostanze.messaggio + '\n\nVuoi procedere comunque con l\'inserimento?', 'Nome simile a sostanza');
+                if (!conferma) {
+                    showNotification('Inserimento annullato', 'info');
+                    
+                    setTimeout(() => {
+                        document.querySelectorAll('.input-error').forEach(el => {
+                            el.classList.remove('input-error');
+                        });
+                        document.querySelectorAll('.error-message').forEach(el => {
+                            el.remove();
+                        });
+                    }, 2000);
+                    
+                    return false;
+                }
+                // Se l'utente conferma, continua con l'inserimento normale
+            }
         }
         
         // Validazione CAS se fornito
@@ -4904,7 +4988,8 @@ async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
         if (!nomeSale || nomeSale.trim() === '') {
             return {
                 valido: false,
-                messaggio: 'Il nome del sale non può essere vuoto'
+                messaggio: 'Il nome del sale non può essere vuoto',
+                bloccante: true
             };
         }
 
@@ -4952,7 +5037,8 @@ async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
                             valido: false,
                             messaggio: `Un sale con il nome "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
                             saleCorrispondente: sale,
-                            tipoCorrispondenza: 'esatta'
+                            tipoCorrispondenza: 'esatta',
+                            bloccante: true
                         };
                     }
                     
@@ -4966,7 +5052,8 @@ async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
                                 valido: false,
                                 messaggio: `Un sale con nome simile "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
                                 saleCorrispondente: sale,
-                                tipoCorrispondenza: 'contenimento'
+                                tipoCorrispondenza: 'contenimento',
+                                bloccante: false
                             };
                         }
                     }
@@ -4984,7 +5071,8 @@ async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
                             messaggio: `Un sale con nome molto simile "${campoInfo.valore}" è già presente nel database (CAS: ${sale.CAS || 'N/A'})`,
                             saleCorrispondente: sale,
                             tipoCorrispondenza: 'similarità',
-                            distanza: distanza
+                            distanza: distanza,
+                            bloccante: false
                         };
                     }
                 }
@@ -4996,7 +5084,8 @@ async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
             valido: true,
             messaggio: '',
             saleCorrispondente: null,
-            tipoCorrispondenza: null
+            tipoCorrispondenza: null,
+            bloccante: false
         };
         
     } catch (error) {
@@ -5005,7 +5094,8 @@ async function verificaNomeSaleEsistente(nomeSale, idEscludere = null) {
         return {
             valido: true, // Permetti l'inserimento in caso di errore di sistema
             messaggio: 'Avviso: Impossibile verificare i duplicati a causa di un errore tecnico: ' + error.message,
-            errore: true
+            errore: true,
+            bloccante: false
         };
     }
 }
@@ -5016,7 +5106,8 @@ async function verificaNomeSaleVsSostanze(nomeSale) {
         if (!nomeSale || nomeSale.trim() === '') {
             return {
                 valido: false,
-                messaggio: 'Il nome del sale non può essere vuoto'
+                messaggio: 'Il nome del sale non può essere vuoto',
+                bloccante: true
             };
         }
 
@@ -5050,7 +5141,8 @@ async function verificaNomeSaleVsSostanze(nomeSale) {
                         valido: false,
                         messaggio: `Il nome "${nomeSale}" corrisponde esattamente alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
                         sostanzaCorrispondente: sostanza,
-                        tipoCorrispondenza: 'esatta'
+                        tipoCorrispondenza: 'esatta',
+                        bloccante: true
                     };
                 }
                 
@@ -5063,7 +5155,8 @@ async function verificaNomeSaleVsSostanze(nomeSale) {
                             valido: false,
                             messaggio: `Il nome "${nomeSale}" è molto simile alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
                             sostanzaCorrispondente: sostanza,
-                            tipoCorrispondenza: 'contenimento'
+                            tipoCorrispondenza: 'contenimento',
+                            bloccante: false
                         };
                     }
                 }
@@ -5079,7 +5172,8 @@ async function verificaNomeSaleVsSostanze(nomeSale) {
                         messaggio: `Il nome "${nomeSale}" è molto simile alla sostanza "${sostanza.Nome}" (CAS: ${sostanza.CAS || 'N/A'}). Un sale non può avere lo stesso nome di una sostanza.`,
                         sostanzaCorrispondente: sostanza,
                         tipoCorrispondenza: 'similarità',
-                        distanza: distanza
+                        distanza: distanza,
+                        bloccante: false
                     };
                 }
             }
@@ -5089,7 +5183,8 @@ async function verificaNomeSaleVsSostanze(nomeSale) {
             valido: true,
             messaggio: '',
             sostanzaCorrispondente: null,
-            tipoCorrispondenza: null
+            tipoCorrispondenza: null,
+            bloccante: false
         };
         
     } catch (error) {
@@ -5097,7 +5192,8 @@ async function verificaNomeSaleVsSostanze(nomeSale) {
         return {
             valido: true, // Permetti l'inserimento in caso di errore di sistema
             messaggio: 'Avviso: Impossibile verificare la corrispondenza con le sostanze a causa di un errore tecnico: ' + error.message,
-            errore: true
+            errore: true,
+            bloccante: false
         };
     }
 }
