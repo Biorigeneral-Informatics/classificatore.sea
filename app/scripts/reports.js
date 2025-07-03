@@ -159,6 +159,19 @@ function initEventListenersReports() {
     if (closeReportPreviewDialog) {
         closeReportPreviewDialog.addEventListener('click', function() {
             document.getElementById('reportPreviewDialog').style.display = 'none';
+            currentPreviewReport = null; // Pulisce la variabile
+        });
+    }
+
+    // Event listener per il bottone Esporta Word nell'anteprima
+    const exportPreviewWordBtn = document.getElementById('exportPreviewWordBtn');
+    if (exportPreviewWordBtn) {
+        exportPreviewWordBtn.addEventListener('click', function() {
+            if (currentPreviewReport) {
+                exportReport(currentPreviewReport, 'word');
+            } else {
+                showNotification('Errore: nessun report selezionato', 'error');
+            }
         });
     }
     
@@ -166,6 +179,7 @@ function initEventListenersReports() {
     if (closePreviewBtn) {
         closePreviewBtn.addEventListener('click', function() {
             document.getElementById('reportPreviewDialog').style.display = 'none';
+            currentPreviewReport = null; // Pulisce la variabile
         });
     }
     
@@ -279,28 +293,28 @@ async function createDemoReport() {
         const demoData = [
             {
                 "Sostanza": "Rame",
-                "Concentrazione (ppm)": 250,
+                "Conc. (ppm)": 250,
                 "Frasi H": "H400, H410",
                 "Caratteristiche HP": "HP14",
                 "CAS": "7440-50-8"
             },
             {
                 "Sostanza": "Piombo",
-                "Concentrazione (ppm)": 150,
+                "Conc. (ppm)": 150,
                 "Frasi H": "H360, H373",
                 "Caratteristiche HP": "HP10, HP5",
                 "CAS": "7439-92-1"
             },
             {
                 "Sostanza": "Zinco",
-                "Concentrazione (ppm)": 350,
+                "Conc. (ppm)": 350,
                 "Frasi H": "H400, H410",
                 "Caratteristiche HP": "HP14",
                 "CAS": "7440-66-6"
             },
             {
                 "Sostanza": "** RISULTATO TOTALE **",
-                "Concentrazione (ppm)": "",
+                "Conc. (ppm)": "",
                 "Frasi H": "",
                 "Caratteristiche HP": "HP5, HP10, HP14",
                 "CAS": ""
@@ -624,7 +638,136 @@ async function openReport(reportPath) {
     }
 }
 
-// Funzione ottimizzata per visualizzare l'anteprima del report
+// Funzione per recuperare il codice CAS dal database
+async function getCASFromDatabase(nomeSostanza) {
+    try {
+        // Prima cerca nelle sostanze
+        const resultSostanze = await window.electronAPI.querySQLite(
+            'SELECT CAS FROM sostanze WHERE Nome = ?',
+            [nomeSostanza]
+        );
+        
+        if (resultSostanze.success && resultSostanze.data && resultSostanze.data.length > 0) {
+            return resultSostanze.data[0].CAS;
+        }
+        
+        // Se non trovato nelle sostanze, cerca nei sali
+        const resultSali = await window.electronAPI.querySQLite(
+            'SELECT CAS FROM sali WHERE Sali = ?',
+            [nomeSostanza]
+        );
+        
+        if (resultSali.success && resultSali.data && resultSali.data.length > 0) {
+            return resultSali.data[0].CAS;
+        }
+        
+        // Se non trovato in nessuna tabella, prova con una ricerca più flessibile
+        const resultFlexSostanze = await window.electronAPI.querySQLite(
+            'SELECT CAS FROM sostanze WHERE Nome LIKE ?',
+            [`%${nomeSostanza}%`]
+        );
+        
+        if (resultFlexSostanze.success && resultFlexSostanze.data && resultFlexSostanze.data.length > 0) {
+            return resultFlexSostanze.data[0].CAS;
+        }
+        
+        const resultFlexSali = await window.electronAPI.querySQLite(
+            'SELECT CAS FROM sali WHERE Sali LIKE ?',
+            [`%${nomeSostanza}%`]
+        );
+        
+        if (resultFlexSali.success && resultFlexSali.data && resultFlexSali.data.length > 0) {
+            return resultFlexSali.data[0].CAS;
+        }
+        
+        return 'N/A'; // Se non trovato in nessuna tabella
+        
+    } catch (error) {
+        console.error('Errore nel recupero CAS dal database:', error);
+        return 'N/A';
+    }
+}
+
+// Funzione per recuperare le Hazard Class dal database
+async function getHazardClassFromDatabase(cas, nomeSostanza) {
+    try {
+        let hazardData = [];
+        
+        // Prima cerca per CAS nella tabella "frasi H"
+        if (cas && cas !== 'N/A') {
+            const resultByCAS = await window.electronAPI.querySQLite(
+                'SELECT Hazard_Statement, Hazard_Class_and_Category FROM "frasi H" WHERE CAS = ?',
+                [cas]
+            );
+            
+            if (resultByCAS.success && resultByCAS.data && resultByCAS.data.length > 0) {
+                hazardData = resultByCAS.data;
+            }
+        }
+        
+        // Se non trovato per CAS, cerca per nome sostanza
+        if (hazardData.length === 0 && nomeSostanza) {
+            const resultByName = await window.electronAPI.querySQLite(
+                'SELECT Hazard_Statement, Hazard_Class_and_Category FROM "frasi H" WHERE Nome_sostanza = ?',
+                [nomeSostanza]
+            );
+            
+            if (resultByName.success && resultByName.data && resultByName.data.length > 0) {
+                hazardData = resultByName.data;
+            }
+        }
+        
+        // Se ancora non trovato, cerca per nome sostanza con ricerca flessibile
+        if (hazardData.length === 0 && nomeSostanza) {
+            const resultFlexName = await window.electronAPI.querySQLite(
+                'SELECT Hazard_Statement, Hazard_Class_and_Category FROM "frasi H" WHERE Nome_sostanza LIKE ?',
+                [`%${nomeSostanza}%`]
+            );
+            
+            if (resultFlexName.success && resultFlexName.data && resultFlexName.data.length > 0) {
+                hazardData = resultFlexName.data;
+            }
+        }
+        
+        // Organizza i dati in un formato utilizzabile
+        const hazardMap = {};
+        hazardData.forEach(item => {
+            const hazardStatement = item.Hazard_Statement;
+            const hazardClass = item.Hazard_Class_and_Category || 'N/A';
+            
+            if (hazardStatement) {
+                hazardMap[hazardStatement] = hazardClass;
+            }
+        });
+        
+        return hazardMap;
+        
+    } catch (error) {
+        console.error('Errore nel recupero Hazard Class dal database:', error);
+        return {};
+    }
+}
+
+// Funzione per formattare le frasi H con le hazard class
+function formatHazardWithClass(frasiHString, hazardMap) {
+    if (!frasiHString || frasiHString === 'N/A') {
+        return 'N/A';
+    }
+    
+    // Separa le frasi H
+    const frasi = frasiHString.split(',').map(f => f.trim()).filter(f => f);
+    
+    // Formatta ogni frase con la sua hazard class
+    const formattedFrasi = frasi.map(frase => {
+        const hazardClass = hazardMap[frase] || 'N/A';
+        return `${hazardClass} - ${frase}`;
+    });
+    
+    // Unisce con virgola e a capo
+    return formattedFrasi.join(',<br>');
+}
+
+// Funzione previewReport modificata per includere le Hazard Class
 async function previewReport(reportName) {
     try {
         // Carica i dati del report
@@ -634,7 +777,7 @@ async function previewReport(reportName) {
             return;
         }
         
-        console.log('Dati report caricati:', reportData); // Debug
+        console.log('Dati report caricati:', reportData);
         
         // Ottieni il container di anteprima
         const previewDialog = document.getElementById('reportPreviewDialog');
@@ -650,14 +793,51 @@ async function previewReport(reportName) {
         let metadata = null;
         
         if (reportData.risultati_classificazione && Array.isArray(reportData.risultati_classificazione)) {
-            // Caso normale: dati in reportData.risultati_classificazione
             dataToDisplay = reportData.risultati_classificazione;
             metadata = reportData._metadata || null;
         } else if (Array.isArray(reportData)) {
-            // Caso legacy: reportData è direttamente un array
             dataToDisplay = reportData;
         } else {
             console.warn('Struttura dati report non riconosciuta:', reportData);
+        }
+        
+        // NUOVO: Recupera i CAS dal database e le Hazard Class
+        for (let i = 0; i < dataToDisplay.length; i++) {
+            const record = dataToDisplay[i];
+            const nomeSostanza = record.Sostanza;
+            let cas = record.CAS;
+            
+            // Recupera CAS se mancante
+            if (cas === 'N/A' || !cas) {
+                if (nomeSostanza) {
+                    const casFromDB = await getCASFromDatabase(nomeSostanza);
+                    if (casFromDB !== 'N/A') {
+                        cas = casFromDB;
+                        dataToDisplay[i].CAS = casFromDB;
+                        console.log(`CAS recuperato per ${nomeSostanza}: ${casFromDB}`);
+                    }
+                }
+            }
+            
+            // Recupera Hazard Class SOLO per le frasi H effettivamente rilevate
+            const frasiHOriginali = record['Frasi H'];
+            const caratteristicheHP = record['Caratteristiche HP'];
+            
+            // Processa solo se ci sono frasi H rilevate E caratteristiche HP assegnate
+            if (frasiHOriginali && frasiHOriginali !== 'N/A' && 
+                caratteristicheHP && caratteristicheHP !== 'N/A' && 
+                !caratteristicheHP.toLowerCase().includes('nessuna')) {
+                
+                const hazardMap = await getHazardClassFromDatabase(cas, nomeSostanza);
+                const frasiHFormatted = formatHazardWithClass(frasiHOriginali, hazardMap);
+                dataToDisplay[i]['Codici e Categoria Pericolo'] = frasiHFormatted;
+                // Rimuovi la vecchia colonna
+                delete dataToDisplay[i]['Frasi H'];
+            } else {
+                // Se non ci sono frasi H rilevate o nessuna caratteristica HP, mostra N/A
+                dataToDisplay[i]['Codici e Categoria Pericolo'] = 'N/A';
+                delete dataToDisplay[i]['Frasi H'];
+            }
         }
         
         // Informazioni base del report
@@ -670,7 +850,7 @@ async function previewReport(reportName) {
             numeroCampionamento: metadata?.infoCertificato?.numeroCampionamento || metadata?.numeroCampionamento || 'N/A'
         };
         
-        // Genera HTML per l'anteprima ottimizzata
+        // Genera HTML per l'anteprima ottimizzata (struttura originale)
         let contentHtml = `
             <div class="optimized-preview-header">
                 <div class="preview-metadata-section">
@@ -706,7 +886,7 @@ async function previewReport(reportName) {
             <div class="optimized-preview-content">
         `;
         
-        // Genera la tabella se ci sono dati
+        // Genera la tabella se ci sono dati (logica originale mantenuta)
         if (dataToDisplay.length > 0) {
             const headers = Object.keys(dataToDisplay[0]);
             
@@ -717,16 +897,18 @@ async function previewReport(reportName) {
                             <tr>
             `;
             
-            // Aggiungi intestazioni con icone
+            // Aggiungi intestazioni con icone (logica originale)
             headers.forEach(header => {
                 let icon = 'fas fa-tag';
                 if (header.toLowerCase().includes('concentrazione')) icon = 'fas fa-flask';
                 if (header.toLowerCase().includes('sostanza')) icon = 'fas fa-atom';
-                if (header.toLowerCase().includes('frasi')) icon = 'fas fa-exclamation-triangle';
+                if (header.toLowerCase().includes('frasi') || header.toLowerCase().includes('codici')) icon = 'fas fa-exclamation-triangle';
                 if (header.toLowerCase().includes('caratteristiche')) icon = 'fas fa-shield-alt';
                 if (header.toLowerCase().includes('hp')) icon = 'fas fa-shield-alt';
                 if (header.toLowerCase().includes('ppm')) icon = 'fas fa-tint';
                 if (header.toLowerCase().includes('%')) icon = 'fas fa-percentage';
+                if (header.toLowerCase().includes('cas')) icon = 'fas fa-barcode';
+                if (header.toLowerCase().includes('categoria')) icon = 'fas fa-tags';
                 
                 contentHtml += `
                     <th>
@@ -742,21 +924,16 @@ async function previewReport(reportName) {
                         <tbody>
             `;
             
-            // Aggiungi righe con limitazione del testo
+            // Aggiungi righe con formattazione speciale
             dataToDisplay.forEach((row, index) => {
                 contentHtml += '<tr>';
                 headers.forEach(header => {
                     let cellValue = row[header] !== undefined ? String(row[header]) : '';
                     let displayValue = cellValue;
                     
-                    // Formattazione speciale per alcuni tipi di dato
+                    // Formattazione speciale per concentrazioni
                     if (header.toLowerCase().includes('concentrazione') && !isNaN(cellValue)) {
                         displayValue = parseFloat(cellValue).toFixed(3);
-                    }
-                    
-                    // Tronca il testo se troppo lungo
-                    if (typeof cellValue === 'string' && cellValue.length > 35) {
-                        displayValue = cellValue.substring(0, 35) + '...';
                     }
                     
                     contentHtml += `
@@ -789,47 +966,30 @@ async function previewReport(reportName) {
         previewContent.innerHTML = contentHtml;
         previewDialog.style.display = 'flex';
         
-        // Imposta il titolo del dialog più semplice
-        const dialogTitle = previewDialog.querySelector('.support-dialog-title');
-        if (dialogTitle) {
-            dialogTitle.innerHTML = `<i class="fas fa-file-alt"></i> Anteprima Report`;
-        }
-        
-        // Aggiungi event listeners per i pulsanti di esportazione nell'anteprima
-       const exportWordBtn = document.getElementById('exportPreviewWordBtn');
-       const closeBtn = document.getElementById('closePreviewBtn');
-
-        if (exportWordBtn) {
-            exportWordBtn.onclick = () => {
-                exportReport(reportName, 'word');
-            };
-        }
-        
-        if (closeBtn) {
-            closeBtn.onclick = () => {
-                previewDialog.style.display = 'none';
-            };
-        }
-        
-        // Aggiungi tooltip personalizzati per le celle con testo troncato
+        // Aggiungi event listener per il tooltip al volo
         const dataCells = previewContent.querySelectorAll('.data-cell');
         dataCells.forEach(cell => {
             const fullText = cell.getAttribute('data-full-text');
-            const displayText = cell.textContent.trim();
-            
-            if (fullText && fullText.length > displayText.length) {
-                cell.style.cursor = 'help';
+            if (fullText && fullText.length > 35) {
                 cell.title = fullText;
+                cell.style.cursor = 'help';
             }
         });
         
     } catch (error) {
         console.error('Errore nella visualizzazione dell\'anteprima:', error);
-        showNotification('Errore nella visualizzazione dell\'anteprima: ' + error.message, 'error');
+        showNotification('Errore nella visualizzazione dell\'anteprima del report', 'error');
     }
 }
 
+// Variabile per tenere traccia del report corrente nell'anteprima
+let currentPreviewReport = null;
+
+
+
 // Funzione migliorata per esportare report
+// Sostituisci la funzione exportReport esistente con questa versione corretta:
+
 async function exportReport(reportName, format) {
     try {
         // Notifica inizio esportazione
@@ -839,6 +999,13 @@ async function exportReport(reportName, format) {
         const reportData = await window.electronAPI.loadReport(reportName);
         if (!reportData) {
             throw new Error('Errore nel caricamento del report');
+        }
+        
+        // CORREZIONE: Elabora i dati per l'esportazione Word come nell'anteprima
+        let processedReportData = reportData;
+        
+        if (format === 'word') {
+            processedReportData = await processReportDataForExport(reportData);
         }
         
         const outputName = reportName.replace('.json', '');
@@ -859,7 +1026,6 @@ async function exportReport(reportName, format) {
                         showNotification('Report esportato in formato Excel');
                         addActivity('Report esportato', `${outputName}.xlsx`, 'fas fa-file-excel');
                         
-                        // Chiedi se l'utente vuole aprire il file
                         const shouldOpen = confirm("Esportazione completata. Vuoi aprire il file?");
                         if (shouldOpen) {
                             await window.electronAPI.openExternal(excelPath);
@@ -885,7 +1051,6 @@ async function exportReport(reportName, format) {
                         showNotification('Report esportato in formato PDF');
                         addActivity('Report esportato', `${outputName}.pdf`, 'fas fa-file-pdf');
                         
-                        // Chiedi se l'utente vuole aprire il file
                         const shouldOpen = confirm("Esportazione completata. Vuoi aprire il file?");
                         if (shouldOpen) {
                             await window.electronAPI.openExternal(pdfPath);
@@ -908,20 +1073,20 @@ async function exportReport(reportName, format) {
                 if (wordPath) {
                     try {
                         console.log('Inizio esportazione Word:', wordPath);
-                        const result = await window.electronAPI.exportReportWord(reportData, wordPath);
+                        // USA I DATI ELABORATI invece di quelli originali
+                        const result = await window.electronAPI.exportReportWord(processedReportData, wordPath);
                         
                         console.log('Risultato esportazione:', result);
                         
                         if (result.success) {
                             showNotification('Report esportato in formato Word');
                             addActivity('Report esportato', `${outputName}.docx`, 'fas fa-file-word');
-                            
+
                             const shouldOpen = confirm("Esportazione completata. Vuoi aprire il file?");
                             if (shouldOpen) {
                                 await window.electronAPI.openExternal(wordPath);
                             }
                         } else {
-                            // Mostra errore dettagliato
                             let errorMsg = result.error || 'Errore sconosciuto';
                             
                             if (result.stderr) {
@@ -939,7 +1104,6 @@ async function exportReport(reportName, format) {
                                 stderr: result.stderr
                             });
                             
-                            // Suggerimenti basati sull'errore
                             if (errorMsg.includes('python-docx')) {
                                 errorMsg += '\n\nSoluzione: Installa python-docx con: pip install python-docx';
                             } else if (errorMsg.includes('No such file')) {
@@ -953,7 +1117,6 @@ async function exportReport(reportName, format) {
                     } catch (error) {
                         console.error('Errore catch esportazione Word:', error);
                         
-                        // Mostra errore in un dialog più dettagliato
                         const errorDialog = document.createElement('div');
                         errorDialog.innerHTML = `
                             <div style="
@@ -1010,12 +1173,89 @@ async function exportReport(reportName, format) {
                     }
                 }
                 break;
-            }
-        } catch (error) {
-            console.error(`Errore nell'esportazione del report in formato ${format}:`, error);
-            showNotification(`Errore nell'esportazione: ${error.message}`, 'error');
         }
+    } catch (error) {
+        console.error(`Errore nell'esportazione del report in formato ${format}:`, error);
+        showNotification(`Errore nell'esportazione: ${error.message}`, 'error');
     }
+}
+
+// NUOVA FUNZIONE: Elabora i dati del report per l'esportazione (stessa logica dell'anteprima)
+async function processReportDataForExport(reportData) {
+    try {
+        console.log('Elaborazione dati per esportazione Word...');
+        
+        // Estrai correttamente i dati dalla struttura del report
+        let dataToDisplay = [];
+        let metadata = null;
+        
+        if (reportData.risultati_classificazione && Array.isArray(reportData.risultati_classificazione)) {
+            dataToDisplay = reportData.risultati_classificazione;
+            metadata = reportData._metadata || null;
+        } else if (Array.isArray(reportData)) {
+            dataToDisplay = reportData;
+        } else {
+            console.warn('Struttura dati report non riconosciuta:', reportData);
+            return reportData; // Ritorna i dati originali se non riconosciuti
+        }
+        
+        // Elabora ogni record aggiungendo le Hazard Class come nell'anteprima
+        for (let i = 0; i < dataToDisplay.length; i++) {
+            const record = dataToDisplay[i];
+            const nomeSostanza = record.Sostanza;
+            let cas = record.CAS;
+            
+            // Recupera CAS se mancante
+            if ((cas === 'N/A' || !cas) && nomeSostanza) {
+                const casFromDB = await getCASFromDatabase(nomeSostanza);
+                if (casFromDB !== 'N/A') {
+                    cas = casFromDB;
+                    dataToDisplay[i].CAS = casFromDB;
+                    console.log(`CAS recuperato per ${nomeSostanza}: ${casFromDB}`);
+                }
+            }
+            
+            // Recupera Hazard Class per le frasi H
+            if (nomeSostanza) {
+                const hazardMap = await getHazardClassFromDatabase(cas, nomeSostanza);
+                
+                // Modifica il campo delle frasi H per includere hazard class
+                const frasiHOriginali = record['Frasi H'];
+                if (frasiHOriginali && frasiHOriginali !== 'N/A') {
+                    const frasiHFormatted = formatHazardWithClass(frasiHOriginali, hazardMap);
+                    dataToDisplay[i]['Codici e Categoria Pericolo'] = frasiHFormatted;
+                    // Rimuovi la vecchia colonna Frasi H
+                    delete dataToDisplay[i]['Frasi H'];
+                }
+                
+                // Rinomina le colonne per corrispondere all'anteprima
+                if (record['Concentrazione (ppm)'] !== undefined) {
+                    dataToDisplay[i]['Conc. (ppm)'] = record['Concentrazione (ppm)'];
+                    delete dataToDisplay[i]['Concentrazione (ppm)'];
+                }
+                
+                if (record['Concentrazione (%)'] !== undefined) {
+                    dataToDisplay[i]['Conc. (%)'] = record['Concentrazione (%)'];
+                    delete dataToDisplay[i]['Concentrazione (%)'];
+                }
+            }
+        }
+        
+        // Ricostruisci la struttura del report con i dati elaborati
+        const processedData = {
+            risultati_classificazione: dataToDisplay,
+            _metadata: metadata,
+            timestamp_elaborazione: new Date().toISOString()
+        };
+        
+        console.log('Dati elaborati per esportazione:', processedData);
+        return processedData;
+        
+    } catch (error) {
+        console.error('Errore nell\'elaborazione dei dati per esportazione:', error);
+        return reportData; // Ritorna i dati originali in caso di errore
+    }
+}
 
 // Funzione migliorata per eliminare report
 async function deleteReport(reportName) {
@@ -1201,8 +1441,8 @@ async function generateClassificationReport(classificationData = null) {
             for (const [sostanza, info] of Object.entries(campione)) {
                 reportData.risultati_classificazione.push({
                     'Sostanza': sostanza,
-                    'Concentrazione (ppm)': info.concentrazione_ppm || 0,
-                    'Concentrazione (%)': info.concentrazione_percentuale || 0,
+                    'Conc. (ppm)': info.concentrazione_ppm || 0,
+                    'Conc. (%)': info.concentrazione_percentuale || 0,
                     'Frasi H': info.frasi_h ? info.frasi_h.join(', ') : 'N/A',
                     'Caratteristiche HP': generateHPWithReasons(info, hp, classificationData.data.motivazioni_hp || {}),
                     'CAS': info.cas || 'N/A',
@@ -1213,8 +1453,8 @@ async function generateClassificationReport(classificationData = null) {
            // Aggiungi una riga con il risultato complessivo
            reportData.risultati_classificazione.push({
                 'Sostanza': '** RISULTATO TOTALE **',
-                'Concentrazione (ppm)': '',
-                'Concentrazione (%)': '',
+                'Conc. (ppm)': '',
+                'Conc. (%)': '',
                 'Frasi H': '',
                 'Caratteristiche HP': hp.join(', ') || 'Nessuna caratteristica di pericolo',
                 'CAS': '',
@@ -1259,28 +1499,28 @@ async function generateClassificationReport(classificationData = null) {
             const demoData = [
                 {
                     "Sostanza": "Rame",
-                    "Concentrazione (ppm)": 250,
+                    "Conc. (ppm)": 250,
                     "Frasi H": "H400, H410",
                     "Caratteristiche HP": "HP14",
                     "CAS": "7440-50-8"
                 },
                 {
                     "Sostanza": "Piombo",
-                    "Concentrazione (ppm)": 150,
+                    "Conc. (ppm)": 150,
                     "Frasi H": "H360, H373",
                     "Caratteristiche HP": "HP10, HP5",
                     "CAS": "7439-92-1"
                 },
                 {
                     "Sostanza": "Zinco",
-                    "Concentrazione (ppm)": 350,
+                    "Conc. (ppm)": 350,
                     "Frasi H": "H400, H410",
                     "Caratteristiche HP": "HP14",
                     "CAS": "7440-66-6"
                 },
                 {
                     "Sostanza": "** RISULTATO TOTALE **",
-                    "Concentrazione (ppm)": "",
+                    "Conc. (ppm)": "",
                     "Frasi H": "",
                     "Caratteristiche HP": "HP5, HP10, HP14",
                     "CAS": ""
