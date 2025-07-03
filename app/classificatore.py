@@ -1021,11 +1021,13 @@ class ClassificatoreRifiuti:
             for nome_sostanza in list(campione_dati.keys()):
                 if 'e suoi composti come' in nome_sostanza:
                     simbolo = nome_sostanza.split('come ')[1].strip().lower()
-                    # Cerca se esiste un sale di questo metallo
+                    # Cerca se esiste un sale SPECIFICO di questo metallo (non il metallo stesso)
                     for altro_nome in campione_dati.keys():
-                        if self.has_corresponding_salt(simbolo, altro_nome):
+                        # CORREZIONE: Verifica che sia effettivamente un sale diverso dal metallo originale
+                        if (altro_nome != nome_sostanza and 
+                            self.has_corresponding_salt(simbolo, altro_nome, nome_sostanza)):
                             sostanze_da_rimuovere.add(nome_sostanza)
-                            print(f"Rimuovo metallo originale: {nome_sostanza} (sostituito da sale)", file=sys.stderr)
+                            print(f"Rimuovo metallo originale: {nome_sostanza} (sostituito da sale: {altro_nome})", file=sys.stderr)
                             break
             # Filtra il campione
             if sostanze_da_rimuovere:
@@ -2396,23 +2398,38 @@ class ClassificatoreRifiuti:
         
         return risultato
 
-    def has_corresponding_salt(self, simbolo_metallo, nome_sostanza):
-        """Verifica se una sostanza è un sale del metallo dato"""
+    def has_corresponding_salt(self, simbolo_metallo, nome_sostanza, nome_metallo_originale):
+        """
+        Verifica se una sostanza è EFFETTIVAMENTE un sale del metallo dato,
+        ESCLUDENDO il metallo originale stesso
+        """
         nome_lower = nome_sostanza.lower()
+        metallo_originale_lower = nome_metallo_originale.lower()
         
-        # Mappatura simboli → sali comuni
-        mappature = {
-            'as': ['arsenico', 'arsenic'],
-            'co': ['cobalto', 'cobalt'],
-            'zn': ['zinco', 'zinc'],
-            'pb': ['piombo', 'lead'],
-            'cu': ['rame', 'copper'],
-            'hg': ['mercurio', 'mercury']
+        # Se è lo stesso metallo originale, non è un sale
+        if nome_lower == metallo_originale_lower:
+            return False
+        
+        # Se contiene "composti come" è probabilmente il metallo originale, non un sale
+        if 'composti come' in nome_lower:
+            return False
+        
+        # Mappatura simboli → indicatori di sali veri
+        mappature_sali = {
+            'as': ['arsenato', 'arsenito', 'arseniato'],  # Sali specifici dell'arsenico
+            'co': ['solfato.*cobalto', 'cloruro.*cobalto', 'nitrato.*cobalto'],  # Sali del cobalto
+            'zn': ['solfato.*zinco', 'cloruro.*zinco', 'ossido.*zinco'],  # Sali dello zinco
+            'pb': ['acetato.*piombo', 'solfato.*piombo', 'cloruro.*piombo'],  # Sali del piombo
+            'cu': ['solfato.*rame', 'cloruro.*rame', 'ossido.*rame'],  # Sali del rame
+            'hg': ['cloruro.*mercurio', 'ossido.*mercurio']  # Sali del mercurio
         }
         
-        if simbolo_metallo in mappature:
-            return any(metallo in nome_lower for metallo in mappature[simbolo_metallo])
+        if simbolo_metallo in mappature_sali:
+            import re
+            return any(re.search(pattern, nome_lower) for pattern in mappature_sali[simbolo_metallo])
+        
         return False
+
 
 
 

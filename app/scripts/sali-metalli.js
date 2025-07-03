@@ -136,6 +136,8 @@ async function loadSaliMetalli() {
 }
 
 // Funzione per aggiornare l'interfaccia utente con i metalli e i loro sali in sali-metalli
+// MODIFICA 1: Aggiorna la funzione renderSaliMetalliUI per includere la checkbox di esclusione
+
 function renderSaliMetalliUI() {
     const container = document.getElementById('metalAssociationContainer');
     
@@ -216,13 +218,26 @@ function renderSaliMetalliUI() {
         
         let saliHtml = '';
         
+        // ✅ NUOVO: Aggiungi checkbox di esclusione PRIMA dei sali
+        const escludiHtml = `
+            <div class="esclusione-container" style="margin-top: 1rem; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="escludi-${metallo.id}" data-metallo-id="${metallo.id}" style="margin-right: 8px;">
+                    <span style="font-weight: 600; color: #d9534f;">Non assegnare alcun sale a questo metallo</span>
+                </label>
+                <small style="color: #666; margin-left: 24px; display: block; margin-top: 4px;">
+                    Seleziona questa opzione se non vuoi includere questo metallo nel calcolo finale
+                </small>
+            </div>
+        `;
+        
         // Aggiungi dropdown per ogni sale associato
         if (metallo.saliAssociati && metallo.saliAssociati.length > 0) {
             // Trova il sale predefinito
             const defaultSale = metallo.saliAssociati.find(sale => sale.default) || metallo.saliAssociati[0];
             
             saliHtml = `
-                <div class="sali-options" style="margin-top: 1rem;">
+                <div class="sali-options" id="sali-options-${metallo.id}" style="margin-top: 1rem;">
                     <p style="margin-bottom: 0.5rem; font-weight: 600;">Seleziona il sale associato:</p>
                     <div class="form-group">
                         <select class="form-control sale-select" id="sale-select-${metallo.id}" data-metallo-id="${metallo.id}" data-metallo-nome="${metallo.nome}">
@@ -249,7 +264,7 @@ function renderSaliMetalliUI() {
             `;
         } else {
             saliHtml = `
-                <div class="sali-options" style="margin-top: 1rem;">
+                <div class="sali-options" id="sali-options-${metallo.id}" style="margin-top: 1rem;">
                     <p style="color: var(--text-muted);">Nessun sale associato a questo metallo.</p>
                 </div>
             `;
@@ -261,6 +276,7 @@ function renderSaliMetalliUI() {
             <div class="stat-info" style="width: 100%;">
                 <h4>${metallo.nome} (CAS: ${metallo.cas})</h4>
                 <p>Concentrazione: ${metallo.concentrazione !== null ? metallo.concentrazione + ' ppm' : 'N/A'}</p>
+                ${escludiHtml}
                 ${saliHtml}
             </div>
         `;
@@ -283,6 +299,37 @@ function renderSaliMetalliUI() {
     // Aggiungi event listener al pulsante di assegnazione
     document.getElementById('assignSaliBtn').addEventListener('click', assegnaSaliMetalli);
     
+    // ✅ NUOVO: Event listeners per le checkbox di esclusione
+    document.querySelectorAll('input[id^="escludi-"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const metalloId = this.getAttribute('data-metallo-id');
+            const saliOptions = document.getElementById(`sali-options-${metalloId}`);
+            const saleSelect = document.getElementById(`sale-select-${metalloId}`);
+            
+            if (this.checked) {
+                // Se la checkbox è selezionata, disabilita i controlli dei sali
+                if (saliOptions) {
+                    saliOptions.style.opacity = '0.5';
+                    saliOptions.style.pointerEvents = 'none';
+                }
+                if (saleSelect) {
+                    saleSelect.disabled = true;
+                }
+                console.log(`Metallo ${metalloId} escluso dall'assegnazione`);
+            } else {
+                // Se la checkbox non è selezionata, riabilita i controlli dei sali
+                if (saliOptions) {
+                    saliOptions.style.opacity = '1';
+                    saliOptions.style.pointerEvents = 'auto';
+                }
+                if (saleSelect) {
+                    saleSelect.disabled = false;
+                }
+                console.log(`Metallo ${metalloId} incluso nell'assegnazione`);
+            }
+        });
+    });
+    
     // Aggiungi event listeners a tutti i dropdown
     document.querySelectorAll('.sale-select').forEach(select => {
         select.addEventListener('change', function() {
@@ -291,7 +338,10 @@ function renderSaliMetalliUI() {
             const fattore = selectedOption.getAttribute('data-fattore');
             
             // Aggiorna il fattore visualizzato
-            document.getElementById(`fattore-display-${metalloId}`).textContent = fattore;
+            const fattoreDisplay = document.getElementById(`fattore-display-${metalloId}`);
+            if (fattoreDisplay) {
+                fattoreDisplay.textContent = fattore;
+            }
         });
     });
 }
@@ -335,31 +385,54 @@ function updateMetalliConcentrations(excelData) {
 // Funzione per assegnare i sali selezionati ai metalli e calcolare le concentrazioni aggiustate
 // MODIFICATO: assegnaSaliMetalli per usare codice EER nel nome file
 // MODIFICA alla funzione assegnaSaliMetalli() - Aggiungi pulizia dopo salvataggio
+// MODIFICA 2: Aggiorna la funzione assegnaSaliMetalli per gestire le esclusioni
+
 async function assegnaSaliMetalli() {
     try {
         console.log('Avvio assegnazione sali...');
         
-        // Ottieni tutte le selezioni dei sali
+        // ✅ NUOVO: Ottieni tutte le selezioni dei sali ESCLUDENDO quelli con checkbox selezionata
         const selezioni = {};
         const selezioniElements = document.querySelectorAll('.sale-select');
         
         selezioniElements.forEach(select => {
             const metalloNome = select.getAttribute('data-metallo-nome');
+            const metalloId = select.getAttribute('data-metallo-id');
             const saleId = select.value;
             
-            if (metalloNome && saleId) {
+            // ✅ NUOVO: Controlla se il metallo è escluso
+            const escludiCheckbox = document.getElementById(`escludi-${metalloId}`);
+            const isEscluso = escludiCheckbox && escludiCheckbox.checked;
+            
+            if (metalloNome && saleId && !isEscluso) {
                 selezioni[metalloNome] = saleId;
+                console.log(`Metallo ${metalloNome} incluso con sale ID ${saleId}`);
+            } else if (isEscluso) {
+                console.log(`Metallo ${metalloNome} escluso dall'assegnazione (checkbox selezionata)`);
             }
         });
         
+        // ✅ NUOVO: Verifica se almeno un metallo è stato selezionato
         if (Object.keys(selezioni).length === 0) {
-            showNotification('Nessun sale selezionato. Seleziona almeno un sale prima di procedere.', 'warning');
-            return {};
+            // Controlla se tutti i metalli sono stati esclusi intenzionalmente
+            const tutteCheckboxSelezionate = Array.from(document.querySelectorAll('input[id^="escludi-"]'))
+                .every(checkbox => checkbox.checked);
+            
+            if (tutteCheckboxSelezionate) {
+                // Tutti i metalli sono stati esclusi intenzionalmente - procedi con bypass
+                console.log('Tutti i metalli esclusi intenzionalmente - avvio bypass');
+                await bypassSaliMetalliAndSaveFile();
+                return {};
+            } else {
+                // Nessun sale selezionato e non tutti esclusi - errore
+                showNotification('Nessun sale selezionato. Seleziona almeno un sale o escludi tutti i metalli per procedere.', 'warning');
+                return {};
+            }
         }
         
-        console.log('Selezioni sali:', selezioni);
+        console.log('Selezioni sali finali:', selezioni);
         
-        // Prepara i dati dei metalli per il calcolo
+        // Prepara i dati dei metalli per il calcolo (SOLO quelli non esclusi)
         const metalliCampione = {};
         for (const [metalloNome, saleId] of Object.entries(selezioni)) {
             // Trova il metallo nel dizionario
@@ -371,7 +444,7 @@ async function assegnaSaliMetalli() {
             }
         }
         
-        console.log('Metalli campione per calcolo:', metalliCampione);
+        console.log('Metalli campione per calcolo (esclusi quelli non selezionati):', metalliCampione);
         
         // Chiama lo script Python per il calcolo
         const result = await window.electronAPI.runPythonScript(
@@ -517,7 +590,21 @@ async function assegnaSaliMetalli() {
                 // ✅ NUOVO: PULIZIA INTERFACCIA SALI-METALLI DOPO SALVATAGGIO
                 cleanUpSaliMetalliInterfaceAfterSave();
                 
-                showNotification(`File ${fileName} salvato con successo! Il progetto temporaneo è stato eliminato.`);
+                // ✅ NUOVO: Mostra informazioni sui metalli esclusi nel messaggio di successo
+                const metalliEsclusi = Array.from(document.querySelectorAll('input[id^="escludi-"]:checked'))
+                    .map(checkbox => {
+                        const metalloId = checkbox.getAttribute('data-metallo-id');
+                        const metallo = Object.values(metalliDizionario).find(m => m.id == metalloId);
+                        return metallo ? metallo.nome : 'Sconosciuto';
+                    });
+                
+                let successMessage = `File ${fileName} salvato con successo!`;
+                if (metalliEsclusi.length > 0) {
+                    successMessage += ` Metalli esclusi: ${metalliEsclusi.join(', ')}.`;
+                }
+                successMessage += ` Il progetto temporaneo è stato eliminato.`;
+                
+                showNotification(successMessage);
                 
                 // Aggiorna la UI della classificazione
                 if (typeof updateClassificationUI === 'function') {
