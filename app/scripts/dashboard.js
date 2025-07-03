@@ -949,7 +949,77 @@ function updateSavedFiles() {
 //==========================================================================================================
 
 
+/*Funzione per sostituire gli alert*/
+// Aggiungi in cima al file dashboard.js (dopo i commenti iniziali)
+function asyncConfirm(message, title = 'Conferma') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
 
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        `;
+
+        dialog.innerHTML = `
+            <h3 style="margin: 0 0 15px 0; color: #e74c3c;">${title}</h3>
+            <p style="margin: 0 0 20px 0; line-height: 1.4; color: #555; white-space: pre-wrap;">${message}</p>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="okBtn" style="
+                    padding: 8px 16px;
+                    border: none;
+                    background: #007bff;
+                    color: white;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">OK</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        const okBtn = dialog.querySelector('#okBtn');
+        setTimeout(() => okBtn.focus(), 50);
+
+        okBtn.onclick = () => {
+            document.body.removeChild(overlay);
+            resolve(true);
+        };
+
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape' || e.key === 'Enter') {
+                document.body.removeChild(overlay);
+                document.removeEventListener('keydown', handleKeydown);
+                resolve(true);
+            }
+        };
+        document.addEventListener('keydown', handleKeydown);
+
+        overlay.onclick = (e) => {
+            if (e.target === overlay) {
+                document.body.removeChild(overlay);
+                resolve(true);
+            }
+        };
+    });
+}
 
 
 /*  FUNZIONI PER I DATI */
@@ -1744,7 +1814,7 @@ async function saveAllData() {
             
             // Se trovati numeri con virgola, mostra alert e interrompi il salvataggio
             if (haCommaNumbers) {
-                alert("Attenzione: sono stati rilevati numeri che utilizzano la virgola (,) come separatore decimale. Per salvare correttamente, i numeri devono utilizzare il punto (.) come separatore decimale. Correggere i dati prima di procedere con il salvataggio.");
+                asyncConfirm("Attenzione: sono stati rilevati numeri che utilizzano la virgola (,) come separatore decimale. Per salvare correttamente, i numeri devono utilizzare il punto (.) come separatore decimale. Correggere i dati prima di procedere con il salvataggio.");
                 return; // INTERROMPI IL SALVATAGGIO
             }
         } catch (error) {
@@ -1849,7 +1919,7 @@ async function saveAllData() {
                 return;
             } else {
                 // Altri tipi di errore - usa alert anche qui per coerenza
-                alert('Errore durante l\'elaborazione dei dati: ' + (pythonResult.message || 'Errore sconosciuto'));
+                asyncConfirm('Errore durante l\'elaborazione dei dati: ' + (pythonResult.message || 'Errore sconosciuto'));
                 return; // INTERROMPI IL SALVATAGGIO
             }
         }
@@ -1972,7 +2042,7 @@ function showSostanzeMissingDialog(sostanzeMancanti) {
     }
     
     // Mostra l'alert (uguale a quello per le virgole)
-    alert(alertMessage);
+    asyncConfirm(alertMessage);
 }
 
 

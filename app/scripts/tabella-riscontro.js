@@ -102,6 +102,97 @@ let frasiEUHInEditMode = false;
 //------------ FUNZIONI ------------//
 //-----------------------------------//
 
+
+// 1. AGGIUNGI QUESTA FUNZIONE IN CIMA AL FILE (dopo i commenti iniziali)
+function asyncConfirm(message, title = 'Conferma') {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        `;
+
+        dialog.innerHTML = `
+            <h3 style="margin: 0 0 15px 0; color: #333;">${title}</h3>
+            <p style="margin: 0 0 20px 0; line-height: 1.4; color: #555; white-space: pre-wrap;">${message}</p>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button id="cancelBtn" style="
+                    padding: 8px 16px;
+                    border: 1px solid #ccc;
+                    background: #f8f9fa;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">Annulla</button>
+                <button id="confirmBtn" style="
+                    padding: 8px 16px;
+                    border: none;
+                    background: #007bff;
+                    color: white;
+                    border-radius: 4px;
+                    cursor: pointer;
+                ">Conferma</button>
+            </div>
+        `;
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        const confirmBtn = dialog.querySelector('#confirmBtn');
+        const cancelBtn = dialog.querySelector('#cancelBtn');
+        
+        setTimeout(() => confirmBtn.focus(), 50);
+
+        confirmBtn.onclick = () => {
+            document.body.removeChild(overlay);
+            resolve(true);
+        };
+
+        cancelBtn.onclick = () => {
+            document.body.removeChild(overlay);
+            resolve(false);
+        };
+
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape') {
+                document.body.removeChild(overlay);
+                document.removeEventListener('keydown', handleKeydown);
+                resolve(false);
+            }
+        };
+        document.addEventListener('keydown', handleKeydown);
+
+        overlay.onclick = (e) => {
+            if (e.target === overlay) {
+                document.body.removeChild(overlay);
+                resolve(false);
+            }
+        };
+    });
+}
+
+
+
+
+
+
 // Mappatura completa tra frasi H e Hazard Class corrispondenti
 // Basata sul documento ufficiale delle caratteristiche di pericolo
 const frasiHToHazardClass = {
@@ -1373,7 +1464,7 @@ async function aggiornaDefaultSale(id, isChecked) {
 function attivaModeModificaSale(id) {
     // Se siamo già in modalità modifica, salva prima le modifiche correnti
     if (saliInEditMode) {
-        const conferma = confirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
+        const conferma = asyncConfirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
         if (conferma) {
             salvaSaliModificati();
         }
@@ -1834,7 +1925,7 @@ function renderTabellaRiscontroSostanze(data) {
 function attivaModeModificaSostanza(id) {
     // Se siamo già in modalità modifica, salva prima le modifiche correnti
     if (sostanzeInEditMode) {
-        const conferma = confirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
+        const conferma = asyncConfirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
         if (conferma) {
             salvaSostanzeModificate();
         }
@@ -2440,7 +2531,7 @@ function renderTabellaRiscontroFrasiH(data) {
 function attivaModeModificaFraseH(id) {
     // Se siamo già in modalità modifica, salva prima le modifiche correnti
     if (frasiHInEditMode) {
-        const conferma = confirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
+        const conferma = asyncConfirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
         if (conferma) {
             salvaFrasiHModificate();
         }
@@ -3779,12 +3870,23 @@ async function inserisciNuovaSostanza() {
                 return false;
             } else {
                 // Per nomi simili, chiedi conferma con alert semplice
-                const conferma = confirm(verificaEsistente.messaggio + '\n\nVuoi procedere comunque con l\'inserimento?');
-                if (!conferma) {
-                    showNotification('Inserimento annullato', 'info');
-                    return false;
-                }
-                // Se l'utente conferma, continua con l'inserimento normale
+                const conferma = await asyncConfirm(verificaEsistente.messaggio + '\n\nVuoi procedere comunque con l\'inserimento?', 'Sostanza simile trovata');
+                    if (!conferma) {
+                        showNotification('Inserimento annullato', 'info');
+                        
+                        // Timeout SOLO DOPO che l'utente ha annullato
+                        setTimeout(() => {
+                            document.querySelectorAll('.input-error').forEach(el => {
+                                el.classList.remove('input-error');
+                            });
+                            document.querySelectorAll('.error-message').forEach(el => {
+                                el.remove();
+                            });
+                        }, 2000);
+                        
+                        return false;
+                    }
+                    // Se l'utente conferma, continua con l'inserimento normale
             }
         }
         
@@ -5984,7 +6086,7 @@ function renderTabellaRiscontroFrasiEUH(data) {
 function attivaModeModificaFraseEUH(id) {
     // Se siamo già in modalità modifica, salva prima le modifiche correnti
     if (frasiEUHInEditMode) {
-        const conferma = confirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
+        const conferma = asyncConfirm('Hai delle modifiche non salvate. Vuoi salvare prima di procedere?');
         if (conferma) {
             salvaFrasiEUHModificate();
         }

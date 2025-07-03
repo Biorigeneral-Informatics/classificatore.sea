@@ -313,7 +313,7 @@ class FormCooldownManager {
 }
 
 // Inizializza il gestore del cooldown globalmente
-window.formCooldownManager = new FormCooldownManager(120000); // 60 secondi
+window.formCooldownManager = new FormCooldownManager(10000); // 60 secondi
 
 // Modifica la funzione di inserimento per utilizzare il cooldown
 function patchInserisciNuovaSostanzaWithCooldown() {
