@@ -31,7 +31,7 @@ def carica_dati_campione(nome_file=None):
         script_dir = os.path.dirname(os.path.abspath(__file__))
         
         if nome_file:
-            # 🔧 NUOVO: Gestione migliorata dei percorsi
+            # NUOVO: Gestione migliorata dei percorsi
             if os.path.isabs(nome_file):
                 # Se è un percorso assoluto, usalo direttamente
                 json_path = nome_file
@@ -90,7 +90,7 @@ def carica_dati_campione(nome_file=None):
             json_path = os.path.join(data_dir, "dati_campione.json")
             print(f"Usando percorso di default: {json_path}")
         
-        # 🔧 NUOVO: Verifica dettagliata dell'esistenza del file
+        # NUOVO: Verifica dettagliata dell'esistenza del file
         print(f"Verificando esistenza file: {json_path}")
         
         if not os.path.exists(json_path):
@@ -490,20 +490,80 @@ class DatabaseSostanze:
         
         Args:
             db_path (str, optional): Percorso personalizzato del file del database SQLite.
-                                    Se None, usa il percorso predefinito nella cartella DB.
+                                    Se None, usa il percorso da variabile d'ambiente o userData.
                 
         Returns:
             bool: True se la connessione ha avuto successo, False altrimenti
         """
         try:
-            # Se non viene fornito un percorso, usa il percorso predefinito
+            # Se non viene fornito un percorso, prova a usare la variabile d'ambiente
             if db_path is None:
+                # Prima prova la variabile d'ambiente passata da Electron
+                db_path = os.getenv('WASTEGUARD_DATABASE_PATH')
+                
+                if not db_path:
+                    # Fallback: determina il percorso userData manualmente
+                    if os.name == 'nt':  # Windows
+                        appdata = os.getenv('APPDATA')
+                        if appdata:
+                            db_path = os.path.join(appdata, 'WasteGuard', 'database_app.db')
+                        else:
+                            # Fallback finale
+                            script_dir = os.path.dirname(os.path.abspath(__file__))
+                            db_path = os.path.join(script_dir, "DB", "database_app.db")
+                    else:  # Linux/Mac
+                        from pathlib import Path
+                        home_dir = str(Path.home())
+                        db_path = os.path.join(home_dir, '.config', 'WasteGuard', 'database_app.db')
+            
+            print(f"Tentativo connessione database: {db_path}")
+            
+            # Verifica che il database esista
+            if not os.path.exists(db_path):
+                print(f"ERRORE: Database non trovato in {db_path}")
+                
+                # Lista tutti i percorsi possibili per debug
+                possible_paths = []
+                
+                # Percorso da variabile d'ambiente
+                env_path = os.getenv('WASTEGUARD_DATABASE_PATH')
+                if env_path:
+                    possible_paths.append(f"Env var: {env_path}")
+                
+                # Percorso userData Windows
+                if os.name == 'nt':
+                    appdata = os.getenv('APPDATA')
+                    if appdata:
+                        userData_path = os.path.join(appdata, 'WasteGuard', 'database_app.db')
+                        possible_paths.append(f"Windows userData: {userData_path}")
+                
+                # Percorso userData Linux/Mac
+                else:
+                    from pathlib import Path
+                    home_dir = str(Path.home())
+                    userData_path = os.path.join(home_dir, '.config', 'WasteGuard', 'database_app.db')
+                    possible_paths.append(f"Unix userData: {userData_path}")
+                
+                # Percorso fallback
                 script_dir = os.path.dirname(os.path.abspath(__file__))
-                db_path = os.path.join(script_dir, "DB", "database_app.db")
+                fallback_path = os.path.join(script_dir, "DB", "database_app.db")
+                possible_paths.append(f"Fallback: {fallback_path}")
+                
+                print("Percorsi controllati:")
+                for p in possible_paths:
+                    print(f"  - {p}")
+                
+                # Prova il fallback
+                if os.path.exists(fallback_path):
+                    print(f"Usando database fallback: {fallback_path}")
+                    db_path = fallback_path
+                else:
+                    return False
             
             self.conn = sqlite3.connect(db_path)
-            print(f"Connessione al database {db_path} stabilita con successo.")
+            print(f"Connessione al database stabilita: {db_path}")
             return True
+            
         except sqlite3.Error as e:
             print(f"Errore nella connessione al database: {e}")
             return False

@@ -29,6 +29,33 @@ class RaccoltaHandler:
         
         # Stampa il percorso per debug
         print(f"Percorso dati: {self.data_path}", file=sys.stderr)
+
+    def get_database_path(self):
+        """
+        NUOVO: Ottiene il percorso corretto del database
+        Ora usa il database in AppData/WasteGuard invece di app/DB/
+        """
+        # Prima prova a ottenere il percorso da variabile ambiente (passata da Electron)
+        if 'USER_DATA_PATH' in os.environ:
+            user_data_path = os.environ['USER_DATA_PATH']
+            db_path = os.path.join(user_data_path, 'database_app.db')
+            print(f"Usando database da USER_DATA_PATH: {db_path}", file=sys.stderr)
+            return db_path
+        
+        # Fallback: cerca in AppData manualmente
+        if os.name == 'nt':  # Windows
+            app_data = os.environ.get('APPDATA', '')
+            user_data_path = os.path.join(app_data, 'WasteGuard')
+        else:  # macOS/Linux
+            home = os.path.expanduser("~")
+            if sys.platform == 'darwin':  # macOS
+                user_data_path = os.path.join(home, 'Library', 'Application Support', 'WasteGuard')
+            else:  # Linux
+                user_data_path = os.path.join(home, '.config', 'WasteGuard')
+        
+        db_path = os.path.join(user_data_path, 'database_app.db')
+        print(f"Usando database fallback: {db_path}", file=sys.stderr)
+        return db_path
     
     def clean_string(self, text):
         """
@@ -173,14 +200,13 @@ class RaccoltaHandler:
                     
                     print(f"Sostanze trovate nel file ({len(sostanze_nel_file)}): {sostanze_nel_file}", file=sys.stderr)
                     
-                    # Connessione al database
-                    script_dir = os.path.dirname(os.path.abspath(__file__))
-                    db_path = os.path.join(script_dir, "DB", "database_app.db")
+                    # MODIFICA PRINCIPALE: Usa il percorso corretto del database
+                    db_path = self.get_database_path()
                     print(f"Percorso database: {db_path}", file=sys.stderr)
                     
                     if not os.path.exists(db_path):
                         print(f"ERRORE: Database non trovato in: {db_path}", file=sys.stderr)
-                        return {"success": False, "message": "Database non trovato"}
+                        return {"success": False, "message": f"Database non trovato in: {db_path}"}
                     
                     conn = sqlite3.connect(db_path)
                     cursor = conn.cursor()
@@ -267,7 +293,7 @@ class RaccoltaHandler:
                     json.dump(processed_data, f, ensure_ascii=False, indent=2)
                 
                 # Identifica i metalli nel campione
-                metalli_campione = identifica_metalli_campione(data)
+                metalli_campione = identifica_metalli_campione(data, db_path)
                 
                 # Salva i metalli identificati nel file JSON
                 metalli_path = os.path.join(self.data_path, "metalli_campione.json")
@@ -314,8 +340,12 @@ def process_excel(json_path, data_type="raccolta"):
             if data_type == "raccolta":
                 data = result.get("data", [])
                 
+                # MODIFICA: Passa il percorso del database alla funzione identifica_metalli_campione
+                handler = RaccoltaHandler()
+                db_path = handler.get_database_path()
+                
                 # Identifica i metalli e aggiungi al risultato
-                metalli_campione = identifica_metalli_campione(data)
+                metalli_campione = identifica_metalli_campione(data, db_path)
                 result["metalli_campione"] = metalli_campione
                 
                 # Usa sys.stderr invece di print standard
@@ -335,17 +365,30 @@ def process_excel(json_path, data_type="raccolta"):
     return json.dumps(result)
 
 
-def identifica_metalli_campione(excel_data):
+def identifica_metalli_campione(excel_data, db_path=None):
     """
     Identifica i metalli nel campione e crea un dizionario con le loro concentrazioni
     Ignora tutti i valori che iniziano con "<"
+    
+    Args:
+        excel_data: Dati Excel da analizzare
+        db_path: Percorso del database (se None, lo determina automaticamente)
     """
     metalli_campione = {}
     
     # Connessione al database per verificare quali sostanze sono metalli
     try:
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        db_path = os.path.join(script_dir, "DB", "database_app.db")
+        # MODIFICA: Se db_path non è fornito, determinalo automaticamente
+        if db_path is None:
+            handler = RaccoltaHandler()
+            db_path = handler.get_database_path()
+        
+        print(f"Connessione al database: {db_path}", file=sys.stderr)
+        
+        if not os.path.exists(db_path):
+            print(f"ERRORE: Database non trovato per identificazione metalli: {db_path}", file=sys.stderr)
+            return {}
+        
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         

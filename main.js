@@ -275,7 +275,7 @@ let mainWindow;
 let loginWindow;
 
 // Funzione helper per eseguire comandi Python (USA SEMPRE .venv)
-// Funzione helper per eseguire comandi Python (USA SEMPRE .venv)
+// Funzione helper per eseguire comandi Python (AGGIORNATA)
 function runPythonScript(scriptName, args) {
   return new Promise((resolve, reject) => {
     const isWin = process.platform === 'win32';
@@ -394,9 +394,17 @@ function runPythonScript(scriptName, args) {
     console.log('\nStarting Python process...');
     console.log(`Arguments: ${args.length > 0 ? args.join(' ') : 'none'}`);
     
-    // Crea processo Python
+    // NUOVO: Aggiungi il percorso del database alle variabili ambiente
+    const pythonEnv = { 
+      ...process.env,
+      USER_DATA_PATH: app.getPath('userData')  // Passa il percorso userData a Python
+    };
+    
+    console.log(`Passing USER_DATA_PATH: ${pythonEnv.USER_DATA_PATH}`);
+    
+    // Crea processo Python con le variabili ambiente aggiornate
     const python = spawn(pythonCmd, [scriptPath, ...args], {
-      env: { ...process.env },
+      env: pythonEnv,  // Usa le variabili ambiente aggiornate
       windowsHide: true // Nasconde la finestra della console su Windows
     });
     
@@ -2128,28 +2136,48 @@ ipcMain.handle('delete-campione-file-with-warning', async (event, fileName) => {
 
 
 //======== Handle SQL Lite
+// Funzione helper per ottenere il percorso corretto del database
+function getDatabasePath() {
+  const userDataPath = app.getPath('userData');
+  return path.join(userDataPath, 'database_app.db');
+}
+// Handler per ottenere il percorso del database da Python
+ipcMain.handle('get-database-path', async () => {
+  try {
+    return getDatabasePath();
+  } catch (error) {
+    console.error('Errore nel recupero del percorso database:', error);
+    return null;
+  }
+});
+
+
+
+
+
 // Handler per query SELECT (AGGIORNATO)
 ipcMain.handle('query-sqlite', async (event, query, params, dbName) => {
   try {
-    // Costruisci il percorso del database
     let dbPath;
     
-    // NUOVO: Se dbName è un percorso assoluto, usalo direttamente
-    if (dbName && (dbName.includes(':') || dbName.startsWith('/'))) {
-      // È un percorso assoluto (Windows: contiene ':', Unix: inizia con '/')
+    // Se dbName è specificato e è un percorso assoluto, usalo
+    if (dbName && (path.isAbsolute(dbName))) {
       dbPath = dbName;
-      console.log(`Usando percorso assoluto: ${dbPath}`);
     }
     // Se dbName inizia con "echa/data/", costruisci il percorso relativo all'app
     else if (dbName && dbName.startsWith('echa/data/')) {
       dbPath = path.join(__dirname, 'app', dbName);
-      console.log(`Usando percorso relativo echa: ${dbPath}`);
     }
-    // Altrimenti usa il database principale
+    // Per il database principale, usa sempre il percorso in userData
+    else if (!dbName || dbName === 'database_app.db') {
+      dbPath = getDatabasePath();
+    }
+    // Per altri database, mantieni la logica esistente
     else {
-      dbPath = dbName ? path.join(__dirname, 'app', 'DB', dbName) : DB_PATH;
-      console.log(`Usando percorso database principale: ${dbPath}`);
+      dbPath = path.join(__dirname, 'app', 'DB', dbName);
     }
+    
+    console.log(`Usando database: ${dbPath}`);
     
     // Verifica che il file del database esista
     if (!fs.existsSync(dbPath)) {
@@ -2160,28 +2188,17 @@ ipcMain.handle('query-sqlite', async (event, query, params, dbName) => {
       };
     }
     
-    try {
-      // Apri database con better-sqlite3
-      const db = new Database(dbPath, { readonly: true });
-      
-      // Prepara e esegui la query
-      const stmt = db.prepare(query);
-      const rows = params && params.length > 0 ? stmt.all(...params) : stmt.all();
-      
-      // Chiudi il database
-      db.close();
-      
-      return { 
-        success: true, 
-        data: rows 
-      };
-    } catch (err) {
-      console.error(`Errore nell'esecuzione della query: ${err.message}`);
-      return { 
-        success: false, 
-        message: `Errore nell'esecuzione della query: ${err.message}` 
-      };
-    }
+    // Resto della logica esistente...
+    const db = new Database(dbPath, { readonly: true });
+    const stmt = db.prepare(query);
+    const rows = params && params.length > 0 ? stmt.all(...params) : stmt.all();
+    db.close();
+    
+    return { 
+      success: true, 
+      data: rows 
+    };
+    
   } catch (error) {
     console.error('Errore nell\'esecuzione della query SQLite:', error);
     return { 

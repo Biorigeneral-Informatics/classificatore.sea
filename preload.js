@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   hasProgettoRaccolta: () => ipcRenderer.invoke('has-progetto-raccolta'),
   deleteProgettoRaccolta: () => ipcRenderer.invoke('delete-progetto-raccolta'),
 
+  // NUOVO: API per ottenere il percorso del database
+  getDatabasePath: () => ipcRenderer.invoke('get-database-path'),
+
   // Aggiungi alle API esistenti nel preload.js
   getCampioneFilesWithMetadata: () => ipcRenderer.invoke('get-campione-files-with-metadata'),
   archiveClassificationResult: (fileName, result) => ipcRenderer.invoke('archive-classification-result', fileName, result),
