@@ -1309,7 +1309,16 @@ class ClassificatoreRifiuti:
                         motivo_infiammabilita = "HP3: criterio infiammabilità fisica"
                         if motivo_infiammabilita not in info["motivi_hp"]:
                             info["motivi_hp"].append(motivo_infiammabilita)
-            
+
+            # NUOVO STEP: VERIFICA HP8 (pH)
+            hp8_ph = self._verifica_hp8_ph()
+            if hp8_ph["assegnata"]:
+                hp_assegnate.add("HP8")
+                if "HP8" in motivazioni_hp:
+                    motivazioni_hp["HP8"] = f"{motivazioni_hp['HP8']}; {hp8_ph['motivo']}"
+                else:
+                    motivazioni_hp["HP8"] = hp8_ph["motivo"]
+
             # STEP 3: VERIFICHE DELLE SOMMATORIE (PER HP CHE SUPPORTANO ADDITIVITÀ)
             # Verifica HP1 da sommatoria
             hp1_sommatoria = self._verifica_hp1_sommatoria(sommatoria_per_frase)
