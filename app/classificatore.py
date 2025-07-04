@@ -1524,20 +1524,21 @@ class ClassificatoreRifiuti:
         # Lista di frasi H rilevanti per HP3
         frasi_hp3 = self.database.hp_mapping["HP3"]
         
-        # Verifica se qualsiasi frase H di HP3 ha una sommatoria > 0.1%
-        frasi_sopra_limite = []
+        # NUOVO: Calcola la sommatoria TOTALE di tutte le frasi H di HP3
+        sommatoria_totale_hp3 = 0
+        frasi_presenti = []
+        
         for frase_h in frasi_hp3:
             if frase_h in sommatoria_per_frase:
-                sommatoria = sommatoria_per_frase[frase_h]
-                limite = self.database.valori_limite.get(frase_h, 0.1)  # Default 0.1% se non specificato
-                
-                if sommatoria >= limite:
-                    frasi_sopra_limite.append(f"{frase_h} ({sommatoria:.4f}% >= {limite}%)")
+                concentrazione = sommatoria_per_frase[frase_h]
+                sommatoria_totale_hp3 += concentrazione
+                frasi_presenti.append(f"{frase_h} ({concentrazione:.4f}%)")
         
-        # Se almeno una frase è sopra il limite, assegna HP3
-        if frasi_sopra_limite:
+        # Verifica se la sommatoria totale supera 0.1%
+        limite_hp3 = 0.1
+        if sommatoria_totale_hp3 >= limite_hp3:
             risultato["assegnata"] = True
-            risultato["motivo"] = f"Sommatoria frasi H sopra limite: {', '.join(frasi_sopra_limite)} [Eseguire metodo di prova]"
+            risultato["motivo"] = f"Sommatoria totale HP3: {' + '.join(frasi_presenti)} = {sommatoria_totale_hp3:.4f}% >= {limite_hp3}% [Eseguire metodo di prova]"
             print(f"HP3 assegnata: {risultato['motivo']}")
         
         return risultato
@@ -2179,20 +2180,21 @@ class ClassificatoreRifiuti:
         # Lista di frasi H rilevanti per HP1
         frasi_hp1 = self.database.hp_mapping["HP1"]
         
-        # Verifica se qualsiasi frase H di HP1 ha una sommatoria > 0.1%
-        frasi_sopra_limite = []
+        # NUOVO: Calcola la sommatoria TOTALE di tutte le frasi H di HP1
+        sommatoria_totale_hp1 = 0
+        frasi_presenti = []
+        
         for frase_h in frasi_hp1:
             if frase_h in sommatoria_per_frase:
-                sommatoria = sommatoria_per_frase[frase_h]
-                limite = self.database.valori_limite.get(frase_h, 0.1)  # Default 0.1% se non specificato
-                
-                if sommatoria >= limite:
-                    frasi_sopra_limite.append(f"{frase_h} ({sommatoria:.4f}% >= {limite}%)")
+                concentrazione = sommatoria_per_frase[frase_h]
+                sommatoria_totale_hp1 += concentrazione
+                frasi_presenti.append(f"{frase_h} ({concentrazione:.4f}%)")
         
-        # Se almeno una frase è sopra il limite, assegna HP1
-        if frasi_sopra_limite:
+        # Verifica se la sommatoria totale supera 0.1%
+        limite_hp1 = 0.1
+        if sommatoria_totale_hp1 >= limite_hp1:
             risultato["assegnata"] = True
-            risultato["motivo"] = f"Sommatoria frasi H sopra limite: {', '.join(frasi_sopra_limite)} [Eseguire metodo di prova]"
+            risultato["motivo"] = f"Sommatoria totale HP1: {' + '.join(frasi_presenti)} = {sommatoria_totale_hp1:.4f}% >= {limite_hp1}% [Eseguire metodo di prova]"
             print(f"HP1 assegnata: {risultato['motivo']}")
         
         return risultato
@@ -2216,20 +2218,21 @@ class ClassificatoreRifiuti:
         # Lista di frasi H rilevanti per HP2
         frasi_hp2 = self.database.hp_mapping["HP2"]
         
-        # Verifica se qualsiasi frase H di HP2 ha una sommatoria > 0.1%
-        frasi_sopra_limite = []
+        # NUOVO: Calcola la sommatoria TOTALE di tutte le frasi H di HP2
+        sommatoria_totale_hp2 = 0
+        frasi_presenti = []
+        
         for frase_h in frasi_hp2:
             if frase_h in sommatoria_per_frase:
-                sommatoria = sommatoria_per_frase[frase_h]
-                limite = self.database.valori_limite.get(frase_h, 0.1)  # Default 0.1% se non specificato
-                
-                if sommatoria >= limite:
-                    frasi_sopra_limite.append(f"{frase_h} ({sommatoria:.4f}% >= {limite}%)")
+                concentrazione = sommatoria_per_frase[frase_h]
+                sommatoria_totale_hp2 += concentrazione
+                frasi_presenti.append(f"{frase_h} ({concentrazione:.4f}%)")
         
-        # Se almeno una frase è sopra il limite, assegna HP2
-        if frasi_sopra_limite:
+        # Verifica se la sommatoria totale supera 0.1%
+        limite_hp2 = 0.1
+        if sommatoria_totale_hp2 >= limite_hp2:
             risultato["assegnata"] = True
-            risultato["motivo"] = f"Sommatoria frasi H sopra limite: {', '.join(frasi_sopra_limite)} [Eseguire metodo di prova]"
+            risultato["motivo"] = f"Sommatoria totale HP2: {' + '.join(frasi_presenti)} = {sommatoria_totale_hp2:.4f}% >= {limite_hp2}% [Eseguire metodo di prova]"
             print(f"HP2 assegnata: {risultato['motivo']}")
         
         return risultato
