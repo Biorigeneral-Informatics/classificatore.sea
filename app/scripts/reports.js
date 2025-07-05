@@ -91,7 +91,13 @@ function initReports() {
 /**
  * Inizializza tutti gli event listeners per la sezione Reports
  */
+/**
+ * Inizializza tutti gli event listeners per la sezione Reports
+ * VERSIONE UNIFICATA - Sostituisci ENTRAMBE le definizioni con questa
+ */
 function initEventListenersReports() {
+    console.log("🚀 Inizializzazione event listeners Reports...");
+    
     // Event listener per il cambio di sezione verso Reports
     document.querySelectorAll('.nav-links a').forEach(link => {
         link.addEventListener('click', function(e) {
@@ -104,20 +110,59 @@ function initEventListenersReports() {
         });
     });
     
-    // Event listeners per i bottoni della sezione report
+    // Per il caricamento dei report all'avvio della pagina se siamo già nella sezione reports
+    if (window.location.hash === '#report') {
+        setTimeout(() => {
+            loadReports();
+            setupReportFilters();
+        }, 100);
+    }
+    
+    // ========== BOTTONI PRINCIPALI ==========
+    
+    // Event listener per il bottone "Apri Cartella Reports" 
     const openReportsFolderBtn = document.getElementById('openReportsFolderBtn');
     if (openReportsFolderBtn) {
-        openReportsFolderBtn.addEventListener('click', async function() {
+        console.log("✅ Bottone openReportsFolderBtn trovato, configurando event listener...");
+        
+        // Rimuovi eventuali listener precedenti
+        const newBtn = openReportsFolderBtn.cloneNode(true);
+        openReportsFolderBtn.parentNode.replaceChild(newBtn, openReportsFolderBtn);
+        
+        newBtn.addEventListener('click', async function() {
             try {
+                console.log("🔥 CLICK rilevato sul bottone Apri Cartella Reports!");
+                
                 const reportsPath = await window.electronAPI.getReportsPath();
+                console.log("📁 Percorso reports:", reportsPath);
+                
+                // Verifica che la cartella esista
+                const folderExists = await window.electronAPI.fileExists(reportsPath);
+                
+                if (!folderExists) {
+                    console.log("📁 Creazione cartella...");
+                    await window.electronAPI.ensureDir(reportsPath);
+                }
+                
+                // Apri la cartella
                 await window.electronAPI.openFolder(reportsPath);
-            } catch (error) {
-                console.error('Errore nell\'apertura della cartella reports:', error);
+                console.log("✅ Cartella aperta con successo!");
+                
                 if (typeof showNotification === 'function') {
-                    showNotification('Errore nell\'apertura della cartella reports', 'error');
+                    showNotification('Cartella reports aperta', 'success');
+                }
+                
+            } catch (error) {
+                console.error('❌ Errore nell\'apertura della cartella reports:', error);
+                if (typeof showNotification === 'function') {
+                    showNotification('Errore nell\'apertura della cartella reports: ' + error.message, 'error');
                 }
             }
         });
+        
+        console.log("✅ Event listener per openReportsFolderBtn configurato!");
+    } else {
+        console.log("❌ ERRORE: Bottone openReportsFolderBtn non trovato!");
     }
     
     // Bottone per creare report demo
@@ -134,6 +179,8 @@ function initEventListenersReports() {
             }
         });
     }
+    
+    // ========== FILTRI DI RICERCA ==========
     
     // Event listeners per i filtri di ricerca
     const reportSearchInput = document.getElementById('reportSearchInput');
@@ -153,6 +200,8 @@ function initEventListenersReports() {
             filterReports(searchTerm, formatValue);
         });
     }
+    
+    // ========== DIALOGHI DI ANTEPRIMA ==========
     
     // Event listeners per i dialoghi di anteprima
     const closeReportPreviewDialog = document.getElementById('closeReportPreviewDialog');
@@ -193,10 +242,12 @@ function initEventListenersReports() {
         });
     }
     
+    // ========== SISTEMA DI NOTE ==========
+    
     // Inizializza il sistema di note
     initNotesSystemEventListeners();
     
-    console.log("Event listeners Reports inizializzati");
+    console.log("✅ Event listeners Reports inizializzati completamente!");
 }
 
 
@@ -1304,48 +1355,7 @@ async function deleteReport(reportName) {
     }
 }
 
-// Estendi la funzione initEventListenersReports per includere i nuovi listeners
-function initEventListenersReports() {
-    // Event listener per il cambio di sezione
-    document.querySelectorAll('.nav-links a').forEach(link => {
-        link.addEventListener('click', function(e) {
-            // Controlla se si sta navigando alla sezione report
-            if (this.getAttribute('data-section') === 'report') {
-                // Carica i report quando si naviga alla sezione
-                setTimeout(() => {
-                    loadReports();
-                    setupReportFilters();
-                }, 100);
-            }
-        });
-    });
-    
-    // Per il caricamento dei report all'avvio della pagina se siamo già nella sezione reports
-    if (window.location.hash === '#report') {
-        setTimeout(() => {
-            loadReports();
-            setupReportFilters();
-        }, 100);
-    }
-    
-    // Aggiungi gli event listeners specifici per la ricerca e il filtro
-    if (document.getElementById('reportSearchInput')) {
-        document.getElementById('reportSearchInput').addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            filterReports(searchTerm, document.getElementById('reportFormatFilter').value);
-        });
-    }
-    
-    if (document.getElementById('reportFormatFilter')) {
-        document.getElementById('reportFormatFilter').addEventListener('change', function() {
-            const formatValue = this.value;
-            filterReports(document.getElementById('reportSearchInput').value.toLowerCase(), formatValue);
-        });
-    }
 
-    // Inizializza il sistema di note
-    initNotesSystem();
-}
 
 // Funzione per filtrare i report
 function filterReports(searchTerm, formatValue) {
