@@ -75,6 +75,82 @@ def format_cell_text(cell, text, bold_if_total=False):
         debug_log(f"Errore formattazione cella: {e}")
         cell.text = str(text)
 
+def format_date_to_italian(date_string):
+    """Converte una data da formato YYYY-MM-DD o ISO a formato DD/MM/YYYY"""
+    try:
+        if not date_string:
+            return "Data non disponibile"
+            
+        # Se è già in formato stringa DD/MM/YYYY, restituiscila così
+        if isinstance(date_string, str) and '/' in date_string:
+            # Verifica se è già nel formato corretto DD/MM/YYYY
+            if len(date_string.split('/')) == 3:
+                parts = date_string.split('/')
+                if len(parts[0]) <= 2:  # Primo elemento è il giorno
+                    return date_string
+        
+        # Prova a parsare diversi formati
+        date_obj = None
+        
+        # Formato ISO completo con T
+        if 'T' in str(date_string):
+            date_obj = datetime.fromisoformat(str(date_string).replace('Z', ''))
+        # Formato YYYY-MM-DD
+        elif '-' in str(date_string) and len(str(date_string).split('-')) == 3:
+            parts = str(date_string).split('-')
+            if len(parts[0]) == 4:  # Anno per primo
+                date_obj = datetime.strptime(str(date_string).split('T')[0], '%Y-%m-%d')
+            elif len(parts[0]) <= 2:  # Giorno per primo DD-MM-YYYY
+                date_obj = datetime.strptime(str(date_string), '%d-%m-%Y')
+        
+        if date_obj:
+            return date_obj.strftime('%d/%m/%Y')
+        else:
+            return str(date_string)
+            
+    except Exception as e:
+        debug_log(f"Errore nel parsing della data '{date_string}': {e}")
+        return str(date_string) if date_string else "Data non disponibile"
+
+def format_datetime_to_italian(datetime_string):
+    """Converte una data-ora in formato DD/MM/YYYY HH:MM:SS"""
+    try:
+        if not datetime_string:
+            return "Data e ora non disponibili"
+            
+        # Se contiene underscore, sostituiscili con spazi
+        if '_' in str(datetime_string):
+            datetime_string = str(datetime_string).replace('_', ' ')
+        
+        # Se è già in formato stringa italiana, restituiscila
+        if isinstance(datetime_string, str) and '/' in datetime_string:
+            return datetime_string
+            
+        # Prova parsing ISO
+        if 'T' in str(datetime_string):
+            date_obj = datetime.fromisoformat(str(datetime_string).replace('Z', ''))
+            return date_obj.strftime('%d/%m/%Y %H:%M:%S')
+            
+        # Formato con trattini DD-MM-YYYY HH-MM-SS
+        if '-' in str(datetime_string):
+            # Sostituisci i trattini nelle ore con i due punti
+            parts = str(datetime_string).split(' ')
+            if len(parts) == 2:
+                date_part = parts[0]
+                time_part = parts[1].replace('-', ':')
+                try:
+                    date_obj = datetime.strptime(f"{date_part} {time_part}", '%d-%m-%Y %H:%M:%S')
+                    return date_obj.strftime('%d/%m/%Y %H:%M:%S')
+                except:
+                    pass
+        
+        return str(datetime_string)
+        
+    except Exception as e:
+        debug_log(f"Errore nel parsing della data-ora '{datetime_string}': {e}")
+        return str(datetime_string) if datetime_string else "Data e ora non disponibili"
+
+
 def format_multi_line_cell(cell, text, separator):
     """Formatta una cella con testo multi-linea"""
     try:
@@ -312,7 +388,7 @@ def add_complete_header_content(doc, metadata):
         
         # 6. TESTO DI RIFERIMENTO NORMATIVO
         ref_text = f"""(redatto ai sensi del Decreto Legislativo 152/2006 e s.m.i., della Linee Guida SNPA 2021 Quadro 2.2 - Delibera n°105/2021
-Approvato con D.D. n°LG/2021-53 del 13/12/2021, del Regolamento (UE) 1357/2014, Regolamento (UE) 2017/997))"""
+Approvato con D.D. n°LG/2021-53 del 13/12/2021, del Regolamento (UE) 1357/2014, Regolamento (UE) 2017/997)"""
         
         ref_p = doc.add_paragraph()
         ref_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -853,6 +929,14 @@ def create_word_report(report_data, file_path):
             debug_log(f"Formato sconosciuto: {type(report_data)}")
             risultati = []
             metadata = {}
+        
+        # CORREZIONE FORMATO DATE NEI METADATA
+        if isinstance(metadata.get('infoCertificato'), dict):
+            data_campionamento = metadata['infoCertificato'].get('dataCampionamento')
+            if data_campionamento:
+                # Applica la correzione del formato data
+                metadata['infoCertificato']['dataCampionamento'] = format_date_to_italian(data_campionamento)
+                debug_log(f"Data campionamento corretta: {metadata['infoCertificato']['dataCampionamento']}")
         
         # PULIZIA CARATTERI SPECIALI nei risultati
         for risultato in risultati:

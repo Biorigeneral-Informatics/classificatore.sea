@@ -700,7 +700,7 @@ function createApplicationMenu() {
         {
           label: 'Guida rapida',
           click: async () => {
-            await shell.openExternal('https://biorigeneral.it/guida-waste-guard');
+            await shell.openExternal('https://docs.google.com/document/d/1CVU5WEulMnzQ3Olzubk3AZiT7Vnpac_2a6DKzdANahk/edit?tab=t.0#heading=h.qsskpyoub74n');
           }
         },
         {

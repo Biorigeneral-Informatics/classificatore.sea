@@ -2390,30 +2390,9 @@ select[disabled] {
     background: rgba(var(--primary-rgb, 46, 125, 50), 0.03);
 }
 
-.optimized-preview-table tbody tr:hover {
-    background: rgba(var(--primary-rgb, 46, 125, 50), 0.08);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
 
-.optimized-preview-table tbody tr:hover .data-cell {
-    background: inherit;
-}
 
-/* Hover migliorato per celle con testo completo */
-.data-cell:hover {
-    overflow: visible;
-    white-space: normal;
-    z-index: 5;
-    position: relative;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-    border-radius: 4px;
-    background: var(--primary) !important;
-    color: white !important;
-    padding: 0.9rem !important;
-    max-width: none;
-    min-width: 200px;
-}
+
 
 /* Sezione quando non ci sono dati */
 .no-data-preview {
@@ -2597,14 +2576,7 @@ select[disabled] {
     background: rgba(0, 214, 91, 0.05);
 }
 
-[data-theme="dark"] .optimized-preview-table tbody tr:hover {
-    background: rgba(0, 214, 91, 0.12);
-}
 
-[data-theme="dark"] .data-cell:hover {
-    background: var(--primary) !important;
-    color: #1a1a1a !important;
-}
 
 [data-theme="dark"] .optimized-preview-content {
     background: #1a1a1a;

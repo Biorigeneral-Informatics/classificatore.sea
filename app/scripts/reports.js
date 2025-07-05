@@ -407,6 +407,8 @@ function showCustomAlert(message, onConfirm, onCancel) {
 
 // Funzioni per la sezione Reports
 
+const reportDisplayTimes = {};
+
 // Carica e visualizza i report disponibili
 // MODIFICATO: loadReports con display codice EER
 function loadReports() {
@@ -459,7 +461,13 @@ function loadReports() {
                 // MODIFICATO: Estrazione codice EER e metadati
                 let codiceEER = extractCodiceEERFromReportName(report);
                 let committente = 'Committente Sconosciuto';
-                let date = new Date().toLocaleString('it-IT');
+                let date;
+                if (reportDisplayTimes[report]) {
+                    date = reportDisplayTimes[report];
+                } else {
+                    date = new Date().toLocaleString('it-IT');
+                    reportDisplayTimes[report] = date;
+                }
                 
                 // Determina il titolo da mostrare
                 let displayTitle;
@@ -965,6 +973,11 @@ async function previewReport(reportName) {
         // Aggiorna il contenuto e mostra il dialog
         previewContent.innerHTML = contentHtml;
         previewDialog.style.display = 'flex';
+
+        // Aggiungi il comportamento al bottone Export Word
+        document.getElementById('exportPreviewWordBtn').onclick = function() {
+            exportReport(reportName, 'word');
+        };
         
         // Aggiungi event listener per il tooltip al volo
         const dataCells = previewContent.querySelectorAll('.data-cell');

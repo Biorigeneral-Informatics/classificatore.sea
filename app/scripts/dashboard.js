@@ -333,9 +333,7 @@ function initEventListeners() {
                 // Determina il tipo di elemento da eliminare in base alla classe della tabella
                 const tableName = row.closest('table').id;
                 
-                if (tableName === 'sostanzeTable' || deleteBtn.classList.contains('delete-sostanza')) {
-                    eliminaSostanza(id);
-                } else if (tableName === 'saliTable' || deleteBtn.classList.contains('delete-sale')) {
+                if (tableName === 'saliTable' || deleteBtn.classList.contains('delete-sale')) {
                     eliminaSale(id);
                 } else if (tableName === 'frasiHTable' || deleteBtn.classList.contains('delete-frase-h')) {
                     eliminaFraseH(id);
@@ -950,10 +948,17 @@ function updateSavedFiles() {
 
 
 /*Funzione per sostituire gli alert*/
-// Aggiungi in cima al file dashboard.js (dopo i commenti iniziali)
 function asyncConfirm(message, title = 'Conferma') {
     return new Promise((resolve) => {
+        // Rimuovi eventuali modal esistenti per evitare conflitti
+        const existingModal = document.querySelector('.async-confirm-overlay');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Crea overlay
         const overlay = document.createElement('div');
+        overlay.className = 'async-confirm-overlay';
         overlay.style.cssText = `
             position: fixed;
             top: 0;
@@ -965,59 +970,144 @@ function asyncConfirm(message, title = 'Conferma') {
             align-items: center;
             justify-content: center;
             z-index: 10000;
+            font-family: Arial, sans-serif;
         `;
 
+        // Crea dialog
         const dialog = document.createElement('div');
+        dialog.className = 'async-confirm-dialog';
         dialog.style.cssText = `
             background: white;
             border-radius: 8px;
             padding: 20px;
-            max-width: 500px;
+            max-width: 450px;
             width: 90%;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            animation: fadeIn 0.2s ease-in-out;
         `;
 
+        // Aggiungi animazione CSS
+        if (!document.getElementById('asyncConfirmStyles')) {
+            const styles = document.createElement('style');
+            styles.id = 'asyncConfirmStyles';
+            styles.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: scale(0.9); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+
+        // Crea contenuto del dialog
         dialog.innerHTML = `
-            <h3 style="margin: 0 0 15px 0; color: #e74c3c;">${title}</h3>
-            <p style="margin: 0 0 20px 0; line-height: 1.4; color: #555; white-space: pre-wrap;">${message}</p>
-            <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                <button id="okBtn" style="
-                    padding: 8px 16px;
+            <h3 style="margin: 0 0 15px 0; color: #333; font-size: 1.2rem; font-weight: 600;">${title}</h3>
+            <p style="margin: 0 0 20px 0; line-height: 1.5; color: #555; white-space: pre-wrap;">${message}</p>
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button class="async-confirm-cancel" style="
+                    padding: 10px 20px;
+                    border: 1px solid #ccc;
+                    background: #f8f9fa;
+                    color: #333;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                ">Annulla</button>
+                <button class="async-confirm-ok" style="
+                    padding: 10px 20px;
                     border: none;
                     background: #007bff;
                     color: white;
                     border-radius: 4px;
                     cursor: pointer;
-                ">OK</button>
+                    font-size: 14px;
+                    font-weight: 500;
+                    transition: all 0.2s;
+                ">Ok</button>
             </div>
         `;
 
         overlay.appendChild(dialog);
         document.body.appendChild(overlay);
 
-        const okBtn = dialog.querySelector('#okBtn');
-        setTimeout(() => okBtn.focus(), 50);
-
-        okBtn.onclick = () => {
-            document.body.removeChild(overlay);
-            resolve(true);
+        // Funzione per chiudere il modal
+        const closeModal = (result) => {
+            if (overlay && overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+            resolve(result);
         };
 
-        const handleKeydown = (e) => {
-            if (e.key === 'Escape' || e.key === 'Enter') {
-                document.body.removeChild(overlay);
-                document.removeEventListener('keydown', handleKeydown);
-                resolve(true);
+        // Trova i bottoni DOPO che sono stati aggiunti al DOM
+        setTimeout(() => {
+            const cancelBtn = overlay.querySelector('.async-confirm-cancel');
+            const okBtn = overlay.querySelector('.async-confirm-ok');
+            
+            if (cancelBtn) {
+                // Effetto hover per bottone Annulla
+                cancelBtn.addEventListener('mouseenter', () => {
+                    cancelBtn.style.background = '#e9ecef';
+                });
+                cancelBtn.addEventListener('mouseleave', () => {
+                    cancelBtn.style.background = '#f8f9fa';
+                });
+                
+                // Click handler
+                cancelBtn.addEventListener('click', () => {
+                    closeModal(false);
+                });
+            }
+            
+            if (okBtn) {
+                // Effetto hover per bottone Ok
+                okBtn.addEventListener('mouseenter', () => {
+                    okBtn.style.background = '#0056b3';
+                });
+                okBtn.addEventListener('mouseleave', () => {
+                    okBtn.style.background = '#007bff';
+                });
+                
+                // Click handler
+                okBtn.addEventListener('click', () => {
+                    closeModal(true);
+                });
+                
+                // Focus sul bottone Ok
+                okBtn.focus();
+            }
+        }, 10);
+
+        // Handler per premere ESC
+        const escHandler = (e) => {
+            if (e.key === 'Escape') {
+                document.removeEventListener('keydown', escHandler);
+                closeModal(false);
             }
         };
-        document.addEventListener('keydown', handleKeydown);
+        document.addEventListener('keydown', escHandler);
 
-        overlay.onclick = (e) => {
+        // Handler per Enter (conferma)
+        const enterHandler = (e) => {
+            if (e.key === 'Enter') {
+                document.removeEventListener('keydown', enterHandler);
+                closeModal(true);
+            }
+        };
+        document.addEventListener('keydown', enterHandler);
+
+        // Chiudi se si clicca sull'overlay (fuori dal dialog)
+        overlay.addEventListener('click', (e) => {
             if (e.target === overlay) {
-                document.body.removeChild(overlay);
-                resolve(true);
+                closeModal(false);
             }
-        };
+        });
+
+        // Previeni la chiusura se si clicca dentro il dialog
+        dialog.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
     });
 }
 
@@ -1549,7 +1639,7 @@ function closeAboutDialog() {
 
 // Apri guida
 function openGuide() {
-    window.electronAPI.openExternal('https://biorigeneral.it/guida-waste-guard');
+    window.electronAPI.openExternal('https://docs.google.com/document/d/1CVU5WEulMnzQ3Olzubk3AZiT7Vnpac_2a6DKzdANahk/edit?tab=t.0#heading=h.qsskpyoub74n');
 }
 
 
