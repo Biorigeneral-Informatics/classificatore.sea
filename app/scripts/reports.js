@@ -1653,22 +1653,358 @@ function updateNotesIndicators() {
 
 
 // Funzioni per gestire le note preimpostate
+// Funzioni per gestire le note preimpostate
 let presetNotes = []; // Array per memorizzare le note preimpostate
+
+// Note preimpostate di default con i contenuti dall'allegato
+const DEFAULT_PRESET_NOTES = [
+    // === TIPO: GENERICA ===
+    {
+        id: 1,
+        title: "NOTA ACCREDIA RIFIUTI – CAMPIONAMENTO SEA",
+        type: "GENERICA",
+        content: `TIPO NOTA: GENERICA
+NOTA ACCREDIA RIFIUTI – CAMPIONAMENTO SEA
+Il rifiuto, il cui campione è oggetto di analisi, è stato classificato dal Produttore/Detentore, in base all'origine/provenienza con il CODICE EER in testa al certificato, ai sensi del D.Lgs. n. 152/06 (All. D parte IV)
+Per le informazioni fornite dal cliente (descrizione campione, data, ora e luogo di campionamento, scopo delle analisi e codice EER) il Laboratorio declina ogni responsabilità. 
+Il prelievo, eseguito a cura del personale dipendente SEA soprariportato, è escluso dall'accreditamento. I metodi di campionamento non sono accreditati ACCREDIA.
+Nel caso di determinazioni di residui/tracce, qualora la procedura analitica preveda concentrazione e/o purificazione degli analiti, ove non espressamente indicato, il recupero è da intendersi compreso all' interno dei limiti di accettabilità del Laboratorio, che rientra nell'intervallo 70-130% o secondo quanto indicato dallo specifico metodo di prova o dalla normativa vigente. Se non espressamente indicato il recupero non è stato utilizzato nei calcoli.
+LEGENDA: Mod. Campionam. = modalità di campionamento, Verb. Campionam.= verbale di campionamento
+Allegati presenti: Caratterizzazione del rifiuto - Allegato al Rapporto di prova N°
+REGOLA DECISIONALE:
+Il laboratorio SEA SRLS in accordo con il cliente decide di non considerare il contributo dell'incertezza per il confronto del risultato sperimentale con il valore limite di riferimento. Questo approccio implica che, nel caso di un risultato di una prova corrispondente al valore limite di specifica, il livello di probabilità che la decisione sia corretta o errata è lo stesso, e corrisponde al 50% (a meno che il valore limite non includa già una tolleranza corrispondente all'incertezza).`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 2,
+        title: "NOTA ACCREDIA RIFIUTI – CAMPIONAMENTO COMMITTENTE",
+        type: "GENERICA",
+        content: `NOTA ACCREDIA RIFIUTI – CAMPIONAMENTO COMMITTENTE
+
+Il rifiuto, il cui campione è oggetto di analisi, è stato classificato dal Produttore/Detentore, in base all'origine/provenienza con il CODICE EER in testa al certificato, ai sensi del D.Lgs. n. 152/06 (All. D parte IV)
+Per le informazioni fornite dal cliente (descrizione campione, data, ora e luogo di campionamento, scopo delle analisi e codice EER) il Laboratorio declina ogni responsabilità. 
+Il Laboratorio SEA SRLS non è responsabile del campionamento: i risultati si riferiscono al campione così come ricevuto.
+Nel caso di determinazioni di residui/tracce, qualora la procedura analitica preveda concentrazione e/o purificazione degli analiti, ove non espressamente indicato, il recupero è da intendersi compreso all' interno dei limiti di accettabilità del Laboratorio, che rientra nell'intervallo 70-130% o secondo quanto indicato dallo specifico metodo di prova o dalla normativa vigente. Se non espressamente indicato il recupero non è stato utilizzato nei calcoli.
+LEGENDA: Mod. Campionam. = modalità di campionamento, Verb. Campionam.= verbale di campionamento
+Allegati presenti: Caratterizzazione del rifiuto - Allegato al Rapporto di prova N°
+REGOLA DECISIONALE:
+Il laboratorio SEA SRLS in accordo con il cliente decide di non considerare il contributo dell'incertezza per il confronto del risultato sperimentale con il valore limite di riferimento. Questo approccio implica che, nel caso di un risultato di una prova corrispondente al valore limite di specifica, il livello di probabilità che la decisione sia corretta o errata è lo stesso, e corrisponde al 50% (a meno che il valore limite non includa già una tolleranza corrispondente all'incertezza).`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 3,
+        title: "MOLP-DC AMIANTO",
+        type: "GENERICA",
+        content: `MOLP-DC AMIANTO
+Per le informazioni fornite dal cliente (descrizione campione, data, luogo di campionamento e codice EER) il Laboratorio declina ogni responsabilità. 
+Il Laboratorio SEA SRLS non è responsabile del campionamento: i risultati si riferiscono al campione così come ricevuto. 
+Il rifiuto, il cui campione è oggetto di analisi, è stato classificato dal Produttore/Detentore, in base all'origine/provenienza con il CODICE EER in testa al certificato, ai sensi del D.Lgs. n. 152/06 (All. D parte IV)
+Limite di rilevabilità LOD = 1%`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 4,
+        title: "AMIANTO C.T.R. PERICOLOSO",
+        type: "GENERICA",
+        content: `AMIANTO C.T.R. PERICOLOSO
+Il rifiuto, il cui campione è oggetto di analisi, è stato classificato dal Produttore/Detentore, in base all'origine/provenienza con il CODICE EER in testa al certificato, ai sensi del D.Lgs. n. 152/06 (All. D parte IV)
+Per le informazioni fornite dal cliente (descrizione campione, data, ora, luogo di campionamento e codice EER) il Laboratorio declina ogni responsabilità.
+Il prelievo, eseguito a cura del personale dipendente SEA sopraindicato, è escluso dall'accreditamento. I metodi di campionamento non sono accreditati ACCREDIA.
+Il Laboratorio SEA SRLS non è responsabile del campionamento: i risultati si riferiscono al campione così come ricevuto.
+Note:
+L'analisi dell'amianto è stata eseguita presso un laboratorio esterno
+Concentrazione totale delle fibre di amianto rilevate in DRX: 10,5 %
+L'analisi rileva la presenza di amianto di tipo crisotilo`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 5,
+        title: "AMIANTO C.T.R. NON PERICOLOSO",
+        type: "GENERICA",
+        content: `AMIANTO C.T.R. NON PERICOLOSO
+Il rifiuto, il cui campione è oggetto di analisi, è stato classificato dal Produttore/Detentore, in base all'origine/provenienza con il CODICE EER in testa al certificato, ai sensi del D.Lgs. n. 152/06 (All. D parte IV)
+Per le informazioni fornite dal cliente (descrizione campione, data, ora, luogo di campionamento e codice EER) il Laboratorio declina ogni responsabilità.
+Il prelievo, eseguito a cura del personale dipendente SEA sopraindicato, è escluso dall'accreditamento. I metodi di campionamento non sono accreditati ACCREDIA.
+Il Laboratorio SEA SRLS non è responsabile del campionamento: i risultati si riferiscono al campione così come ricevuto.
+L'analisi dell'amianto è stata eseguita in SEM presso un laboratorio esterno accreditato ACCREDIA N. 0840 L`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    
+    // === TIPO: CARATTERIZZAZIONE ===
+    {
+        id: 6,
+        title: "ANALISI CARATTERIZZAZIONE",
+        type: "CARATTERIZZAZIONE",
+        content: `TIPO NOTA: CARATTERIZZAZIONE
+ANALISI CARATTERIZZAZIONE
+Il profilo analitico, determinante per la caratterizzazione è stato scelto con il Produttore, sulla base delle informazioni fornite dallo stesso, inerenti al processo chimico e produttivo generatore del rifiuto, ed eventuali schede di sicurezza dei prodotti da cui deriva. 
+La presente valutazione si riferisce esclusivamente al campione analizzato, ai test eseguiti e ai parametri analizzati.
+Per le informazioni (se disponibili) richieste ai punti 1-2-3-4-9-10 nel Riquadro 2.2 delle Linee Guida SNPA approvate con Decreto Direttoriale 47/2021, si rimanda al Rapporto di Prova di cui la presente valutazione è un allegato.
+La classificazione delle sostanze pericolose prese in esame, ove non espressamente dichiarato, è quella riportata nell'elenco armonizzato del CLP.`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 7,
+        title: "ANALISI DI RISCHIO",
+        type: "CARATTERIZZAZIONE",
+        content: `ANALISI DI RISCHIO
+Al fine di verificare ogni possibile fonte di rischi relativamente alla composizione del rifiuto è stata eseguita una verifica all' interno dell'Impianto, in particolare nelle aree di stoccaggio rifiuti a seguito delle operazioni che lo hanno generato.
+Il rifiuto oggetto della presente caratterizzazione è costituito dal seguente materiale:
+Tanto i reperti quanto i cicli di lavoro presentano delle complessità in materia di Rischio Chimico in generale, normalmente gestite secondo i processi interni di prevenzione e protezione che, tuttavia, nel caso specifico non influiscono sulla contaminazione del rifiuto in esame.
+Il profilo analitico - merceologico utilizzabile, e le valutazioni per la caratterizzazione sono state scelte con il Produttore, sulla base delle informazioni fornite dallo stesso, inerenti al processo produttivo generatore del rifiuto.
+La presente valutazione si riferisce esclusivamente al campione in esame.
+Per le informazioni (se disponibili) richieste ai punti 1-2-3-4-9-10 nel Riquadro 2.2 delle Linee Guida SNPA approvate con Decreto Direttoriale 47/2021, si rimanda al Rapporto di Prova di cui la presente valutazione è un allegato.`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    
+    // === TIPO: CONCLUSIONI ===
+    {
+        id: 8,
+        title: "NON PERICOLOSO",
+        type: "CONCLUSIONI",
+        content: `TIPO NOTA: CONCLUSIONI
+NON PERICOLOSO
+CONCLUSIONI
+In considerazione della provenienza, tipologia e ciclo produttivo che lo ha generato, essendo la concentrazione degli eventuali contaminanti inferiore alle concentrazioni limite, ai sensi del Regolamento UE N.1357/2014 del 18/12/2014, della Decisione 2014/955/UE, del Regolamento (CE) n. 1272/2008 come modificato dal Regolamento UE 2016/1179 del 19 luglio 2016 e Sulla base del Regolamento (UE) 2017/997 del 8 giugno 2017, che modifica l'allegato III della direttiva 2008/98/CE del Parlamento europeo e del Consiglio, il rifiuto in esame è classificato come 'NON PERICOLOSO'`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 9,
+        title: "PERICOLOSO CAUTELATIVO",
+        type: "CONCLUSIONI",
+        content: `PERICOLOSO CAUTELATIVO
+CONCLUSIONI
+In considerazione della provenienza, tipologia e ciclo produttivo che lo ha generato, dalle informazioni e schede di sicurezza fornite dal cliente, ai sensi del Regolamento UE N.1357/2014 del 18/12/2014, della Decisione 2014/955/UE,  del Regolamento (CE) n. 1272/2008 come modificato dal Regolamento UE 2016/1179 del 19 luglio 2016  e Sulla base del Regolamento (UE) 2017/997 del 8 giugno 2017, che modifica l'allegato III della direttiva 2008/98/CE del Parlamento europeo e del Consiglio, il rifiuto in esame è classificato  in via cautelativa come 'PERICOLOSO' in base alle seguenti Caratteristiche di pericolo:`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 10,
+        title: "PERICOLOSO",
+        type: "CONCLUSIONI",
+        content: `PERICOLOSO
+CONCLUSIONI
+In considerazione della provenienza, tipologia e ciclo produttivo che lo ha generato, essendo la concentrazione degli eventuali contaminanti superiore alle concentrazioni limite, ai sensi del Regolamento UE N.1357/2014 del 18/12/2014, della Decisione 2014/955/UE, del Regolamento (CE) n. 1272/2008 come modificato dal Regolamento UE 2016/1179 del 19 luglio 2016  e Sulla base del Regolamento (UE) 2017/997 del 8 giugno 2017, che modifica l'allegato III della direttiva 2008/98/CE del Parlamento europeo e del Consiglio, il rifiuto in esame è classificato come 'PERICOLOSO' in base alle seguenti Caratteristiche di pericolo:`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 11,
+        title: "NON PERICOLOSO ANALISI RISCHIO",
+        type: "CONCLUSIONI",
+        content: `NON PERICOLOSO ANALISI RISCHIO
+CONCLUSIONI
+In considerazione della provenienza, tipologia e ciclo produttivo che lo ha generato, dalle informazioni e schede di sicurezza fornite dal cliente, ai sensi del Regolamento UE N.1357/2014 del 18/12/2014, della Decisione 2014/955/UE, del Regolamento (CE) n. 1272/2008 come modificato dal Regolamento UE 2016/1179 del 19 luglio 2016 e Sulla base del Regolamento (UE) 2017/997 del 8 giugno 2017, che modifica l'allegato III della direttiva 2008/98/CE del Parlamento europeo e del Consiglio, il rifiuto in esame è classificato come ' NON PERICOLOSO'`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 12,
+        title: "PERICOLOSO FAV",
+        type: "CONCLUSIONI",
+        content: `PERICOLOSO FAV
+CONCLUSIONI
+In considerazione della provenienza, tipologia e ciclo produttivo che lo ha generato, essendo la concentrazione degli eventuali contaminanti superiore alle concentrazioni limite, ai sensi del Regolamento UE N.1357/2014 del 18/12/2014, della Decisione 2014/955/UE, del Regolamento (CE) n. 1272/2008 come modificato dal Regolamento UE 2016/1179 del 19 luglio 2016 e Sulla base del Regolamento (UE) 2017/997 del 8 giugno 2017, che modifica l'allegato III della direttiva 2008/98/CE del Parlamento europeo e del Consiglio, e sulla base del Regolamento (CE) n. 1272/2008 come modificato dal regolamento UE 2016/1179 del 19 luglio 2016 secondo i criteri CLP (Classificazione ed etichettatura armonizzata delle FAV) e ai sensi del Regolamento n. 761/2009/CE Met. A.22 + D.M 06/09/94 All. 1 Met. B (G.U. n. 288 10/12/94), considerando i risultati analitici al Rapporto di Prova n. ……., il rifiuto in esame è classificato come 'PERICOLOSO' in base alle seguenti Caratteristiche di pericolo:`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 13,
+        title: "PERICOLOSO CAUTELATIVO AGGIUNTIVO",
+        type: "CONCLUSIONI",
+        content: `PERICOLOSO CAUTELATIVO AGGIUNTIVO
+Inoltre, in considerazione della provenienza, tipologia e ciclo produttivo che lo ha generato, dalle informazioni e schede di sicurezza fornite dal cliente, il rifiuto in esame è classificato in via cautelativa come "PERICOLOSO" in base alle seguenti Caratteristiche di pericolo:`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 14,
+        title: "IDROCARBURI NO HP7",
+        type: "CONCLUSIONI",
+        content: `IDROCARBURI NO HP7
+Pur avendo una concentrazione di Idrocarburi totali superiore a 1000 mg/kg SS, dati l'articolo 6-quarter Legge 26 Febbraio 2009, n°13, la tabella 2 All. A Decreto del Ministero dell'ambiente e della tutela del territorio e del mare 7 Novembre 2008 e All. 1 Direttiva 67/548/CEE aggiornato al 29° ATP recepito con DM 28/02/2006, il campione in esame risulta non essere classificato come cancerogeno per la Caratteristica di pericolo HP7`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 15,
+        title: "POPs",
+        type: "CONCLUSIONI",
+        content: `POPs
+Inoltre sulla base del Regolamento (UE) 2019/1021 del Parlamento Europeo e del Consiglio del 20 giugno 2019 relativo agli inquinanti organici persistenti (GU L 169/45 del 25.06.2019) e ss.mm.ii. Così come analizzati nel rapporto di prova ………….. il rifiuto in esame NON è classificato come 'POP WASTE'`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 16,
+        title: "PH ESTREMI ALCALINI",
+        type: "CONCLUSIONI",
+        content: `PH ESTREMI ALCALINI
+Trattandosi di un rifiuto con pH > 11,5 (estremo), le caratteristiche di pericolosità HP8(corrosivo) e HP4 (irritante) sono state valutate ai sensi del Parere ISS N. 2423 AMPP/IA.12 del 16/05/2008, determinando la riserva alcalina e applicando la classificazione di Young: a) pH =.......... b) riserva alcalina = ........... ( in g NaOH/100 g di rifiuto - metodo per titolazione con acido cloridrico 0,1 N) c) Test di Young (corrosivo se pH + 1/12 riserva alcalina >= 14,5 o se pH - 1/12 riserva acida <= -0,5) = .......... d) Test di Young (irritante se pH+1/6 riserva alcalina >= 13 o se pH-1/6 riserva acida <= 1)= ......... considerate le risultanze di cui sopra, visto il parere dell' ISS, e tenuto conto che il rifiuto non è / è costituito da una miscela di basi/ acidi forti: - al rifiuto è/ non è attribuibile la caratteristica di pericolo H8 (corrosivo) - al rifiuto è/ non è attribuibile la caratteristica di pericolo H4 (irritante)`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 17,
+        title: "NO LIMITE DOC ANALISI IRDP",
+        type: "CONCLUSIONI",
+        content: `NO LIMITE DOC ANALISI IRDP
+Il limite di concentrazione per il parametro DOC non si applica alla presente tipologia di rifiuto alle condizioni indicate nella nota G della tab. 5 All. 4 D.lgs 13 gennaio 2003 n. 36 e ss.mm. e ii. e il valore dell'Indice di Respirazione Dinamico non supera il valore limite, come da RDP n…………`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 18,
+        title: "NO LIMITE DOC",
+        type: "CONCLUSIONI",
+        content: `NO LIMITE DOC
+Il limite di concentrazione per il parametro DOC non si applica alla presente tipologia di rifiuto alle condizioni indicate nella nota G della tab. 5 All. 4 D.lgs 13 gennaio 2003 n. 36 e ss.mm. e ii.`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 19,
+        title: "CONFORMITÀ DM 186",
+        type: "CONCLUSIONI",
+        content: `CONFORMITÀ DM 186
+In base ai risultati analitici e sulla base dell'origine e provenienza, il materiale in esame risulta conforme ai limiti definiti nell'allegato 3 del DM 05/02/98, così come modificato dal DM Ambiente 05/04/06 n. 186.`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 20,
+        title: "CONFERIMENTO AMIANTO",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO AMIANTO
+CONFERIMENTO: Vista la composizione, l'origine del rifiuto, ai sensi dell'art. 7-quinquies, comma 7, del Decreto legislativo 13 gennaio 2003 n. 36 e ss.mm.ii., si può considerare che lo smaltimento debba avvenire in impianti di DISCARICA PER RIFIUTI NON PERICOLOSI`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 21,
+        title: "CONFERIMENTO SOLIDI",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO SOLIDI
+CONFERIMENTO: Viste le informazioni circa natura, origine, provenienza e le caratteristiche del campione esaminato, si può affermare che il rifiuto corrispondente possa essere conferito in idoneo impianto autorizzato`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 22,
+        title: "CONFERIMENTO LIQUIDI",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO LIQUIDI
+CONFERIMENTO: Vista la composizione e l'origine del rifiuto, si può considerare che lo smaltimento debba avvenire in impianti di trattamento autorizzati`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 23,
+        title: "CONFERIMENTO DM186",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO DM186
+CONFERIMENTO: In base ai risultati analitici, limitatamente ai parametri presi in esame, e sulla base dell'origine del rifiuto, risultando individuato nell'elenco dei rifiuti non pericolosi, ( All.1 Suball.1, punto_ ) del DM 05/02/98, così come modificato dal DM Ambiente 05/04/06 n. 186, si può affermare che il rifiuto possa essere avviato ad attività di recupero`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 24,
+        title: "CONFERIMENTO RECUPERO DM 161",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO RECUPERO DM 161
+CONFERIMENTO: Si può affermare che lo smaltimento debba avvenire in impianti di recupero autorizzati ai sensi del DM 12/06/2002 n. 161 All.1 Sub. All. 1, Punto 6.3`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 25,
+        title: "CONFERIMENTO DISCARICA NP TAB 5",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO DISCARICA NP TAB 5
+CONFERIMENTO: Vista la composizione, l'origine del rifiuto e le prove di lisciviazione effettuate, considerando che la concentrazione delle sostanze nell'allegato non superano le concentrazioni limite indicate nella tab. 5 All. 4 D.lgs 13 gennaio 2003 n. 36 e ss.mm. e ii. ai sensi dall'art. 7-quinquies, comma 4 del medesimo Decreto, si può considerare che il conferimento del rifiuto può avvenire in impianti di Discarica per rifiuti non pericolosi o presso idonei impianti di trattamento autorizzati.`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 26,
+        title: "CONFERIMENTO DISCARICA NP TAB 5 a",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO DISCARICA NP TAB 5 a
+CONFERIMENTO: Vista la composizione, l'origine del rifiuto e le prove di lisciviazione effettuate, considerando che la concentrazione delle sostanze nell'allegato non superano le concentrazioni limite indicate nella tab. 5a All. 4 D.lgs 13 gennaio 2003 n. 36 e ss.mm. e ii. ai sensi dall'art. 7-quinquies, comma 4 del medesimo Decreto, si può considerare che il conferimento del rifiuto può avvenire in impianti di Discarica per rifiuti non pericolosi o presso idonei impianti di trattamento autorizzati.`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 27,
+        title: "CONFERIMENTO DISCARICA NP TAB 5 a DEROGHE",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO DISCARICA NP TAB 5 a DEROGHE
+CONFERIMENTO: Vista la composizione, l'origine del rifiuto e le prove di lisciviazione effettuate, considerando che la concentrazione delle sostanze nell'allegato non superano le concentrazioni limite indicate nella tab. 5a All. 4 D.lgs 13 gennaio 2003 n. 36 e ss.mm. e ii. ai sensi dall'art. 7-quinquies, comma 4 del medesimo Decreto, si può considerare che lo smaltimento debba avvenire in impianti di DISCARICA PER RIFIUTI NON PERICOLOSI aventi deroghe superiori ai valori sperimentali per i seguenti parametri:`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    },
+    {
+        id: 28,
+        title: "CONFERIMENTO DISCARICA NP TAB 5 DEROGHE",
+        type: "CONCLUSIONI",
+        content: `CONFERIMENTO DISCARICA NP TAB 5 DEROGHE
+CONFERIMENTO: Vista la composizione, l'origine del rifiuto e le prove di lisciviazione effettuate, considerando che la concentrazione delle sostanze nell'allegato non superano le concentrazioni limite indicate nella tab. 5 All. 4 D.lgs 13 gennaio 2003 n. 36 e ss.mm. e ii. ai sensi dall'art. 7-quinquies, comma 4 del medesimo Decreto, si può considerare che lo smaltimento debba avvenire in impianti di DISCARICA PER RIFIUTI NON PERICOLOSI aventi deroghe superiori ai valori sperimentali per i seguenti parametri:`,
+        created: new Date().toISOString(),
+        updated: new Date().toISOString()
+    }
+];
+
+// Funzione per inizializzare le note preimpostate di default
+function initializeDefaultPresetNotes() {
+    try {
+        const existingPresets = localStorage.getItem('presetNotes');
+        
+        if (!existingPresets) {
+            // Se non ci sono note preimpostate, carica quelle di default
+            localStorage.setItem('presetNotes', JSON.stringify(DEFAULT_PRESET_NOTES));
+            presetNotes = [...DEFAULT_PRESET_NOTES];
+        } else {
+            // Carica quelle esistenti
+            presetNotes = JSON.parse(existingPresets);
+        }
+    } catch (error) {
+        console.error('Errore nell\'inizializzazione delle note preimpostate:', error);
+        // In caso di errore, usa le note di default
+        presetNotes = [...DEFAULT_PRESET_NOTES];
+        localStorage.setItem('presetNotes', JSON.stringify(presetNotes));
+    }
+}
+
+// Funzione per filtrare le note per tipo
+function getFilteredPresetNotes() {
+    const selectedType = document.getElementById('noteTypeFilter')?.value || '';
+    
+    if (!selectedType) {
+        return presetNotes;
+    }
+    
+    return presetNotes.filter(note => note.type === selectedType);
+}
 
 // Carica le note preimpostate dal localStorage
 function loadPresetNotes() {
     try {
-        const savedPresets = localStorage.getItem('presetNotes');
-        if (savedPresets) {
-            presetNotes = JSON.parse(savedPresets);
-        } else {
-            presetNotes = [];
-        }
+        // Prima inizializza le note di default se necessario
+        initializeDefaultPresetNotes();
         
         updatePresetNotesUI();
     } catch (error) {
         console.error('Errore nel caricamento delle note preimpostate:', error);
-        presetNotes = [];
+        presetNotes = [...DEFAULT_PRESET_NOTES];
+        localStorage.setItem('presetNotes', JSON.stringify(presetNotes));
     }
 }
 
@@ -1678,11 +2014,18 @@ function updatePresetNotesUI() {
     
     if (!container) return;
     
-    if (presetNotes.length === 0) {
+    const filteredNotes = getFilteredPresetNotes();
+    
+    if (filteredNotes.length === 0) {
+        const selectedType = document.getElementById('noteTypeFilter')?.value || '';
+        const message = selectedType 
+            ? `Nessuna nota preimpostata disponibile per il tipo "${selectedType}"`
+            : 'Nessuna nota preimpostata disponibile';
+            
         container.innerHTML = `
             <div class="no-presets-message">
                 <i class="fas fa-info-circle"></i>
-                <p>Nessuna nota preimpostata disponibile</p>
+                <p>${message}</p>
             </div>
         `;
         return;
@@ -1690,11 +2033,17 @@ function updatePresetNotesUI() {
     
     let html = '';
     
-    presetNotes.forEach(preset => {
+    filteredNotes.forEach(preset => {
+        // Aggiungi un badge per il tipo di nota
+        const typeBadge = `<span class="note-type-badge note-type-${preset.type.toLowerCase()}">${preset.type}</span>`;
+        
         html += `
             <div class="preset-note-card" data-id="${preset.id}" onclick="usePresetNote(${preset.id})">
-                <div class="preset-note-title">${preset.title}</div>
-                <div class="preset-note-preview">${preset.content}</div>
+                <div class="preset-note-header">
+                    <div class="preset-note-title">${preset.title}</div>
+                    ${typeBadge}
+                </div>
+                <div class="preset-note-preview">${preset.content.substring(0, 150)}...</div>
                 <div class="preset-actions">
                     <button class="preset-btn" onclick="editPresetNote(${preset.id}, event)" title="Modifica">
                         <i class="fas fa-edit"></i>
@@ -1756,11 +2105,13 @@ function openPresetDialog(presetId = null) {
             document.getElementById('currentPresetId').value = preset.id;
             document.getElementById('presetTitle').value = preset.title;
             document.getElementById('presetContent').value = preset.content;
+            document.getElementById('presetType').value = preset.type || 'GENERICA';
         } else {
             // Nuova nota preimpostata
             document.getElementById('currentPresetId').value = '';
             document.getElementById('presetTitle').value = '';
             document.getElementById('presetContent').value = '';
+            document.getElementById('presetType').value = 'GENERICA';
         }
         
         // Mostra il dialog
@@ -1792,6 +2143,7 @@ function savePresetNote() {
         const presetId = document.getElementById('currentPresetId').value;
         const title = document.getElementById('presetTitle').value.trim();
         const content = document.getElementById('presetContent').value.trim();
+        const type = document.getElementById('presetType').value;
         
         if (!title) {
             throw new Error('Il titolo è obbligatorio');
@@ -1801,6 +2153,10 @@ function savePresetNote() {
             throw new Error('Il contenuto è obbligatorio');
         }
         
+        if (!type) {
+            throw new Error('Il tipo di nota è obbligatorio');
+        }
+        
         if (presetId) {
             // Aggiorna una nota esistente
             const index = presetNotes.findIndex(p => p.id === parseInt(presetId));
@@ -1808,6 +2164,7 @@ function savePresetNote() {
             if (index !== -1) {
                 presetNotes[index].title = title;
                 presetNotes[index].content = content;
+                presetNotes[index].type = type;
                 presetNotes[index].updated = new Date().toISOString();
             }
         } else {
@@ -1820,6 +2177,7 @@ function savePresetNote() {
                 id: newId,
                 title: title,
                 content: content,
+                type: type,
                 created: new Date().toISOString(),
                 updated: new Date().toISOString()
             });
@@ -1870,57 +2228,101 @@ function deletePresetNote(presetId, event) {
     }
 }
 
+// Funzione per gestire il cambio di filtro tipo nota
+function handleNoteTypeFilterChange() {
+    updatePresetNotesUI();
+}
+
+
 // Estendi la funzione initNotesSystem esistente
 function initNotesSystem() {
-    // Listener già esistenti
-    document.getElementById('saveNotesBtn').addEventListener('click', saveNotes);
+    // Event listeners per le note del report
+    const saveNotesBtn = document.getElementById('saveNotesBtn');
+    if (saveNotesBtn) {
+        saveNotesBtn.addEventListener('click', saveNotes);
+    }
     
-    document.getElementById('closeNotesBtn').addEventListener('click', function() {
-        document.getElementById('notesDialog').style.display = 'none';
-    });
+    const closeNotesBtn = document.getElementById('closeNotesBtn');
+    if (closeNotesBtn) {
+        closeNotesBtn.addEventListener('click', function() {
+            document.getElementById('notesDialog').style.display = 'none';
+        });
+    }
     
-    document.getElementById('closeNotesDialog').addEventListener('click', function() {
-        document.getElementById('notesDialog').style.display = 'none';
-    });
+    const closeNotesDialog = document.getElementById('closeNotesDialog');
+    if (closeNotesDialog) {
+        closeNotesDialog.addEventListener('click', function() {
+            document.getElementById('notesDialog').style.display = 'none';
+        });
+    }
     
-    document.getElementById('notesDialog').addEventListener('click', function(e) {
-        if (e.target === this) {
-            this.style.display = 'none';
-        }
-    });
+    // Chiudi il dialog quando si clicca al di fuori
+    const notesDialog = document.getElementById('notesDialog');
+    if (notesDialog) {
+        notesDialog.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+    }
     
-    document.getElementById('reportNotes').addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'Enter') {
-            saveNotes();
-        }
-    });
+    // Salva con Ctrl+Enter nel textarea
+    const reportNotesTextarea = document.getElementById('reportNotes');
+    if (reportNotesTextarea) {
+        reportNotesTextarea.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                saveNotes();
+            }
+        });
+    }
     
-    // Nuovi listener per le note preimpostate
-    document.getElementById('addNewPresetBtn').addEventListener('click', function() {
-        openPresetDialog();
-    });
+    // Event listeners per le note preimpostate
+    const addNewPresetBtn = document.getElementById('addNewPresetBtn');
+    if (addNewPresetBtn) {
+        addNewPresetBtn.addEventListener('click', function() {
+            openPresetDialog();
+        });
+    }
     
-    document.getElementById('savePresetBtn').addEventListener('click', savePresetNote);
+    const savePresetBtn = document.getElementById('savePresetBtn');
+    if (savePresetBtn) {
+        savePresetBtn.addEventListener('click', savePresetNote);
+    }
     
-    document.getElementById('cancelPresetBtn').addEventListener('click', function() {
-        document.getElementById('presetDialog').style.display = 'none';
-    });
+    const cancelPresetBtn = document.getElementById('cancelPresetBtn');
+    if (cancelPresetBtn) {
+        cancelPresetBtn.addEventListener('click', function() {
+            document.getElementById('presetDialog').style.display = 'none';
+        });
+    }
     
-    document.getElementById('closePresetDialog').addEventListener('click', function() {
-        document.getElementById('presetDialog').style.display = 'none';
-    });
+    const closePresetDialog = document.getElementById('closePresetDialog');
+    if (closePresetDialog) {
+        closePresetDialog.addEventListener('click', function() {
+            document.getElementById('presetDialog').style.display = 'none';
+        });
+    }
     
-    document.getElementById('presetDialog').addEventListener('click', function(e) {
-        if (e.target === this) {
-            this.style.display = 'none';
-        }
-    });
+    const presetDialog = document.getElementById('presetDialog');
+    if (presetDialog) {
+        presetDialog.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+    }
+    
+    // Event listener per il filtro tipo nota
+    const noteTypeFilter = document.getElementById('noteTypeFilter');
+    if (noteTypeFilter) {
+        noteTypeFilter.addEventListener('change', handleNoteTypeFilterChange);
+    }
     
     // Carica le note preimpostate all'inizializzazione
     loadPresetNotes();
 }
 
-// Modifica la funzione openNotes esistente per caricare anche le note preimpostate
+// Modifica della funzione openNotes esistente per caricare anche le note preimpostate
 function openNotes(reportName) {
     try {
         // Imposta il nome del report corrente
